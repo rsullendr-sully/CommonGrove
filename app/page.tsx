@@ -86,7 +86,7 @@ export default function Home() {
         </button>
       </header>
 
-      <section className={`scene ${gardenView}`} id="garden" aria-label={`Your garden ${gardenView === 'before' ? 'before the recent changes' : 'now, after the recent changes'}`}>
+      <section className={`scene ${gardenView} focus-${selectedChange}`} id="garden" aria-label={`Your garden ${gardenView === 'before' ? 'before the recent changes' : 'now, after the recent changes'}`}>
         <div className="scene-toolbar" aria-label="Prototype controls">
           <span>Garden comparison</span>
           <div className="view-toggle">
@@ -111,11 +111,16 @@ export default function Home() {
           <div className="flowers flower-a">✦ <i>✦</i> ✦</div>
           <div className="flowers flower-b">✦ <i>✦</i></div>
           <div className="seed-pod"><span>?</span></div>
-          <div className="companion" aria-label="Pip, your companion">
-            <div className="ear left" /><div className="ear right" />
-            <div className="companion-body"><i className="eye left" /><i className="eye right" /><b className="smile" /></div>
-            <div className="companion-foot left" /><div className="companion-foot right" />
-            <div className="companion-shadow" />
+          <button className="garden-focus flower-focus" type="button" aria-label="Inspect the blooming starflowers" onClick={() => setSelectedChange('flower')}><span /></button>
+          <button className="garden-focus nook-focus" type="button" aria-label="Inspect the reading nook" onClick={() => setSelectedChange('nook')}><span /></button>
+          <button className="garden-focus seed-focus" type="button" aria-label="Inspect the discovery seed" onClick={() => setSelectedChange('seed')}><span /></button>
+          <div className="pip-moment" aria-label="Pip, your companion, proudly holds a new starflower">
+            <div className="pip-thought">
+              <small>Pip’s morning find</small>
+              <p>“I saved the brightest one for you.”</p>
+            </div>
+            <img src="/pip-character.png" alt="Pip proudly cradles a newly bloomed lilac starflower" />
+            <div className="pip-shadow" />
           </div>
         </div>
         <div className="scene-caption"><span className="pulse" /> {gardenView === 'before' ? 'A quiet garden, a few days earlier' : 'Pip is admiring the new starflowers'}</div>
