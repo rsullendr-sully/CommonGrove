@@ -114,10 +114,8 @@ export default function Home() {
           <button className="garden-focus flower-focus" type="button" aria-label="Inspect the blooming starflowers" onClick={() => setSelectedChange('flower')}><span /></button>
           <button className="garden-focus nook-focus" type="button" aria-label="Inspect the reading nook" onClick={() => setSelectedChange('nook')}><span /></button>
           <button className="garden-focus seed-focus" type="button" aria-label="Inspect the discovery seed" onClick={() => setSelectedChange('seed')}><span /></button>
-          <div className="companion" aria-label="Pip, your companion">
-            <div className="ear left" /><div className="ear right" />
-            <div className="companion-body"><i className="eye left" /><i className="eye right" /><b className="smile" /></div>
-            <div className="companion-foot left" /><div className="companion-foot right" />
+          <div className="companion detailed" aria-label="Pip, your companion">
+            <img src="/pip-detailed.png" alt="Pip, a small cream companion with short rounded ears and a quiet smile" />
             <div className="companion-shadow" />
           </div>
         </div>
