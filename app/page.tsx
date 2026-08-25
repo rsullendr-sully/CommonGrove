@@ -60,8 +60,17 @@ export default function Home() {
   const [selectedRole, setSelectedRole] = useState<RoleKey>('support');
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [gardenChoice, setGardenChoice] = useState<'orchard' | 'workshop' | null>(null);
+  const [gardenView, setGardenView] = useState<'before' | 'now'>('now');
   const activeChange = changes.find((change) => change.id === selectedChange) ?? changes[0];
   const role = roleEvents[selectedRole];
+
+  const resetSession = () => {
+    setSelectedChange(changes[0].id);
+    setSelectedRole('support');
+    setChoiceOpen(false);
+    setGardenChoice(null);
+    setGardenView('now');
+  };
 
   return (
     <main className="garden-app">
@@ -77,7 +86,15 @@ export default function Home() {
         </button>
       </header>
 
-      <section className="scene" id="garden" aria-label="Your garden at morning">
+      <section className={`scene ${gardenView}`} id="garden" aria-label={`Your garden ${gardenView === 'before' ? 'before the recent changes' : 'now, after the recent changes'}`}>
+        <div className="scene-toolbar" aria-label="Prototype controls">
+          <span>Garden comparison</span>
+          <div className="view-toggle">
+            <button type="button" className={gardenView === 'before' ? 'active' : ''} onClick={() => setGardenView('before')}>Before</button>
+            <button type="button" className={gardenView === 'now' ? 'active' : ''} onClick={() => setGardenView('now')}>Now</button>
+          </div>
+          <button type="button" className="reset-button" onClick={resetSession}>Reset session</button>
+        </div>
         <div className="sun" />
         <div className="cloud cloud-one" /><div className="cloud cloud-two" />
         <div className="hill hill-back" /><div className="hill hill-front" />
@@ -101,7 +118,7 @@ export default function Home() {
             <div className="companion-shadow" />
           </div>
         </div>
-        <div className="scene-caption"><span className="pulse" /> Pip is admiring the new starflowers</div>
+        <div className="scene-caption"><span className="pulse" /> {gardenView === 'before' ? 'A quiet garden, a few days earlier' : 'Pip is admiring the new starflowers'}</div>
       </section>
 
       <aside className="story-panel" aria-labelledby="welcome-title">

@@ -31,6 +31,7 @@ button { color: inherit; }
 .profile-copy small { font-size: 10px; color: var(--muted); }
 
 .scene { position: absolute; inset: 0 42% 0 0; overflow: hidden; background: linear-gradient(180deg, #c9dfdf 0%, #e7ead0 51%, #a7c185 52%, #718d5e 100%); }
+.scene-toolbar{position:absolute;z-index:12;top:96px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:7px 8px 7px 13px;border:1px solid rgba(255,255,255,.45);border-radius:30px;background:rgba(255,253,244,.72);box-shadow:0 8px 30px rgba(38,58,48,.12);backdrop-filter:blur(14px);white-space:nowrap}.scene-toolbar>span{color:#718077;font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.view-toggle{display:flex;padding:2px;border-radius:20px;background:rgba(64,87,70,.1)}.view-toggle button,.reset-button{border:0;cursor:pointer}.view-toggle button{border-radius:18px;background:transparent;padding:6px 10px;color:#66756b;font-size:9px}.view-toggle button.active{background:#fffdf4;color:#35543f;box-shadow:0 2px 7px rgba(40,61,47,.12);font-weight:700}.reset-button{background:transparent;color:#7d7465;padding:5px 7px;font-size:8px;text-decoration:underline;text-underline-offset:2px}
 .sun { position: absolute; width: 150px; height: 150px; top: 132px; left: 16%; border-radius: 50%; background: rgba(255,241,184,.83); box-shadow: 0 0 75px rgba(255,235,155,.6); }
 .cloud { position: absolute; height: 19px; width: 110px; border-radius: 40px; background: rgba(255,255,244,.58); filter: blur(.2px); }
 .cloud::before, .cloud::after { content: ''; position: absolute; border-radius: 50%; background: inherit; }
@@ -52,6 +53,7 @@ button { color: inherit; }
 .flowers { position:absolute;font-family:Georgia,serif;font-size:26px;color:#e7d4ee;letter-spacing:2px;text-shadow:0 3px #71805b}.flowers i{color:#f6d39e;font-style:normal}.flower-a{left:28%;bottom:38%}.flower-b{left:13%;bottom:13%;transform:scale(.8)}
 .seed-pod { position:absolute;right:32%;bottom:35%;width:56px;height:56px;border-radius:50% 50% 45% 45%;background:#d5bc70;border:5px solid #63805d;transform:rotate(-7deg);display:grid;place-items:center;color:#6e5a35;box-shadow:0 7px 0 rgba(49,70,49,.18)}
 .seed-pod span{font-family:Georgia,serif;font-weight:700;font-size:22px}
+.scene .reading-nook,.scene .flowers,.scene .seed-pod{transition:opacity .45s ease,transform .45s ease,filter .45s ease}.scene.before .reading-nook{opacity:.12;filter:saturate(.25);transform:translateY(25px) scale(.88)}.scene.before .flowers,.scene.before .seed-pod{opacity:0;transform:translateY(14px) scale(.75)}
 .companion { position:absolute;left:43%;bottom:27%;width:95px;height:120px;animation:float 3s ease-in-out infinite;z-index:5}.companion-body{position:absolute;width:83px;height:90px;left:6px;top:18px;border-radius:48% 48% 43% 43%;background:#e8dec3;box-shadow:inset -10px -8px rgba(149,126,103,.12)}
 .ear{position:absolute;width:32px;height:48px;background:#e8dec3;border-radius:80% 8% 65% 25%;top:3px;z-index:0}.ear.left{left:3px;transform:rotate(-24deg)}.ear.right{right:3px;transform:scaleX(-1) rotate(-24deg)}
 .eye{position:absolute;width:7px;height:9px;border-radius:50%;background:#3e4d41;top:37px}.eye.left{left:24px}.eye.right{right:24px}.smile{position:absolute;width:16px;height:8px;border-bottom:2px solid #6f6557;border-radius:0 0 15px 15px;left:34px;top:51px}
@@ -77,7 +79,7 @@ button { color: inherit; }
   .garden-app{padding-top:76px;overflow:visible}.scene-caption{left:20px}.story-panel h1{font-size:42px}.reading-nook{right:1%;transform:scale(.8)}
 }
 @media (max-width: 520px) {
-  .brand{font-size:17px}.scene{min-height:470px}.reading-nook{right:-35px;bottom:33%;transform:scale(.65)}.tree-right{display:none}.companion{left:46%;bottom:25%}.pond{left:-50px;transform:scale(.8)}.panel-footer{align-items:flex-start;flex-direction:column}.panel-footer button{width:100%}.story-panel{padding-top:36px}
+  .brand{font-size:17px}.scene{min-height:470px}.reading-nook{right:-35px;bottom:33%;transform:scale(.65)}.tree-right{display:none}.companion{left:46%;bottom:25%}.pond{left:-50px;transform:scale(.8)}.panel-footer{align-items:flex-start;flex-direction:column}.panel-footer button{width:100%}.story-panel{padding-top:36px}.scene-toolbar{top:88px;gap:5px;padding-left:8px}.scene-toolbar>span{display:none}
 }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior:auto!important; animation:none!important; transition:none!important; } }
