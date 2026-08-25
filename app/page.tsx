@@ -114,13 +114,11 @@ export default function Home() {
           <button className="garden-focus flower-focus" type="button" aria-label="Inspect the blooming starflowers" onClick={() => setSelectedChange('flower')}><span /></button>
           <button className="garden-focus nook-focus" type="button" aria-label="Inspect the reading nook" onClick={() => setSelectedChange('nook')}><span /></button>
           <button className="garden-focus seed-focus" type="button" aria-label="Inspect the discovery seed" onClick={() => setSelectedChange('seed')}><span /></button>
-          <div className="pip-moment" aria-label="Pip, your companion, proudly holds a new starflower">
-            <div className="pip-thought">
-              <small>Pip’s morning find</small>
-              <p>“I saved the brightest one for you.”</p>
-            </div>
-            <img src="/pip-character.png" alt="Pip proudly cradles a newly bloomed lilac starflower" />
-            <div className="pip-shadow" />
+          <div className="companion" aria-label="Pip, your companion">
+            <div className="ear left" /><div className="ear right" />
+            <div className="companion-body"><i className="eye left" /><i className="eye right" /><b className="smile" /></div>
+            <div className="companion-foot left" /><div className="companion-foot right" />
+            <div className="companion-shadow" />
           </div>
         </div>
         <div className="scene-caption"><span className="pulse" /> {gardenView === 'before' ? 'A quiet garden, a few days earlier' : 'Pip is admiring the new starflowers'}</div>
