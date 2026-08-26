@@ -7,6 +7,7 @@ import * as THREE from 'three';
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
 const WALK_SPEED = 2;
+const POND_COLLISION_RADIUS = 6.7;
 
 type MovementInput = MutableRefObject<Set<string>>;
 
@@ -72,10 +73,21 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
     const forward = new THREE.Vector3(Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, Math.sin(yaw.current));
 
-    camera.position.addScaledVector(forward, (forwardAmount / length) * frameDistance);
-    camera.position.addScaledVector(right, (sideAmount / length) * frameDistance);
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
+    const nextPosition = camera.position.clone();
+    nextPosition.addScaledVector(forward, (forwardAmount / length) * frameDistance);
+    nextPosition.addScaledVector(right, (sideAmount / length) * frameDistance);
+    nextPosition.x = THREE.MathUtils.clamp(nextPosition.x, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
+    nextPosition.z = THREE.MathUtils.clamp(nextPosition.z, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
+
+    const pondDistance = Math.hypot(nextPosition.x, nextPosition.z);
+    if (pondDistance < POND_COLLISION_RADIUS) {
+      const safeDistance = pondDistance || 1;
+      nextPosition.x = (nextPosition.x / safeDistance) * POND_COLLISION_RADIUS;
+      nextPosition.z = (nextPosition.z / safeDistance) * POND_COLLISION_RADIUS;
+    }
+
+    camera.position.x = nextPosition.x;
+    camera.position.z = nextPosition.z;
     camera.position.y = 1.7;
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
   });
@@ -89,6 +101,33 @@ function Boundary({ position, size }: { position: [number, number, number]; size
       <boxGeometry args={size} />
       <meshStandardMaterial color="#6f8064" roughness={0.95} />
     </mesh>
+  );
+}
+
+function CentralPond() {
+  return (
+    <group>
+      <mesh position={[0, -0.13, 0]} receiveShadow>
+        <cylinderGeometry args={[6.35, 6.35, 0.34, 64]} />
+        <meshStandardMaterial color="#8a8b72" roughness={0.92} />
+      </mesh>
+      <mesh position={[0, 0.055, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[5.82, 64]} />
+        <meshPhysicalMaterial color="#559fa4" roughness={0.18} metalness={0.05} clearcoat={0.72} clearcoatRoughness={0.22} />
+      </mesh>
+      <mesh position={[0, 0.075, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[5.82, 6.55, 64]} />
+        <meshStandardMaterial color="#d0c7a5" roughness={0.96} />
+      </mesh>
+      <mesh position={[0, 0.087, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[2.1, 2.16, 64]} />
+        <meshBasicMaterial color="#b8e1dc" transparent opacity={0.52} />
+      </mesh>
+      <mesh position={[0, 0.088, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[3.55, 3.61, 64]} />
+        <meshBasicMaterial color="#b8e1dc" transparent opacity={0.34} />
+      </mesh>
+    </group>
   );
 }
 
@@ -110,10 +149,7 @@ function GardenShell({ movement }: { movement: MovementInput }) {
       <Boundary position={[-20, 1.15, 0]} size={[1.2, 2.3, 40]} />
       <Boundary position={[20, 1.15, 0]} size={[1.2, 2.3, 40]} />
 
-      <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[0.8, 1.05, 32]} />
-        <meshStandardMaterial color="#d8cda5" roughness={1} />
-      </mesh>
+      <CentralPond />
 
       <FirstPersonControls movement={movement} />
     </>

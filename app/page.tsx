@@ -23,9 +23,9 @@ export default function Home() {
 
       <aside className="story-panel shell-notes" aria-labelledby="space-title">
         <p className="overline">Release 0 · Space test</p>
-        <h1 id="space-title">Does this feel like a garden you can inhabit?</h1>
+        <h1 id="space-title">Does the pond anchor the garden?</h1>
         <p className="story-lede">
-          This first slice tests only scale and movement. Walk the full square and notice whether the space feels calm, open, and large enough for discoveries without feeling empty.
+          The first landmark is a twelve-meter pond at the center of the approved garden. Walk around it and notice whether it feels important without taking over the space.
         </p>
 
         <dl className="scale-specs">
@@ -37,15 +37,15 @@ export default function Home() {
 
         <div className="shell-scope">
           <span>Testing now</span>
-          <p>Movement flow · apparent size · boundary comfort</p>
+          <p>Pond scale · central placement · room to walk around it</p>
         </div>
 
         <div className="shell-scope muted">
           <span>Intentionally waiting</span>
-          <p>Pond · pavilion · rock landmark · Pip · garden rewards</p>
+          <p>Pavilion · rock landmark · Pip · garden rewards</p>
         </div>
 
-        <p className="shell-reminder">One decision at a time. If the space feels right, we place the first landmark next.</p>
+        <p className="shell-reminder">One decision at a time. If the pond feels right, we shape the rock backdrop next.</p>
       </aside>
     </main>
   );
