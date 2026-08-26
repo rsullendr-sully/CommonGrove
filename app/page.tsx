@@ -11,6 +11,8 @@ export default function Home() {
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<GardenChoice | null>(null);
   const [gardenChoice, setGardenChoice] = useState<GardenChoice | null>(null);
+  const [visitPreviewOpen, setVisitPreviewOpen] = useState(false);
+  const [comfortResponse, setComfortResponse] = useState<'comfortable' | 'unsure' | 'invasive' | null>(null);
 
   const simulateAchievement = () => {
     setRewardStage((current) => Math.min(3, current + 1) as 0 | 1 | 2 | 3);
@@ -99,6 +101,7 @@ export default function Home() {
               <span>Path remembered</span>
               <strong>{gardenChoice === 'orchard' ? 'The Lantern Orchard' : 'The Tinker Workshop'}</strong>
               <p>Pip will keep exploring while this destination grows. Nothing needs your attention.</p>
+              <button type="button" onClick={() => setVisitPreviewOpen(true)}>Preview an optional garden visit</button>
             </div>
           )}
           <small>No scores. No upkeep. Just progress.</small>
@@ -127,6 +130,48 @@ export default function Home() {
             <div className="choice-footer">
               <span>{pendingChoice ? 'Your choice will begin forming in the garden.' : 'Nothing expires. Choose when you are ready.'}</span>
               <button type="button" disabled={!pendingChoice} onClick={confirmChoice}>Keep this path</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {visitPreviewOpen && (
+        <section className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="visit-title">
+          <div className="choice-card visit-card">
+            <button type="button" className="choice-close" onClick={() => setVisitPreviewOpen(false)} aria-label="Close visit preview">×</button>
+            <p className="overline">Static privacy preview · no visit is occurring</p>
+            <h2 id="visit-title">What would a teammate see?</h2>
+            <p>A garden visit would always be opt-in. The visitor could enjoy the space and meet Pip, but the work behind the garden would remain private.</p>
+
+            <div className="visit-scene" aria-label="Concept preview of an optional coworker garden visit">
+              <div className="visit-landscape"><i /><i /><i /><span className="visit-pip">Pip</span></div>
+              <div className="visitor-chip"><b aria-hidden="true">T</b><span><strong>A teammate is visiting</strong><small>They see the garden—not your work history.</small></span></div>
+            </div>
+
+            <div className="privacy-columns">
+              <section>
+                <h3>Visible during a visit</h3>
+                <ul><li>Garden appearance</li><li>Pip and shared scenery</li><li>The destination you chose</li></ul>
+              </section>
+              <section>
+                <h3>Always private</h3>
+                <ul><li>Work events and explanations</li><li>Progress totals or comparisons</li><li>Visit history and activity</li></ul>
+              </section>
+            </div>
+
+            <div className="comfort-check">
+              <span>How would this boundary feel?</span>
+              <div>
+                <button type="button" className={comfortResponse === 'comfortable' ? 'selected' : ''} onClick={() => setComfortResponse('comfortable')}>Comfortable</button>
+                <button type="button" className={comfortResponse === 'unsure' ? 'selected' : ''} onClick={() => setComfortResponse('unsure')}>Not sure</button>
+                <button type="button" className={comfortResponse === 'invasive' ? 'selected' : ''} onClick={() => setComfortResponse('invasive')}>Feels invasive</button>
+              </div>
+              <small>{comfortResponse ? 'Response noted only for this local session.' : 'This response is not saved or sent anywhere.'}</small>
+            </div>
+
+            <div className="choice-footer visit-footer">
+              <span>You could disable visits at any time.</span>
+              <button type="button" onClick={() => setVisitPreviewOpen(false)}>Done</button>
             </div>
           </div>
         </section>
