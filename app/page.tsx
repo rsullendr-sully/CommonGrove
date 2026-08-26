@@ -99,6 +99,9 @@ export default function Home() {
         <div className="cloud cloud-one" /><div className="cloud cloud-two" />
         <div className="hill hill-back" /><div className="hill hill-front" />
         <div className="garden-ground">
+          <div className="island-edge" aria-hidden="true" />
+          <div className="island-top" aria-hidden="true" />
+          <div className="terrain-stones" aria-hidden="true"><i /><i /><i /><i /><i /></div>
           <div className="path path-one" /><div className="path path-two" /><div className="path path-three" />
           <div className="pond"><span /><span /><span /></div>
           <div className="reading-nook">
@@ -119,6 +122,8 @@ export default function Home() {
             <div className="companion-shadow" />
           </div>
         </div>
+        <div className="foreground-leaves leaves-left" aria-hidden="true"><i /><i /><i /></div>
+        <div className="foreground-leaves leaves-right" aria-hidden="true"><i /><i /><i /></div>
         <div className="scene-caption"><span className="pulse" /> {gardenView === 'before' ? 'A quiet garden, a few days earlier' : 'Pip is admiring the new starflowers'}</div>
       </section>
 
