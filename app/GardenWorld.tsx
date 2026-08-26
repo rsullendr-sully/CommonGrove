@@ -1,6 +1,7 @@
 'use client';
 
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import Image from 'next/image';
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
@@ -19,6 +20,18 @@ const obstacles = [
 
 type MovementInput = MutableRefObject<Set<string>>;
 type GardenChoice = 'orchard' | 'workshop';
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return reduced;
+}
 
 function useGrassTexture() {
   const texture = useMemo(() => {
@@ -53,9 +66,9 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
   const pitch = useRef(-0.05);
   const dragging = useRef(false);
   const previousPointer = useRef({ x: 0, y: 0 });
-  const forward = useMemo(() => new THREE.Vector3(), []);
-  const right = useMemo(() => new THREE.Vector3(), []);
-  const nextPosition = useMemo(() => new THREE.Vector3(), []);
+  const forward = useRef(new THREE.Vector3());
+  const right = useRef(new THREE.Vector3());
+  const nextPosition = useRef(new THREE.Vector3());
 
   useEffect(() => {
     camera.position.set(0, 1.7, 17);
@@ -108,32 +121,35 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
   }, [camera, gl, movement]);
 
   useFrame((_, delta) => {
+    const forwardVector = forward.current;
+    const rightVector = right.current;
+    const candidatePosition = nextPosition.current;
     const pressed = movement.current;
     const forwardAmount = Number(pressed.has('w') || pressed.has('arrowup')) - Number(pressed.has('s') || pressed.has('arrowdown'));
     const sideAmount = Number(pressed.has('d') || pressed.has('arrowright')) - Number(pressed.has('a') || pressed.has('arrowleft'));
     const length = Math.hypot(forwardAmount, sideAmount) || 1;
     const frameDistance = WALK_SPEED * Math.min(delta, 0.05);
 
-    forward.set(Math.sin(yaw.current), 0, -Math.cos(yaw.current));
-    right.set(Math.cos(yaw.current), 0, Math.sin(yaw.current));
-    nextPosition.copy(camera.position);
-    nextPosition.addScaledVector(forward, (forwardAmount / length) * frameDistance);
-    nextPosition.addScaledVector(right, (sideAmount / length) * frameDistance);
-    nextPosition.x = THREE.MathUtils.clamp(nextPosition.x, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
-    nextPosition.z = THREE.MathUtils.clamp(nextPosition.z, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
+    forwardVector.set(Math.sin(yaw.current), 0, -Math.cos(yaw.current));
+    rightVector.set(Math.cos(yaw.current), 0, Math.sin(yaw.current));
+    candidatePosition.copy(camera.position);
+    candidatePosition.addScaledVector(forwardVector, (forwardAmount / length) * frameDistance);
+    candidatePosition.addScaledVector(rightVector, (sideAmount / length) * frameDistance);
+    candidatePosition.x = THREE.MathUtils.clamp(candidatePosition.x, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
+    candidatePosition.z = THREE.MathUtils.clamp(candidatePosition.z, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
 
     obstacles.forEach((obstacle) => {
-      const dx = nextPosition.x - obstacle.x;
-      const dz = nextPosition.z - obstacle.z;
+      const dx = candidatePosition.x - obstacle.x;
+      const dz = candidatePosition.z - obstacle.z;
       const distance = Math.hypot(dx, dz);
       if (distance < obstacle.radius) {
         const safeDistance = distance || 1;
-        nextPosition.x = obstacle.x + (dx / safeDistance) * obstacle.radius;
-        nextPosition.z = obstacle.z + (dz / safeDistance) * obstacle.radius;
+        candidatePosition.x = obstacle.x + (dx / safeDistance) * obstacle.radius;
+        candidatePosition.z = obstacle.z + (dz / safeDistance) * obstacle.radius;
       }
     });
 
-    camera.position.set(nextPosition.x, 1.7, nextPosition.z);
+    camera.position.set(candidatePosition.x, 1.7, candidatePosition.z);
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
   });
 
@@ -214,10 +230,10 @@ function SkyClouds() {
   );
 }
 
-function CentralPond() {
+function CentralPond({ reducedMotion }: { reducedMotion: boolean }) {
   const ripples = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
-    if (ripples.current) ripples.current.rotation.z = clock.elapsedTime * 0.025;
+    if (ripples.current && !reducedMotion) ripples.current.rotation.z = clock.elapsedTime * 0.025;
   });
 
   return (
@@ -279,10 +295,10 @@ function RockBackdrop() {
   );
 }
 
-function SpringSanctuary() {
+function SpringSanctuary({ reducedMotion }: { reducedMotion: boolean }) {
   const water = useRef<THREE.MeshPhysicalMaterial>(null);
   useFrame(({ clock }) => {
-    if (water.current) water.current.opacity = 0.64 + Math.sin(clock.elapsedTime * 1.8) * 0.08;
+    if (water.current) water.current.opacity = reducedMotion ? 0.7 : 0.64 + Math.sin(clock.elapsedTime * 1.8) * 0.08;
   });
   return (
     <group position={[0, 0, -8.4]}>
@@ -317,12 +333,12 @@ function SpringSanctuary() {
   );
 }
 
-function Pavilion({ improved }: { improved: boolean }) {
+function Pavilion({ improved, reducedMotion }: { improved: boolean; reducedMotion: boolean }) {
   const additions = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (!additions.current) return;
     const target = improved ? 1 : 0.03;
-    const next = THREE.MathUtils.damp(additions.current.scale.x, target, improved ? 4.2 : 7, delta);
+    const next = reducedMotion ? target : THREE.MathUtils.damp(additions.current.scale.x, target, improved ? 4.2 : 7, delta);
     additions.current.scale.setScalar(next);
   });
 
@@ -421,12 +437,12 @@ function FlowerPatch({ position, color }: { position: [number, number, number]; 
   );
 }
 
-function StarflowerPatch({ visible }: { visible: boolean }) {
+function StarflowerPatch({ visible, reducedMotion }: { visible: boolean; reducedMotion: boolean }) {
   const flowers = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (!flowers.current) return;
     const target = visible ? 1 : 0.04;
-    const next = THREE.MathUtils.damp(flowers.current.scale.x, target, visible ? 4.8 : 7, delta);
+    const next = reducedMotion ? target : THREE.MathUtils.damp(flowers.current.scale.x, target, visible ? 4.8 : 7, delta);
     flowers.current.scale.setScalar(next);
   });
 
@@ -445,15 +461,15 @@ function StarflowerPatch({ visible }: { visible: boolean }) {
   );
 }
 
-function CuriousSeed({ visible }: { visible: boolean }) {
+function CuriousSeed({ visible, reducedMotion }: { visible: boolean; reducedMotion: boolean }) {
   const discovery = useRef<THREE.Group>(null);
   useFrame(({ clock }, delta) => {
     if (!discovery.current) return;
     const target = visible ? 1 : 0.03;
-    const next = THREE.MathUtils.damp(discovery.current.scale.x, target, visible ? 4.4 : 7, delta);
+    const next = reducedMotion ? target : THREE.MathUtils.damp(discovery.current.scale.x, target, visible ? 4.4 : 7, delta);
     discovery.current.scale.setScalar(next);
-    discovery.current.rotation.y = clock.elapsedTime * 0.32;
-    discovery.current.position.y = 0.72 + Math.sin(clock.elapsedTime * 1.6) * 0.08;
+    discovery.current.rotation.y = reducedMotion ? 0 : clock.elapsedTime * 0.32;
+    discovery.current.position.y = reducedMotion ? 0.72 : 0.72 + Math.sin(clock.elapsedTime * 1.6) * 0.08;
   });
 
   return (
@@ -481,12 +497,12 @@ function CuriousSeed({ visible }: { visible: boolean }) {
   );
 }
 
-function ChoiceDestination({ choice }: { choice: GardenChoice | null }) {
+function ChoiceDestination({ choice, reducedMotion }: { choice: GardenChoice | null; reducedMotion: boolean }) {
   const destination = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (!destination.current) return;
     const target = choice ? 1 : 0.03;
-    const next = THREE.MathUtils.damp(destination.current.scale.x, target, choice ? 3.5 : 7, delta);
+    const next = reducedMotion ? target : THREE.MathUtils.damp(destination.current.scale.x, target, choice ? 3.5 : 7, delta);
     destination.current.scale.setScalar(next);
   });
 
@@ -558,8 +574,14 @@ const pipWaypoints: Array<[number, number]> = [
   [-8.1, -5.2], [-8.2, 2.4], [-6.3, 7.1], [0.4, 8], [6.4, 7],
 ];
 
-function Pip({ onMessage, rewardStage, gardenChoice }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null }) {
+function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const texture = useLoader(THREE.TextureLoader, '/pip-detailed-v2.png');
+  const pipTexture = useMemo(() => {
+    const preparedTexture = texture.clone();
+    preparedTexture.colorSpace = THREE.SRGBColorSpace;
+    preparedTexture.needsUpdate = true;
+    return preparedTexture;
+  }, [texture]);
   const pip = useRef<THREE.Group>(null);
   const sprite = useRef<THREE.Sprite>(null);
   const waypointIndex = useRef(0);
@@ -572,7 +594,8 @@ function Pip({ onMessage, rewardStage, gardenChoice }: { onMessage: (message: st
   const reactionMessageUntil = useRef(0);
   const observedChoice = useRef<GardenChoice | null>(null);
   const choiceMission = useRef<GardenChoice | null>(null);
-  texture.colorSpace = THREE.SRGBColorSpace;
+
+  useEffect(() => () => pipTexture.dispose(), [pipTexture]);
 
   useEffect(() => {
     if (rewardStage > observedRewardStage.current) {
@@ -665,8 +688,8 @@ function Pip({ onMessage, rewardStage, gardenChoice }: { onMessage: (message: st
         }
       }
 
-      pip.current.position.y = Math.sin(clock.elapsedTime * 1.7) * 0.035;
-      pip.current.rotation.y = Math.sin(clock.elapsedTime * 0.65) * 0.08;
+      pip.current.position.y = reducedMotion ? 0 : Math.sin(clock.elapsedTime * 1.7) * 0.035;
+      pip.current.rotation.y = reducedMotion ? 0 : Math.sin(clock.elapsedTime * 0.65) * 0.08;
       if (sprite.current) {
         const attentiveScale = isNearby ? 1.08 : 1;
         sprite.current.scale.lerp(new THREE.Vector3(0.82 * attentiveScale, 1.05 * attentiveScale, 1), 0.08);
@@ -681,13 +704,13 @@ function Pip({ onMessage, rewardStage, gardenChoice }: { onMessage: (message: st
         <meshBasicMaterial color="#34483b" transparent opacity={0.24} />
       </mesh>
       <sprite ref={sprite} position={[0, 0.57, 0]} scale={[0.82, 1.05, 1]}>
-        <spriteMaterial map={texture} transparent alphaTest={0.08} depthWrite={false} />
+        <spriteMaterial map={pipTexture} transparent alphaTest={0.08} depthWrite={false} />
       </sprite>
     </group>
   );
 }
 
-function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible, gardenChoice }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; gardenChoice: GardenChoice | null }) {
+function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible, gardenChoice, reducedMotion }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const grassTexture = useGrassTexture();
   return (
     <>
@@ -713,18 +736,18 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
       <BoundaryPlanting />
       <GardenPaths />
 
-      <CentralPond />
+      <CentralPond reducedMotion={reducedMotion} />
       <RockBackdrop />
-      <SpringSanctuary />
-      <Pavilion improved={pavilionImproved} />
+      <SpringSanctuary reducedMotion={reducedMotion} />
+      <Pavilion improved={pavilionImproved} reducedMotion={reducedMotion} />
       <GardenTree position={[11.8, 0, -9.2]} scale={1.05} />
       <GardenTree position={[14.4, 0, 5.8]} scale={0.88} color="#49744c" />
       <GardenTree position={[-14.8, 0, 4.5]} scale={0.94} color="#5f8558" />
-      <StarflowerPatch visible={starflowersVisible} />
-      <CuriousSeed visible={seedVisible} />
-      <ChoiceDestination choice={gardenChoice} />
+      <StarflowerPatch visible={starflowersVisible} reducedMotion={reducedMotion} />
+      <CuriousSeed visible={seedVisible} reducedMotion={reducedMotion} />
+      <ChoiceDestination choice={gardenChoice} reducedMotion={reducedMotion} />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
-      <Pip onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} />
+      <Pip onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} reducedMotion={reducedMotion} />
 
       <FirstPersonControls movement={movement} />
     </>
@@ -734,6 +757,7 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
 export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved, seedVisible, gardenChoice }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; gardenChoice: GardenChoice | null }) {
   const movement = useRef(new Set<string>());
   const [pipMessage, setPipMessage] = useState<string | null>(null);
+  const reducedMotion = useReducedMotion();
   const startMoving = (key: string) => movement.current.add(key);
   const stopMoving = (key: string) => movement.current.delete(key);
 
@@ -748,11 +772,12 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
           pavilionImproved={pavilionImproved}
           seedVisible={seedVisible}
           gardenChoice={gardenChoice}
+          reducedMotion={reducedMotion}
         />
       </Canvas>
       <div className="world-reticle" aria-hidden="true" />
       <div className={`pip-presence ${pipMessage ? 'visible' : ''}`} role="status" aria-live="polite">
-        <img src="/pip-detailed-v2.png" alt="" aria-hidden="true" />
+        <Image src="/pip-detailed-v2.png" width={43} height={43} alt="" aria-hidden="true" />
         <span><strong>Pip</strong>{pipMessage}</span>
       </div>
       <div className="world-instructions">
