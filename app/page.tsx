@@ -55,9 +55,9 @@ const roleEvents = {
 
 type RoleKey = keyof typeof roleEvents;
 
-type VisitorPosition = { x: number; y: number };
+type CameraPosition = { x: number; y: number };
 
-const initialVisitorPosition: VisitorPosition = { x: 53, y: 17 };
+const initialCameraPosition: CameraPosition = { x: 0, y: 0 };
 
 export default function Home() {
   const [selectedChange, setSelectedChange] = useState(changes[0].id);
@@ -65,7 +65,7 @@ export default function Home() {
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [gardenChoice, setGardenChoice] = useState<'orchard' | 'workshop' | null>(null);
   const [gardenView, setGardenView] = useState<'before' | 'now'>('now');
-  const [visitorPosition, setVisitorPosition] = useState<VisitorPosition>(initialVisitorPosition);
+  const [cameraPosition, setCameraPosition] = useState<CameraPosition>(initialCameraPosition);
   const activeChange = changes.find((change) => change.id === selectedChange) ?? changes[0];
   const role = roleEvents[selectedRole];
 
@@ -75,13 +75,13 @@ export default function Home() {
     setChoiceOpen(false);
     setGardenChoice(null);
     setGardenView('now');
-    setVisitorPosition(initialVisitorPosition);
+    setCameraPosition(initialCameraPosition);
   };
 
-  const moveVisitor = (deltaX: number, deltaY: number) => {
-    setVisitorPosition((current) => ({
-      x: Math.min(78, Math.max(17, current.x + deltaX)),
-      y: Math.min(42, Math.max(10, current.y + deltaY)),
+  const moveCamera = (deltaX: number, deltaY: number) => {
+    setCameraPosition((current) => ({
+      x: Math.min(18, Math.max(-18, current.x + deltaX)),
+      y: Math.min(10, Math.max(-10, current.y + deltaY)),
     }));
   };
 
@@ -99,7 +99,7 @@ export default function Home() {
       const movement = movements[event.key];
       if (!movement) return;
       event.preventDefault();
-      moveVisitor(...movement);
+      moveCamera(...movement);
     };
 
     window.addEventListener('keydown', handleMovement);
@@ -132,7 +132,12 @@ export default function Home() {
         <div className="sun" />
         <div className="cloud cloud-one" /><div className="cloud cloud-two" />
         <div className="hill hill-back" /><div className="hill hill-front" />
-        <div className="garden-ground">
+        <div
+          className="garden-ground"
+          style={{
+            transform: `translate3d(${-cameraPosition.x}%, ${cameraPosition.y}%, 0) scale(${1.18 + cameraPosition.y / 180})`,
+          }}
+        >
           <div className="island-edge" aria-hidden="true" />
           <div className="island-top" aria-hidden="true" />
           <div className="terrain-stones" aria-hidden="true"><i /><i /><i /><i /><i /></div>
@@ -155,31 +160,18 @@ export default function Home() {
             <img src="/pip-detailed-v2.png" alt="Pip, a smooth cream companion with one listening ear, cheek freckles, and a quiet smile" />
             <div className="companion-shadow" />
           </div>
-          <div
-            className="garden-visitor"
-            style={{
-              left: `${visitorPosition.x}%`,
-              bottom: `${visitorPosition.y}%`,
-              transform: `translateX(-50%) scale(${0.82 + visitorPosition.y / 220})`,
-            }}
-            aria-label="Your visitor in the garden"
-          >
-            <span className="visitor-label">You</span>
-            <span className="visitor-head"><i /></span>
-            <span className="visitor-body"><i /><i /></span>
-            <span className="visitor-shadow" />
-          </div>
         </div>
         <div className="foreground-leaves leaves-left" aria-hidden="true"><i /><i /><i /></div>
         <div className="foreground-leaves leaves-right" aria-hidden="true"><i /><i /><i /></div>
-        <div className="scene-caption"><span className="pulse" /> {gardenView === 'before' ? 'A quiet garden, a few days earlier' : 'Pip is admiring the new starflowers'}</div>
-        <div className="movement-controls" aria-label="Move your garden visitor">
-          <span className="movement-title">Explore <small>Arrow keys or WASD</small></span>
+        <div className="first-person-marker" aria-hidden="true"><i /></div>
+        <div className="scene-caption"><span className="pulse" /> {gardenView === 'before' ? 'You are standing in the quiet garden from a few days earlier' : 'You are standing near Pip and the new starflowers'}</div>
+        <div className="movement-controls" aria-label="Move through the garden in first person">
+          <span className="movement-title">Walk <small>First-person view · Arrow keys or WASD</small></span>
           <div className="movement-pad">
-            <button type="button" className="move-up" aria-label="Move up" onClick={() => moveVisitor(0, 3)}>↑</button>
-            <button type="button" className="move-left" aria-label="Move left" onClick={() => moveVisitor(-3, 0)}>←</button>
-            <button type="button" className="move-down" aria-label="Move down" onClick={() => moveVisitor(0, -3)}>↓</button>
-            <button type="button" className="move-right" aria-label="Move right" onClick={() => moveVisitor(3, 0)}>→</button>
+            <button type="button" className="move-up" aria-label="Walk forward" onClick={() => moveCamera(0, 3)}>↑</button>
+            <button type="button" className="move-left" aria-label="Look left" onClick={() => moveCamera(-3, 0)}>←</button>
+            <button type="button" className="move-down" aria-label="Step backward" onClick={() => moveCamera(0, -3)}>↓</button>
+            <button type="button" className="move-right" aria-label="Look right" onClick={() => moveCamera(3, 0)}>→</button>
           </div>
         </div>
       </section>
