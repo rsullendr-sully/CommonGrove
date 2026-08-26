@@ -316,7 +316,15 @@ function SpringSanctuary() {
   );
 }
 
-function Pavilion() {
+function Pavilion({ improved }: { improved: boolean }) {
+  const additions = useRef<THREE.Group>(null);
+  useFrame((_, delta) => {
+    if (!additions.current) return;
+    const target = improved ? 1 : 0.03;
+    const next = THREE.MathUtils.damp(additions.current.scale.x, target, improved ? 4.2 : 7, delta);
+    additions.current.scale.setScalar(next);
+  });
+
   return (
     <group position={[-12.2, 0, -12.4]}>
       <mesh position={[0, 0.9, 0]} castShadow receiveShadow>
@@ -337,11 +345,35 @@ function Pavilion() {
         <boxGeometry args={[3, 0.45, 1]} />
         <meshStandardMaterial color="#9a7859" roughness={0.9} />
       </mesh>
-      <mesh position={[0, 3.6, 0]}>
-        <sphereGeometry args={[0.28, 16, 12]} />
-        <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={1.2} />
-      </mesh>
-      <pointLight position={[0, 3.6, 0]} color="#ffd88a" intensity={4} distance={8} decay={2} />
+      <group ref={additions} scale={improved ? 1 : 0.03}>
+        <mesh position={[0, 3.6, 0]}>
+          <sphereGeometry args={[0.28, 16, 12]} />
+          <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={1.2} />
+        </mesh>
+        <mesh position={[0, 2.25, -1.35]} castShadow>
+          <boxGeometry args={[2.9, 2.05, 0.42]} />
+          <meshStandardMaterial color="#8f6d52" roughness={0.92} />
+        </mesh>
+        {[-0.9, -0.45, 0, 0.45, 0.9].map((x, index) => (
+          <mesh key={x} position={[x, 2.35 + (index % 2) * 0.08, -1.11]} rotation={[0, 0, (index - 2) * 0.035]} castShadow>
+            <boxGeometry args={[0.25, 1.2 - (index % 3) * 0.08, 0.28]} />
+            <meshStandardMaterial color={['#ad7658', '#6e8266', '#c59a58', '#7f6d91', '#b98263'][index]} roughness={0.86} />
+          </mesh>
+        ))}
+        {[-1.7, 1.7].map((x) => (
+          <group key={x} position={[x, 3.45, 0.25]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.18, 0.24, 0.5, 8]} />
+              <meshStandardMaterial color="#e6b763" emissive="#d99745" emissiveIntensity={1.1} />
+            </mesh>
+            <mesh position={[0, 0.48, 0]}>
+              <cylinderGeometry args={[0.025, 0.025, 0.5, 6]} />
+              <meshStandardMaterial color="#655446" />
+            </mesh>
+          </group>
+        ))}
+      </group>
+      <pointLight position={[0, 3.6, 0]} color="#ffd88a" intensity={improved ? 4 : 0} distance={8} decay={2} />
       {[0, 1, 2, 3].map((step) => (
         <mesh key={step} position={[0, 0.18 + step * 0.18, 4.2 - step * 0.52]} castShadow receiveShadow>
           <boxGeometry args={[2.5, 0.35, 0.9]} />
@@ -417,7 +449,7 @@ const pipWaypoints: Array<[number, number]> = [
   [-8.1, -5.2], [-8.2, 2.4], [-6.3, 7.1], [0.4, 8], [6.4, 7],
 ];
 
-function Pip({ onMessage, achievementTriggered }: { onMessage: (message: string | null) => void; achievementTriggered: boolean }) {
+function Pip({ onMessage, rewardStage }: { onMessage: (message: string | null) => void; rewardStage: number }) {
   const texture = useLoader(THREE.TextureLoader, '/pip-detailed-v2.png');
   const pip = useRef<THREE.Group>(null);
   const sprite = useRef<THREE.Sprite>(null);
@@ -426,18 +458,20 @@ function Pip({ onMessage, achievementTriggered }: { onMessage: (message: string 
   const nearby = useRef(false);
   const greeted = useRef(false);
   const target = useMemo(() => new THREE.Vector3(), []);
-  const bloomMission = useRef(false);
-  const bloomReacted = useRef(false);
+  const rewardMission = useRef<0 | 1 | 2>(0);
+  const observedRewardStage = useRef(0);
   const reactionMessageUntil = useRef(0);
   texture.colorSpace = THREE.SRGBColorSpace;
 
   useEffect(() => {
-    if (achievementTriggered && !bloomReacted.current) {
-      bloomReacted.current = true;
-      bloomMission.current = true;
-      onMessage('One ear lifts. Pip noticed something change near the pond.');
+    if (rewardStage > observedRewardStage.current) {
+      observedRewardStage.current = rewardStage;
+      rewardMission.current = rewardStage as 1 | 2;
+      onMessage(rewardStage === 2
+        ? 'A warm chime carries from the reading pavilion. Pip turns toward it.'
+        : 'One ear lifts. Pip noticed something change near the pond.');
     }
-  }, [achievementTriggered, onMessage]);
+  }, [rewardStage, onMessage]);
 
   useFrame(({ clock, camera }, delta) => {
     if (pip.current) {
@@ -466,16 +500,19 @@ function Pip({ onMessage, achievementTriggered }: { onMessage: (message: string 
         onMessage(null);
       }
 
-      if (!isNearby && bloomMission.current) {
-        target.set(8.2, 0, 6.6);
-        const distanceToBloom = pip.current.position.distanceTo(target);
-        if (distanceToBloom < 0.22) {
-          bloomMission.current = false;
+      if (!isNearby && rewardMission.current) {
+        const activeMission = rewardMission.current;
+        target.set(activeMission === 2 ? -8.65 : 8.2, 0, activeMission === 2 ? -8.1 : 6.6);
+        const distanceToReward = pip.current.position.distanceTo(target);
+        if (distanceToReward < 0.22) {
+          rewardMission.current = 0;
           pauseUntil.current = clock.elapsedTime + 6;
           reactionMessageUntil.current = clock.elapsedTime + 6;
-          onMessage('It bloomed! Something kind reached the garden.');
+          onMessage(activeMission === 2
+            ? 'The nook is ready. Pip settles beside the new books for a moment.'
+            : 'It bloomed! Something kind reached the garden.');
         } else {
-          pip.current.position.lerp(target, Math.min(1, (delta * 0.62) / distanceToBloom));
+          pip.current.position.lerp(target, Math.min(1, (delta * 0.62) / distanceToReward));
         }
       } else if (!isNearby && clock.elapsedTime >= pauseUntil.current) {
         const [targetX, targetZ] = pipWaypoints[waypointIndex.current];
@@ -511,7 +548,7 @@ function Pip({ onMessage, achievementTriggered }: { onMessage: (message: string 
   );
 }
 
-function GardenWorldScene({ movement, onPipMessage, achievementTriggered, starflowersVisible }: { movement: MovementInput; onPipMessage: (message: string | null) => void; achievementTriggered: boolean; starflowersVisible: boolean }) {
+function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean }) {
   const grassTexture = useGrassTexture();
   return (
     <>
@@ -540,21 +577,21 @@ function GardenWorldScene({ movement, onPipMessage, achievementTriggered, starfl
       <CentralPond />
       <RockBackdrop />
       <SpringSanctuary />
-      <Pavilion />
+      <Pavilion improved={pavilionImproved} />
       <GardenTree position={[11.8, 0, -9.2]} scale={1.05} />
       <GardenTree position={[14.4, 0, 5.8]} scale={0.88} color="#49744c" />
       <GardenTree position={[-14.8, 0, 4.5]} scale={0.94} color="#5f8558" />
       <StarflowerPatch visible={starflowersVisible} />
       <FlowerPatch position={[-8.5, 0, 7.4]} color="#f1c77c" />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
-      <Pip onMessage={onPipMessage} achievementTriggered={achievementTriggered} />
+      <Pip onMessage={onPipMessage} rewardStage={rewardStage} />
 
       <FirstPersonControls movement={movement} />
     </>
   );
 }
 
-export default function GardenWorld({ achievementTriggered, starflowersVisible }: { achievementTriggered: boolean; starflowersVisible: boolean }) {
+export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean }) {
   const movement = useRef(new Set<string>());
   const [pipMessage, setPipMessage] = useState<string | null>(null);
   const startMoving = (key: string) => movement.current.add(key);
@@ -566,8 +603,9 @@ export default function GardenWorld({ achievementTriggered, starflowersVisible }
         <GardenWorldScene
           movement={movement}
           onPipMessage={setPipMessage}
-          achievementTriggered={achievementTriggered}
+          rewardStage={rewardStage}
           starflowersVisible={starflowersVisible}
+          pavilionImproved={pavilionImproved}
         />
       </Canvas>
       <div className="world-reticle" aria-hidden="true" />

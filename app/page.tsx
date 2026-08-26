@@ -4,13 +4,17 @@ import { useState } from 'react';
 import GardenWorld from './GardenWorld';
 
 export default function Home() {
-  const [achievementTriggered, setAchievementTriggered] = useState(false);
+  const [rewardStage, setRewardStage] = useState<0 | 1 | 2>(0);
   const [gardenView, setGardenView] = useState<'before' | 'now'>('before');
 
   const simulateAchievement = () => {
-    setAchievementTriggered(true);
+    setRewardStage((current) => Math.min(2, current + 1) as 0 | 1 | 2);
     setGardenView('now');
   };
+
+  const activeReward = rewardStage === 2 ? 'pavilion' : 'starflowers';
+  const starflowersVisible = rewardStage > 1 || (rewardStage === 1 && gardenView === 'now');
+  const pavilionImproved = rewardStage === 2 && gardenView === 'now';
 
   return (
     <main className="garden-app immersive-app">
@@ -28,8 +32,9 @@ export default function Home() {
 
       <section className="world-panel immersive-world" id="garden" aria-label="Explore your first-person Common Grove garden">
         <GardenWorld
-          achievementTriggered={achievementTriggered}
-          starflowersVisible={achievementTriggered && gardenView === 'now'}
+          rewardStage={rewardStage}
+          starflowersVisible={starflowersVisible}
+          pavilionImproved={pavilionImproved}
         />
       </section>
 
@@ -37,30 +42,34 @@ export default function Home() {
         <summary><span>Garden journal</span><b aria-hidden="true">+</b></summary>
         <div className="garden-guide-content">
           <p className="overline">Welcome back</p>
-          <h1>{achievementTriggered ? 'Something new is blooming.' : 'The grove is listening.'}</h1>
-          <p>{achievementTriggered
-            ? 'A recent contribution helped someone move forward. Fresh water reached the garden, and a patch of starflowers opened near the pond.'
-            : 'This private prototype control simulates one accomplishment so you can see how work becomes a calm garden change.'}</p>
+          <h1>{rewardStage === 2 ? 'The pavilion feels warmer.' : rewardStage === 1 ? 'Something new is blooming.' : 'The grove is listening.'}</h1>
+          <p>{rewardStage === 2
+            ? 'Progress on important work brought finished shelves, new books, and warm lantern light to the reading pavilion.'
+            : rewardStage === 1
+              ? 'A recent contribution helped someone move forward. Fresh water reached the garden, and a patch of starflowers opened near the pond.'
+              : 'This private prototype control simulates accomplishments so you can see how work becomes calm garden changes.'}</p>
 
           <div className="reward-controls" aria-label="Reward-loop prototype controls">
-            <button type="button" onClick={simulateAchievement} disabled={achievementTriggered}>
-              {achievementTriggered ? 'Accomplishment received' : 'Simulate accomplishment'}
+            <button type="button" onClick={simulateAchievement} disabled={rewardStage === 2}>
+              {rewardStage === 2 ? 'Two accomplishments received' : rewardStage === 1 ? 'Simulate next accomplishment' : 'Simulate accomplishment'}
             </button>
             <div className="moment-toggle" aria-label="Compare the garden before and now">
               <button type="button" className={gardenView === 'before' ? 'active' : ''} onClick={() => setGardenView('before')}>Before</button>
-              <button type="button" className={gardenView === 'now' ? 'active' : ''} onClick={() => setGardenView('now')} disabled={!achievementTriggered}>Now</button>
+              <button type="button" className={gardenView === 'now' ? 'active' : ''} onClick={() => setGardenView('now')} disabled={rewardStage === 0}>Now</button>
             </div>
           </div>
 
           <div className="garden-moments">
-            <span className={achievementTriggered ? 'arrived' : 'waiting'}><i className="moment-flower" />{achievementTriggered ? 'Starflowers bloomed' : 'A quiet flower bed'}</span>
-            <span><i className="moment-pavilion" />The reading pavilion grew</span>
+            <span className={rewardStage >= 1 ? 'arrived' : 'waiting'}><i className="moment-flower" />{rewardStage >= 1 ? 'Starflowers bloomed' : 'A quiet flower bed'}</span>
+            <span className={rewardStage >= 2 ? 'arrived pavilion-arrived' : 'waiting'}><i className="moment-pavilion" />{rewardStage >= 2 ? 'The reading pavilion grew' : 'A quiet reading pavilion'}</span>
             <span><i className="moment-seed" />A curious path is waiting</span>
           </div>
-          {achievementTriggered && (
+          {rewardStage > 0 && (
             <div className="private-change" role="status">
               <span>Private explanation</span>
-              <p>A contribution that helped someone succeed brought fresh water to the starflower bed.</p>
+              <p>{activeReward === 'pavilion'
+                ? 'Moving important work forward supplied the finished shelves, books, and lanterns for the pavilion.'
+                : 'A contribution that helped someone succeed brought fresh water to the starflower bed.'}</p>
             </div>
           )}
           <small>No scores. No upkeep. Just progress.</small>
