@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const changes = [
   {
@@ -55,12 +55,17 @@ const roleEvents = {
 
 type RoleKey = keyof typeof roleEvents;
 
+type VisitorPosition = { x: number; y: number };
+
+const initialVisitorPosition: VisitorPosition = { x: 53, y: 17 };
+
 export default function Home() {
   const [selectedChange, setSelectedChange] = useState(changes[0].id);
   const [selectedRole, setSelectedRole] = useState<RoleKey>('support');
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [gardenChoice, setGardenChoice] = useState<'orchard' | 'workshop' | null>(null);
   const [gardenView, setGardenView] = useState<'before' | 'now'>('now');
+  const [visitorPosition, setVisitorPosition] = useState<VisitorPosition>(initialVisitorPosition);
   const activeChange = changes.find((change) => change.id === selectedChange) ?? changes[0];
   const role = roleEvents[selectedRole];
 
@@ -70,7 +75,36 @@ export default function Home() {
     setChoiceOpen(false);
     setGardenChoice(null);
     setGardenView('now');
+    setVisitorPosition(initialVisitorPosition);
   };
+
+  const moveVisitor = (deltaX: number, deltaY: number) => {
+    setVisitorPosition((current) => ({
+      x: Math.min(78, Math.max(17, current.x + deltaX)),
+      y: Math.min(42, Math.max(10, current.y + deltaY)),
+    }));
+  };
+
+  useEffect(() => {
+    const handleMovement = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, select, textarea, button')) return;
+
+      const movements: Record<string, [number, number]> = {
+        ArrowUp: [0, 3], w: [0, 3], W: [0, 3],
+        ArrowDown: [0, -3], s: [0, -3], S: [0, -3],
+        ArrowLeft: [-3, 0], a: [-3, 0], A: [-3, 0],
+        ArrowRight: [3, 0], d: [3, 0], D: [3, 0],
+      };
+      const movement = movements[event.key];
+      if (!movement) return;
+      event.preventDefault();
+      moveVisitor(...movement);
+    };
+
+    window.addEventListener('keydown', handleMovement);
+    return () => window.removeEventListener('keydown', handleMovement);
+  }, []);
 
   return (
     <main className="garden-app">
@@ -121,10 +155,33 @@ export default function Home() {
             <img src="/pip-detailed-v2.png" alt="Pip, a smooth cream companion with one listening ear, cheek freckles, and a quiet smile" />
             <div className="companion-shadow" />
           </div>
+          <div
+            className="garden-visitor"
+            style={{
+              left: `${visitorPosition.x}%`,
+              bottom: `${visitorPosition.y}%`,
+              transform: `translateX(-50%) scale(${0.82 + visitorPosition.y / 220})`,
+            }}
+            aria-label="Your visitor in the garden"
+          >
+            <span className="visitor-label">You</span>
+            <span className="visitor-head"><i /></span>
+            <span className="visitor-body"><i /><i /></span>
+            <span className="visitor-shadow" />
+          </div>
         </div>
         <div className="foreground-leaves leaves-left" aria-hidden="true"><i /><i /><i /></div>
         <div className="foreground-leaves leaves-right" aria-hidden="true"><i /><i /><i /></div>
         <div className="scene-caption"><span className="pulse" /> {gardenView === 'before' ? 'A quiet garden, a few days earlier' : 'Pip is admiring the new starflowers'}</div>
+        <div className="movement-controls" aria-label="Move your garden visitor">
+          <span className="movement-title">Explore <small>Arrow keys or WASD</small></span>
+          <div className="movement-pad">
+            <button type="button" className="move-up" aria-label="Move up" onClick={() => moveVisitor(0, 3)}>↑</button>
+            <button type="button" className="move-left" aria-label="Move left" onClick={() => moveVisitor(-3, 0)}>←</button>
+            <button type="button" className="move-down" aria-label="Move down" onClick={() => moveVisitor(0, -3)}>↓</button>
+            <button type="button" className="move-right" aria-label="Move right" onClick={() => moveVisitor(3, 0)}>→</button>
+          </div>
+        </div>
       </section>
 
       <aside className="story-panel" aria-labelledby="welcome-title">
