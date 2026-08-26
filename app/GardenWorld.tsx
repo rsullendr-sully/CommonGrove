@@ -444,6 +444,42 @@ function StarflowerPatch({ visible }: { visible: boolean }) {
   );
 }
 
+function CuriousSeed({ visible }: { visible: boolean }) {
+  const discovery = useRef<THREE.Group>(null);
+  useFrame(({ clock }, delta) => {
+    if (!discovery.current) return;
+    const target = visible ? 1 : 0.03;
+    const next = THREE.MathUtils.damp(discovery.current.scale.x, target, visible ? 4.4 : 7, delta);
+    discovery.current.scale.setScalar(next);
+    discovery.current.rotation.y = clock.elapsedTime * 0.32;
+    discovery.current.position.y = 0.72 + Math.sin(clock.elapsedTime * 1.6) * 0.08;
+  });
+
+  return (
+    <group position={[-8.5, 0, 7.4]}>
+      <mesh position={[0, 0.035, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[0.7, 1.1, 20]} />
+        <meshStandardMaterial color="#c8bea1" roughness={0.96} />
+      </mesh>
+      <group ref={discovery} position={[0, 0.72, 0]} scale={visible ? 1 : 0.03}>
+        <mesh castShadow>
+          <dodecahedronGeometry args={[0.42, 1]} />
+          <meshStandardMaterial color="#d2ad59" roughness={0.48} emissive="#9d7938" emissiveIntensity={0.18} flatShading />
+        </mesh>
+        <mesh position={[-0.28, 0.38, 0]} rotation={[0.1, 0, -0.72]} scale={[0.34, 0.12, 0.18]}>
+          <sphereGeometry args={[1, 12, 8]} />
+          <meshStandardMaterial color="#68865a" roughness={0.88} />
+        </mesh>
+        <mesh position={[0.28, 0.38, 0]} rotation={[0.1, 0, 0.72]} scale={[0.34, 0.12, 0.18]}>
+          <sphereGeometry args={[1, 12, 8]} />
+          <meshStandardMaterial color="#789664" roughness={0.88} />
+        </mesh>
+      </group>
+      <pointLight position={[0, 1.1, 0]} color="#f0cf77" intensity={visible ? 2.2 : 0} distance={5} decay={2} />
+    </group>
+  );
+}
+
 const pipWaypoints: Array<[number, number]> = [
   [8.4, 1.5], [8.7, -3.8], [6.8, -7.2], [1.8, -8], [-4.8, -8],
   [-8.1, -5.2], [-8.2, 2.4], [-6.3, 7.1], [0.4, 8], [6.4, 7],
@@ -458,7 +494,7 @@ function Pip({ onMessage, rewardStage }: { onMessage: (message: string | null) =
   const nearby = useRef(false);
   const greeted = useRef(false);
   const target = useMemo(() => new THREE.Vector3(), []);
-  const rewardMission = useRef<0 | 1 | 2>(0);
+  const rewardMission = useRef<0 | 1 | 2 | 3>(0);
   const observedRewardStage = useRef(0);
   const reactionMessageUntil = useRef(0);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -466,10 +502,12 @@ function Pip({ onMessage, rewardStage }: { onMessage: (message: string | null) =
   useEffect(() => {
     if (rewardStage > observedRewardStage.current) {
       observedRewardStage.current = rewardStage;
-      rewardMission.current = rewardStage as 1 | 2;
-      onMessage(rewardStage === 2
-        ? 'A warm chime carries from the reading pavilion. Pip turns toward it.'
-        : 'One ear lifts. Pip noticed something change near the pond.');
+      rewardMission.current = rewardStage as 1 | 2 | 3;
+      onMessage(rewardStage === 3
+        ? 'A tiny golden light appears by the unopened path. Pip hurries to see.'
+        : rewardStage === 2
+          ? 'A warm chime carries from the reading pavilion. Pip turns toward it.'
+          : 'One ear lifts. Pip noticed something change near the pond.');
     }
   }, [rewardStage, onMessage]);
 
@@ -502,15 +540,17 @@ function Pip({ onMessage, rewardStage }: { onMessage: (message: string | null) =
 
       if (!isNearby && rewardMission.current) {
         const activeMission = rewardMission.current;
-        target.set(activeMission === 2 ? -8.65 : 8.2, 0, activeMission === 2 ? -8.1 : 6.6);
+        target.set(activeMission === 3 ? -8.5 : activeMission === 2 ? -8.65 : 8.2, 0, activeMission === 3 ? 7.4 : activeMission === 2 ? -8.1 : 6.6);
         const distanceToReward = pip.current.position.distanceTo(target);
         if (distanceToReward < 0.22) {
           rewardMission.current = 0;
           pauseUntil.current = clock.elapsedTime + 6;
           reactionMessageUntil.current = clock.elapsedTime + 6;
-          onMessage(activeMission === 2
-            ? 'The nook is ready. Pip settles beside the new books for a moment.'
-            : 'It bloomed! Something kind reached the garden.');
+          onMessage(activeMission === 3
+            ? 'A curious seed! Pip leaves it safely waiting for your choice.'
+            : activeMission === 2
+              ? 'The nook is ready. Pip settles beside the new books for a moment.'
+              : 'It bloomed! Something kind reached the garden.');
         } else {
           pip.current.position.lerp(target, Math.min(1, (delta * 0.62) / distanceToReward));
         }
@@ -548,7 +588,7 @@ function Pip({ onMessage, rewardStage }: { onMessage: (message: string | null) =
   );
 }
 
-function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean }) {
+function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean }) {
   const grassTexture = useGrassTexture();
   return (
     <>
@@ -582,7 +622,7 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
       <GardenTree position={[14.4, 0, 5.8]} scale={0.88} color="#49744c" />
       <GardenTree position={[-14.8, 0, 4.5]} scale={0.94} color="#5f8558" />
       <StarflowerPatch visible={starflowersVisible} />
-      <FlowerPatch position={[-8.5, 0, 7.4]} color="#f1c77c" />
+      <CuriousSeed visible={seedVisible} />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
       <Pip onMessage={onPipMessage} rewardStage={rewardStage} />
 
@@ -591,7 +631,7 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
   );
 }
 
-export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean }) {
+export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved, seedVisible }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean }) {
   const movement = useRef(new Set<string>());
   const [pipMessage, setPipMessage] = useState<string | null>(null);
   const startMoving = (key: string) => movement.current.add(key);
@@ -606,6 +646,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
           rewardStage={rewardStage}
           starflowersVisible={starflowersVisible}
           pavilionImproved={pavilionImproved}
+          seedVisible={seedVisible}
         />
       </Canvas>
       <div className="world-reticle" aria-hidden="true" />
