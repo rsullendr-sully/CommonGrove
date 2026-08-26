@@ -33,6 +33,24 @@ function useReducedMotion() {
   return reduced;
 }
 
+function StaticShadowMap({ revision }: { revision: string }) {
+  const { gl } = useThree();
+  useEffect(() => {
+    /* eslint-disable react-hooks/immutability -- Three.js shadow maps are intentionally configured through its imperative renderer API. */
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+    const settleTimer = window.setTimeout(() => {
+      gl.shadowMap.needsUpdate = true;
+    }, 900);
+    return () => {
+      window.clearTimeout(settleTimer);
+      gl.shadowMap.autoUpdate = true;
+    };
+  }, [gl, revision]);
+  /* eslint-enable react-hooks/immutability */
+  return null;
+}
+
 function useGrassTexture() {
   const texture = useMemo(() => {
     const size = 64;
@@ -158,7 +176,7 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
 
 function HedgeBoundary({ position, size }: { position: [number, number, number]; size: [number, number, number] }) {
   return (
-    <mesh position={position} castShadow receiveShadow>
+    <mesh position={position} receiveShadow>
       <boxGeometry args={size} />
       <meshStandardMaterial color="#4f744e" roughness={1} />
     </mesh>
@@ -181,7 +199,7 @@ function BoundaryPlanting() {
   return (
     <group>
       {shrubs.map((shrub, index) => (
-        <mesh key={index} position={shrub.position} scale={shrub.scale} castShadow receiveShadow>
+        <mesh key={index} position={shrub.position} scale={shrub.scale} receiveShadow>
           <dodecahedronGeometry args={[1, 1]} />
           <meshStandardMaterial color={shrub.color} roughness={1} flatShading />
         </mesh>
@@ -199,7 +217,7 @@ function GardenPaths() {
   return (
     <group>
       {steppingStones.map(([x, y, z, rotation], index) => (
-        <mesh key={index} position={[x, y, z]} rotation={[0, rotation, 0]} scale={[1.3, 0.11, 0.78]} castShadow receiveShadow>
+        <mesh key={index} position={[x, y, z]} rotation={[0, rotation, 0]} scale={[1.3, 0.11, 0.78]} receiveShadow>
           <cylinderGeometry args={[0.82, 0.9, 0.28, 10]} />
           <meshStandardMaterial color={index % 2 ? '#c9bea0' : '#d8cdac'} roughness={0.98} />
         </mesh>
@@ -714,10 +732,11 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
   const grassTexture = useGrassTexture();
   return (
     <>
+      <StaticShadowMap revision={`${rewardStage}-${gardenChoice ?? 'none'}`} />
       <color attach="background" args={['#addde5']} />
       <fog attach="fog" args={['#c9ddd0', 36, 78]} />
       <hemisphereLight args={['#d9f4ff', '#526d47', 1.65]} />
-      <directionalLight position={[13, 24, 10]} intensity={2.45} color="#ffedb8" castShadow shadow-mapSize={[1536, 1536]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} />
+      <directionalLight position={[13, 24, 10]} intensity={2.45} color="#ffedb8" castShadow shadow-mapSize={[512, 512]} shadow-camera-left={-22} shadow-camera-right={22} shadow-camera-top={22} shadow-camera-bottom={-22} />
       <SkyClouds />
 
       <mesh position={[0, -0.26, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -763,7 +782,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
 
   return (
     <div className="world-wrap">
-      <Canvas shadows camera={{ fov: 68, near: 0.1, far: 120 }} dpr={[1, 1.5]} gl={{ antialias: true }}>
+      <Canvas shadows={{ type: THREE.BasicShadowMap }} camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.85} gl={{ antialias: false, powerPreference: 'high-performance' }}>
         <GardenWorldScene
           movement={movement}
           onPipMessage={setPipMessage}
