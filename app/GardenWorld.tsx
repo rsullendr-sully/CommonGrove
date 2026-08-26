@@ -19,6 +19,33 @@ const obstacles = [
 
 type MovementInput = MutableRefObject<Set<string>>;
 
+function useGrassTexture() {
+  const texture = useMemo(() => {
+    const size = 64;
+    const data = new Uint8Array(size * size * 4);
+    let seed = 731;
+    for (let index = 0; index < size * size; index += 1) {
+      seed = (seed * 16807) % 2147483647;
+      const variation = (seed % 34) - 17;
+      data[index * 4] = 105 + variation;
+      data[index * 4 + 1] = 151 + variation;
+      data[index * 4 + 2] = 84 + Math.round(variation * 0.55);
+      data[index * 4 + 3] = 255;
+    }
+    const result = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    result.wrapS = THREE.RepeatWrapping;
+    result.wrapT = THREE.RepeatWrapping;
+    result.repeat.set(22, 22);
+    result.colorSpace = THREE.SRGBColorSpace;
+    result.magFilter = THREE.NearestFilter;
+    result.needsUpdate = true;
+    return result;
+  }, []);
+
+  useEffect(() => () => texture.dispose(), [texture]);
+  return texture;
+}
+
 function FirstPersonControls({ movement }: { movement: MovementInput }) {
   const { camera, gl } = useThree();
   const yaw = useRef(0);
@@ -121,6 +148,71 @@ function HedgeBoundary({ position, size }: { position: [number, number, number];
   );
 }
 
+function BoundaryPlanting() {
+  const shrubs = useMemo(() => {
+    const items: Array<{ position: [number, number, number]; scale: [number, number, number]; color: string }> = [];
+    for (let value = -18; value <= 18; value += 3) {
+      const variation = 0.82 + ((value + 18) % 5) * 0.055;
+      items.push({ position: [value, 1.35, -19.1], scale: [1.65, variation, 1.25], color: value % 2 ? '#527650' : '#5f8257' });
+      items.push({ position: [value, 1.2, 19.1], scale: [1.55, variation * 0.9, 1.15], color: value % 2 ? '#5a7d52' : '#4e714c' });
+      items.push({ position: [-19.1, 1.25, value], scale: [1.2, variation, 1.55], color: value % 2 ? '#527650' : '#62845a' });
+      items.push({ position: [19.1, 1.25, value], scale: [1.2, variation * 0.95, 1.55], color: value % 2 ? '#4e714c' : '#597c52' });
+    }
+    return items;
+  }, []);
+
+  return (
+    <group>
+      {shrubs.map((shrub, index) => (
+        <mesh key={index} position={shrub.position} scale={shrub.scale} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 1]} />
+          <meshStandardMaterial color={shrub.color} roughness={1} flatShading />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function GardenPaths() {
+  const steppingStones: Array<[number, number, number, number]> = [
+    [0, 0.035, 14.5, -0.04], [-0.2, 0.04, 12.4, 0.08], [0.25, 0.045, 10.4, -0.1],
+    [-0.3, 0.04, 8.45, 0.06], [-7.1, 0.04, -5.7, -0.35], [-8.4, 0.045, -7, -0.55],
+    [-9.5, 0.05, -8.3, -0.68], [-10.5, 0.055, -9.7, -0.75],
+  ];
+  return (
+    <group>
+      {steppingStones.map(([x, y, z, rotation], index) => (
+        <mesh key={index} position={[x, y, z]} rotation={[0, rotation, 0]} scale={[1.3, 0.11, 0.78]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.82, 0.9, 0.28, 10]} />
+          <meshStandardMaterial color={index % 2 ? '#c9bea0' : '#d8cdac'} roughness={0.98} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function SkyClouds() {
+  const cloudGroups = [
+    { position: [-16, 12, -34] as [number, number, number], scale: 1.3 },
+    { position: [21, 15, -42] as [number, number, number], scale: 1.8 },
+    { position: [-30, 17, 5] as [number, number, number], scale: 1.5 },
+  ];
+  return (
+    <group>
+      {cloudGroups.map((cloud, index) => (
+        <group key={index} position={cloud.position} scale={cloud.scale}>
+          {[[-1.5, 0, 0], [0, 0.35, 0], [1.5, 0, 0], [0.7, -0.15, 0]].map((position, puff) => (
+            <mesh key={puff} position={position as [number, number, number]} scale={[1.9, 0.75, 0.7]}>
+              <sphereGeometry args={[1, 12, 8]} />
+              <meshBasicMaterial color="#f6f3dc" transparent opacity={0.62} fog={false} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
 function CentralPond() {
   const ripples = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
@@ -176,11 +268,21 @@ function RockBackdrop() {
           <meshStandardMaterial color="#55724e" roughness={1} flatShading />
         </mesh>
       ))}
+      {[[-7.8, 0.55, -13.6], [-6.7, 0.38, -15], [7.2, 0.52, -14.4], [8.1, 0.32, -16]].map((position, index) => (
+        <mesh key={`base-${index}`} position={position as [number, number, number]} scale={[1.5 - index * 0.1, 1.05, 1.15]} rotation={[0.2, index * 0.8, 0.1]} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color={index % 2 ? '#85836c' : '#747663'} roughness={1} flatShading />
+        </mesh>
+      ))}
     </group>
   );
 }
 
 function SpringSanctuary() {
+  const water = useRef<THREE.MeshPhysicalMaterial>(null);
+  useFrame(({ clock }) => {
+    if (water.current) water.current.opacity = 0.64 + Math.sin(clock.elapsedTime * 1.8) * 0.08;
+  });
   return (
     <group position={[0, 0, -8.4]}>
       <mesh position={[0, 1.9, 0.1]} castShadow receiveShadow>
@@ -199,12 +301,17 @@ function SpringSanctuary() {
       ))}
       <mesh position={[0, 2.1, 0.72]}>
         <planeGeometry args={[2.55, 2.9]} />
-        <meshPhysicalMaterial color="#89cbd0" transparent opacity={0.7} roughness={0.08} side={THREE.DoubleSide} />
+        <meshPhysicalMaterial ref={water} color="#89cbd0" transparent opacity={0.7} roughness={0.08} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       <mesh position={[0, 0.42, 1.1]} castShadow>
         <cylinderGeometry args={[1.55, 1.8, 0.65, 32]} />
         <meshStandardMaterial color="#bcb59c" roughness={0.88} />
       </mesh>
+      <mesh position={[0, 0.79, 1.1]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[1.36, 32]} />
+        <meshPhysicalMaterial color="#6db2b7" roughness={0.1} clearcoat={0.7} />
+      </mesh>
+      <pointLight position={[0, 2.4, 1.2]} color="#b7eff0" intensity={3} distance={7} decay={2} />
     </group>
   );
 }
@@ -230,6 +337,11 @@ function Pavilion() {
         <boxGeometry args={[3, 0.45, 1]} />
         <meshStandardMaterial color="#9a7859" roughness={0.9} />
       </mesh>
+      <mesh position={[0, 3.6, 0]}>
+        <sphereGeometry args={[0.28, 16, 12]} />
+        <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={1.2} />
+      </mesh>
+      <pointLight position={[0, 3.6, 0]} color="#ffd88a" intensity={4} distance={8} decay={2} />
       {[0, 1, 2, 3].map((step) => (
         <mesh key={step} position={[0, 0.18 + step * 0.18, 4.2 - step * 0.52]} castShadow receiveShadow>
           <boxGeometry args={[2.5, 0.35, 0.9]} />
@@ -278,10 +390,18 @@ function FlowerPatch({ position, color }: { position: [number, number, number]; 
 
 function Pip() {
   const texture = useLoader(THREE.TextureLoader, '/pip-detailed-v2.png');
+  const pip = useRef<THREE.Group>(null);
   texture.colorSpace = THREE.SRGBColorSpace;
 
+  useFrame(({ clock }) => {
+    if (pip.current) {
+      pip.current.position.y = Math.sin(clock.elapsedTime * 1.7) * 0.035;
+      pip.current.rotation.y = Math.sin(clock.elapsedTime * 0.65) * 0.08;
+    }
+  });
+
   return (
-    <group position={[8.4, 0, 1.5]}>
+    <group ref={pip} position={[8.4, 0, 1.5]}>
       <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.42, 24]} />
         <meshBasicMaterial color="#34483b" transparent opacity={0.24} />
@@ -294,12 +414,14 @@ function Pip() {
 }
 
 function GardenWorldScene({ movement }: { movement: MovementInput }) {
+  const grassTexture = useGrassTexture();
   return (
     <>
       <color attach="background" args={['#addde5']} />
       <fog attach="fog" args={['#c9ddd0', 36, 78]} />
       <hemisphereLight args={['#d9f4ff', '#526d47', 1.65]} />
       <directionalLight position={[13, 24, 10]} intensity={2.45} color="#ffedb8" castShadow shadow-mapSize={[1536, 1536]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} />
+      <SkyClouds />
 
       <mesh position={[0, -0.26, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[120, 120]} />
@@ -307,13 +429,15 @@ function GardenWorldScene({ movement }: { movement: MovementInput }) {
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial color="#76a160" roughness={1} />
+        <meshStandardMaterial map={grassTexture} color="#ffffff" roughness={1} />
       </mesh>
 
       <HedgeBoundary position={[0, 1, -20]} size={[40, 2, 1.15]} />
       <HedgeBoundary position={[0, 1, 20]} size={[40, 2, 1.15]} />
       <HedgeBoundary position={[-20, 1, 0]} size={[1.15, 2, 40]} />
       <HedgeBoundary position={[20, 1, 0]} size={[1.15, 2, 40]} />
+      <BoundaryPlanting />
+      <GardenPaths />
 
       <CentralPond />
       <RockBackdrop />
