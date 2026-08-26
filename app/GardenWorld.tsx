@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { MutableRefObject, useEffect, useMemo, useRef } from 'react';
+import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 const GARDEN_HALF_SIZE = 20;
@@ -388,15 +388,62 @@ function FlowerPatch({ position, color }: { position: [number, number, number]; 
   );
 }
 
-function Pip() {
+const pipWaypoints: Array<[number, number]> = [
+  [8.4, 1.5], [8.7, -3.8], [6.8, -7.2], [1.8, -8], [-4.8, -8],
+  [-8.1, -5.2], [-8.2, 2.4], [-6.3, 7.1], [0.4, 8], [6.4, 7],
+];
+
+function Pip({ onMessage }: { onMessage: (message: string | null) => void }) {
   const texture = useLoader(THREE.TextureLoader, '/pip-detailed-v2.png');
   const pip = useRef<THREE.Group>(null);
+  const sprite = useRef<THREE.Sprite>(null);
+  const waypointIndex = useRef(0);
+  const pauseUntil = useRef(0);
+  const nearby = useRef(false);
+  const greeted = useRef(false);
+  const target = useMemo(() => new THREE.Vector3(), []);
   texture.colorSpace = THREE.SRGBColorSpace;
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }, delta) => {
     if (pip.current) {
+      const distanceToVisitor = Math.hypot(
+        pip.current.position.x - camera.position.x,
+        pip.current.position.z - camera.position.z,
+      );
+      const isNearby = distanceToVisitor < 3.15;
+
+      if (isNearby && !nearby.current) {
+        nearby.current = true;
+        if (!greeted.current) {
+          greeted.current = true;
+          onMessage('Oh! You’re here. I saved the quiet spot by the spring for you.');
+        } else {
+          onMessage('Pip pauses, perks up one ear, and listens.');
+        }
+      } else if (distanceToVisitor > 4.1 && nearby.current) {
+        nearby.current = false;
+        onMessage(null);
+        pauseUntil.current = clock.elapsedTime + 1.5;
+      }
+
+      if (!isNearby && clock.elapsedTime >= pauseUntil.current) {
+        const [targetX, targetZ] = pipWaypoints[waypointIndex.current];
+        target.set(targetX, 0, targetZ);
+        const distanceToTarget = pip.current.position.distanceTo(target);
+        if (distanceToTarget < 0.16) {
+          waypointIndex.current = (waypointIndex.current + 1) % pipWaypoints.length;
+          pauseUntil.current = clock.elapsedTime + 2.5 + (waypointIndex.current % 3);
+        } else {
+          pip.current.position.lerp(target, Math.min(1, (delta * 0.48) / distanceToTarget));
+        }
+      }
+
       pip.current.position.y = Math.sin(clock.elapsedTime * 1.7) * 0.035;
       pip.current.rotation.y = Math.sin(clock.elapsedTime * 0.65) * 0.08;
+      if (sprite.current) {
+        const attentiveScale = isNearby ? 1.08 : 1;
+        sprite.current.scale.lerp(new THREE.Vector3(0.82 * attentiveScale, 1.05 * attentiveScale, 1), 0.08);
+      }
     }
   });
 
@@ -406,14 +453,14 @@ function Pip() {
         <circleGeometry args={[0.42, 24]} />
         <meshBasicMaterial color="#34483b" transparent opacity={0.24} />
       </mesh>
-      <sprite position={[0, 0.57, 0]} scale={[0.82, 1.05, 1]}>
+      <sprite ref={sprite} position={[0, 0.57, 0]} scale={[0.82, 1.05, 1]}>
         <spriteMaterial map={texture} transparent alphaTest={0.08} depthWrite={false} />
       </sprite>
     </group>
   );
 }
 
-function GardenWorldScene({ movement }: { movement: MovementInput }) {
+function GardenWorldScene({ movement, onPipMessage }: { movement: MovementInput; onPipMessage: (message: string | null) => void }) {
   const grassTexture = useGrassTexture();
   return (
     <>
@@ -449,7 +496,7 @@ function GardenWorldScene({ movement }: { movement: MovementInput }) {
       <FlowerPatch position={[8.2, 0, 6.6]} color="#e6c5ef" />
       <FlowerPatch position={[-8.5, 0, 7.4]} color="#f1c77c" />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
-      <Pip />
+      <Pip onMessage={onPipMessage} />
 
       <FirstPersonControls movement={movement} />
     </>
@@ -458,15 +505,20 @@ function GardenWorldScene({ movement }: { movement: MovementInput }) {
 
 export default function GardenWorld() {
   const movement = useRef(new Set<string>());
+  const [pipMessage, setPipMessage] = useState<string | null>(null);
   const startMoving = (key: string) => movement.current.add(key);
   const stopMoving = (key: string) => movement.current.delete(key);
 
   return (
     <div className="world-wrap">
       <Canvas shadows camera={{ fov: 68, near: 0.1, far: 120 }} dpr={[1, 1.5]} gl={{ antialias: true }}>
-        <GardenWorldScene movement={movement} />
+        <GardenWorldScene movement={movement} onPipMessage={setPipMessage} />
       </Canvas>
       <div className="world-reticle" aria-hidden="true" />
+      <div className={`pip-presence ${pipMessage ? 'visible' : ''}`} role="status" aria-live="polite">
+        <img src="/pip-detailed-v2.png" alt="" aria-hidden="true" />
+        <span><strong>Pip</strong>{pipMessage}</span>
+      </div>
       <div className="world-instructions">
         <strong>Walk the grove</strong>
         <span>WASD or arrow keys · drag to look</span>
