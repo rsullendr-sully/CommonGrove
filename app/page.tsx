@@ -3,9 +3,14 @@
 import { useState } from 'react';
 import GardenWorld from './GardenWorld';
 
+type GardenChoice = 'orchard' | 'workshop';
+
 export default function Home() {
   const [rewardStage, setRewardStage] = useState<0 | 1 | 2 | 3>(0);
   const [gardenView, setGardenView] = useState<'before' | 'now'>('before');
+  const [choiceOpen, setChoiceOpen] = useState(false);
+  const [pendingChoice, setPendingChoice] = useState<GardenChoice | null>(null);
+  const [gardenChoice, setGardenChoice] = useState<GardenChoice | null>(null);
 
   const simulateAchievement = () => {
     setRewardStage((current) => Math.min(3, current + 1) as 0 | 1 | 2 | 3);
@@ -16,6 +21,13 @@ export default function Home() {
   const starflowersVisible = rewardStage > 1 || (rewardStage === 1 && gardenView === 'now');
   const pavilionImproved = rewardStage > 2 || (rewardStage === 2 && gardenView === 'now');
   const seedVisible = rewardStage === 3 && gardenView === 'now';
+
+  const confirmChoice = () => {
+    if (!pendingChoice) return;
+    setGardenChoice(pendingChoice);
+    setChoiceOpen(false);
+    setGardenView('now');
+  };
 
   return (
     <main className="garden-app immersive-app">
@@ -37,6 +49,7 @@ export default function Home() {
           starflowersVisible={starflowersVisible}
           pavilionImproved={pavilionImproved}
           seedVisible={seedVisible}
+          gardenChoice={gardenChoice}
         />
       </section>
 
@@ -78,9 +91,46 @@ export default function Home() {
                   : 'A contribution that helped someone succeed brought fresh water to the starflower bed.'}</p>
             </div>
           )}
+          {rewardStage === 3 && !gardenChoice && (
+            <button type="button" className="seed-choice-button" onClick={() => setChoiceOpen(true)}>Choose where the seed leads <b>→</b></button>
+          )}
+          {gardenChoice && (
+            <div className="chosen-path" role="status">
+              <span>Path remembered</span>
+              <strong>{gardenChoice === 'orchard' ? 'The Lantern Orchard' : 'The Tinker Workshop'}</strong>
+              <p>Pip will keep exploring while this destination grows. Nothing needs your attention.</p>
+            </div>
+          )}
           <small>No scores. No upkeep. Just progress.</small>
         </div>
       </details>
+
+      {choiceOpen && (
+        <section className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="choice-title">
+          <div className="choice-card">
+            <button type="button" className="choice-close" onClick={() => setChoiceOpen(false)} aria-label="Close garden choice">×</button>
+            <p className="overline">A discovery for whenever you’re ready</p>
+            <h2 id="choice-title">Where should the curious seed lead?</h2>
+            <p>Both paths continue the same essential garden progress. This choice only shapes the kind of place you would enjoy returning to.</p>
+            <div className="choice-options">
+              <button type="button" className={pendingChoice === 'orchard' ? 'chosen' : ''} onClick={() => setPendingChoice('orchard')}>
+                <span className="choice-art orchard"><i /><i /><i /></span>
+                <strong>The Lantern Orchard</strong>
+                <small>A quiet grove for gathering, stories, and soft evening light.</small>
+              </button>
+              <button type="button" className={pendingChoice === 'workshop' ? 'chosen' : ''} onClick={() => setPendingChoice('workshop')}>
+                <span className="choice-art workshop"><i /><i /><i /></span>
+                <strong>The Tinker Workshop</strong>
+                <small>A cheerful place for making, experimenting, and useful discoveries.</small>
+              </button>
+            </div>
+            <div className="choice-footer">
+              <span>{pendingChoice ? 'Your choice will begin forming in the garden.' : 'Nothing expires. Choose when you are ready.'}</span>
+              <button type="button" disabled={!pendingChoice} onClick={confirmChoice}>Keep this path</button>
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }
