@@ -33,21 +33,24 @@ function useReducedMotion() {
   return reduced;
 }
 
-function StaticShadowMap({ revision }: { revision: string }) {
-  const { gl } = useThree();
+function FrameCadence() {
+  const invalidate = useThree((state) => state.invalidate);
   useEffect(() => {
-    /* eslint-disable react-hooks/immutability -- Three.js shadow maps are intentionally configured through its imperative renderer API. */
-    gl.shadowMap.autoUpdate = false;
-    gl.shadowMap.needsUpdate = true;
-    const settleTimer = window.setTimeout(() => {
-      gl.shadowMap.needsUpdate = true;
-    }, 900);
-    return () => {
-      window.clearTimeout(settleTimer);
-      gl.shadowMap.autoUpdate = true;
+    let cadence: number | null = null;
+    const updateCadence = () => {
+      if (cadence !== null) window.clearInterval(cadence);
+      cadence = null;
+      if (document.hidden) return;
+      invalidate();
+      cadence = window.setInterval(invalidate, 34);
     };
-  }, [gl, revision]);
-  /* eslint-enable react-hooks/immutability */
+    updateCadence();
+    document.addEventListener('visibilitychange', updateCadence);
+    return () => {
+      document.removeEventListener('visibilitychange', updateCadence);
+      if (cadence !== null) window.clearInterval(cadence);
+    };
+  }, [invalidate]);
   return null;
 }
 
@@ -732,11 +735,11 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
   const grassTexture = useGrassTexture();
   return (
     <>
-      <StaticShadowMap revision={`${rewardStage}-${gardenChoice ?? 'none'}`} />
+      <FrameCadence />
       <color attach="background" args={['#addde5']} />
       <fog attach="fog" args={['#c9ddd0', 36, 78]} />
       <hemisphereLight args={['#d9f4ff', '#526d47', 1.65]} />
-      <directionalLight position={[13, 24, 10]} intensity={2.45} color="#ffedb8" castShadow shadow-mapSize={[512, 512]} shadow-camera-left={-22} shadow-camera-right={22} shadow-camera-top={22} shadow-camera-bottom={-22} />
+      <directionalLight position={[13, 24, 10]} intensity={2.45} color="#ffedb8" />
       <SkyClouds />
 
       <mesh position={[0, -0.26, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -782,7 +785,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
 
   return (
     <div className="world-wrap">
-      <Canvas shadows={{ type: THREE.BasicShadowMap }} camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.85} gl={{ antialias: false, powerPreference: 'high-performance' }}>
+      <Canvas frameloop="demand" shadows={false} camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.7} gl={{ antialias: false, powerPreference: 'high-performance' }}>
         <GardenWorldScene
           movement={movement}
           onPipMessage={setPipMessage}
