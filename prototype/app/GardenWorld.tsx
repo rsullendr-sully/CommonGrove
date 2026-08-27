@@ -1,9 +1,12 @@
 'use client';
 
-import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import Image from 'next/image';
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import PipCharacter from './garden/PipCharacter';
+import { stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
+import { getPipPose, type PipPose } from './garden/pipPose';
 
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
@@ -595,16 +598,30 @@ const pipWaypoints: Array<[number, number]> = [
   [-8.1, -5.2], [-8.2, 2.4], [-6.3, 7.1], [0.4, 8], [6.4, 7],
 ];
 
+const pipLocomotionConfig: LocomotionConfig = {
+  maxSpeed: 1.2,
+  acceleration: 3,
+  deceleration: 4,
+  turnSpeed: Math.PI * 2,
+  arrivalRadius: 0.12,
+  brakingRadius: 0.9,
+};
+
 function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
-  const texture = useLoader(THREE.TextureLoader, '/pip-detailed-v2.png');
-  const pipTexture = useMemo(() => {
-    const preparedTexture = texture.clone();
-    preparedTexture.colorSpace = THREE.SRGBColorSpace;
-    preparedTexture.needsUpdate = true;
-    return preparedTexture;
-  }, [texture]);
   const pip = useRef<THREE.Group>(null);
-  const sprite = useRef<THREE.Sprite>(null);
+  const locomotion = useRef<LocomotionState>({
+    position: new THREE.Vector3(8.4, 0, 1.5),
+    facing: Math.PI,
+    speed: 0,
+    distanceTravelled: 0,
+    moving: false,
+  });
+  const [pose, setPose] = useState<PipPose>(() => getPipPose({
+    speed: 0,
+    distanceTravelled: 0,
+    attentive: false,
+    reducedMotion,
+  }));
   const waypointIndex = useRef(0);
   const pauseUntil = useRef(0);
   const nearby = useRef(false);
@@ -615,8 +632,6 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
   const reactionMessageUntil = useRef(0);
   const observedChoice = useRef<GardenChoice | null>(null);
   const choiceMission = useRef<GardenChoice | null>(null);
-
-  useEffect(() => () => pipTexture.dispose(), [pipTexture]);
 
   useEffect(() => {
     if (rewardStage > observedRewardStage.current) {
@@ -642,6 +657,7 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
 
   useFrame(({ clock, camera }, delta) => {
     if (pip.current) {
+      let hasMovementTarget = false;
       const distanceToVisitor = Math.hypot(
         pip.current.position.x - camera.position.x,
         pip.current.position.z - camera.position.z,
@@ -681,7 +697,7 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
               ? 'The nook is ready. Pip settles beside the new books for a moment.'
               : 'It bloomed! Something kind reached the garden.');
         } else {
-          pip.current.position.lerp(target, Math.min(1, (delta * 0.62) / distanceToReward));
+          hasMovementTarget = true;
         }
       } else if (!isNearby && choiceMission.current) {
         const activeChoice = choiceMission.current;
@@ -695,7 +711,7 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
             ? 'The lantern saplings are taking root. Pip curls up in their warm glow.'
             : 'The workshop foundation is ready. Pip listens for the next useful idea.');
         } else {
-          pip.current.position.lerp(target, Math.min(1, (delta * 0.62) / distanceToChoice));
+          hasMovementTarget = true;
         }
       } else if (!isNearby && clock.elapsedTime >= pauseUntil.current) {
         const [targetX, targetZ] = pipWaypoints[waypointIndex.current];
@@ -705,28 +721,35 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
           waypointIndex.current = (waypointIndex.current + 1) % pipWaypoints.length;
           pauseUntil.current = clock.elapsedTime + 2.5 + (waypointIndex.current % 3);
         } else {
-          pip.current.position.lerp(target, Math.min(1, (delta * 0.48) / distanceToTarget));
+          hasMovementTarget = true;
         }
       }
 
-      pip.current.position.y = reducedMotion ? 0 : Math.sin(clock.elapsedTime * 1.7) * 0.035;
-      pip.current.rotation.y = reducedMotion ? 0 : Math.sin(clock.elapsedTime * 0.65) * 0.08;
-      if (sprite.current) {
-        const attentiveScale = isNearby ? 1.08 : 1;
-        sprite.current.scale.lerp(new THREE.Vector3(0.82 * attentiveScale, 1.05 * attentiveScale, 1), 0.08);
+      if (hasMovementTarget) {
+        locomotion.current = stepLocomotion(locomotion.current, target, delta, pipLocomotionConfig);
+        pip.current.position.copy(locomotion.current.position);
+        pip.current.rotation.y = locomotion.current.facing;
+      } else if (locomotion.current.moving || locomotion.current.speed > 0) {
+        locomotion.current = { ...locomotion.current, speed: 0, moving: false };
       }
+
+      const currentLocomotion = locomotion.current;
+      setPose(getPipPose({
+        speed: currentLocomotion.moving ? currentLocomotion.speed : 0,
+        distanceTravelled: currentLocomotion.distanceTravelled,
+        attentive: isNearby,
+        reducedMotion,
+      }));
     }
   });
 
   return (
-    <group ref={pip} position={[8.4, 0, 1.5]}>
-      <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.42, 24]} />
+    <group ref={pip} position={[8.4, 0, 1.5]} rotation={[0, Math.PI, 0]}>
+      <mesh name="blobShadow" position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.48, 0.31, 1]}>
+        <circleGeometry args={[0.9, 24]} />
         <meshBasicMaterial color="#34483b" transparent opacity={0.24} />
       </mesh>
-      <sprite ref={sprite} position={[0, 0.57, 0]} scale={[0.82, 1.05, 1]}>
-        <spriteMaterial map={pipTexture} transparent alphaTest={0.08} depthWrite={false} />
-      </sprite>
+      <PipCharacter pose={pose} />
     </group>
   );
 }
