@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createSafeGardenRoute,
+  GARDEN_OBSTACLES,
   hasActivityTimedOut,
   isSafeGardenPoint,
   isSafeGardenSegment,
@@ -15,15 +16,6 @@ import {
 
 const scenery: readonly GardenObstacle[] = [
   { x: 13, z: 8, radius: 1.2 },
-];
-
-const sceneObstacles: readonly GardenObstacle[] = [
-  { x: 0, z: 0, radius: 6.7 },
-  { x: 0, z: -15.2, radius: 6.8 },
-  { x: -12.2, z: -12.4, radius: 3.2 },
-  { x: 11.8, z: -9.2, radius: 1.15 },
-  { x: 14.4, z: 5.8, radius: 1.15 },
-  { x: -14.8, z: 4.5, radius: 1.15 },
 ];
 
 function expectSafeRoute(
@@ -119,12 +111,12 @@ describe('Pip garden navigation', () => {
     const rewardOne = { x: 8.2, z: 6.6 };
     const rewardTwo = { x: -8.65, z: -8.1 };
 
-    expect(isSafeGardenSegment(rewardOne, rewardTwo, sceneObstacles)).toBe(false);
-    const route = createSafeGardenRoute(rewardOne, rewardTwo, sceneObstacles);
+    expect(isSafeGardenSegment(rewardOne, rewardTwo, GARDEN_OBSTACLES)).toBe(false);
+    const route = createSafeGardenRoute(rewardOne, rewardTwo, GARDEN_OBSTACLES);
 
     expect(route.length).toBeGreaterThan(1);
     expect(route.at(-1)).toEqual(rewardTwo);
-    expectSafeRoute(rewardOne, route, sceneObstacles);
+    expectSafeRoute(rewardOne, route, GARDEN_OBSTACLES);
   });
 
   it('builds safe routes from Pip’s start to every ordinary garden interest', () => {
@@ -141,9 +133,9 @@ describe('Pip garden navigation', () => {
     ];
 
     for (const target of ordinaryTargets) {
-      const route = createSafeGardenRoute(start, target, sceneObstacles);
+      const route = createSafeGardenRoute(start, target, GARDEN_OBSTACLES);
       expect(route.at(-1)).toEqual(target);
-      expectSafeRoute(start, route, sceneObstacles);
+      expectSafeRoute(start, route, GARDEN_OBSTACLES);
     }
   });
 

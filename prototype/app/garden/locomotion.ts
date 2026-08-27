@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isSafeGardenSegment, type GardenObstacle, type GardenPoint } from './navigation';
 
 export const EMPLOYEE_WALK_SPEED = 4;
 
@@ -17,6 +18,26 @@ export type LocomotionState = {
   speed: number;
   distanceTravelled: number;
   moving: boolean;
+};
+
+export const PIP_MOTION_CONFIG: LocomotionConfig = {
+  maxSpeed: 1.2,
+  acceleration: 3,
+  deceleration: 4,
+  turnSpeed: Math.PI * 2,
+  arrivalRadius: 0.16,
+  brakingRadius: 0.9,
+};
+
+export const PIP_REWARD_MOTION_CONFIG: LocomotionConfig = {
+  ...PIP_MOTION_CONFIG,
+  maxSpeed: 1.65,
+};
+
+export type SafeRouteLocomotionProgress = {
+  motion: LocomotionState;
+  waypointIndex: number;
+  complete: boolean;
 };
 
 export function shortestAngleDelta(from: number, to: number) {
@@ -70,5 +91,57 @@ export function stepLocomotion(
     speed,
     distanceTravelled: state.distanceTravelled + stepDistance,
     moving: stepDistance > 0.0001,
+  };
+}
+
+export function stepSafeRouteLocomotion(
+  progress: SafeRouteLocomotionProgress,
+  route: readonly GardenPoint[],
+  delta: number,
+  config: LocomotionConfig,
+  obstacles: readonly GardenObstacle[],
+): SafeRouteLocomotionProgress {
+  if (progress.complete || route.length === 0) return { ...progress, complete: true };
+
+  const waypointIndex = Math.min(progress.waypointIndex, route.length - 1);
+  const waypoint = route[waypointIndex];
+  const target = new THREE.Vector3(waypoint.x, progress.motion.position.y, waypoint.z);
+  const previousMotion = progress.motion;
+  const steppedMotion = stepLocomotion(previousMotion, target, delta, config);
+  const acceptedMotion = isSafeGardenSegment(
+    { x: previousMotion.position.x, z: previousMotion.position.z },
+    { x: steppedMotion.position.x, z: steppedMotion.position.z },
+    obstacles,
+  ) ? steppedMotion : {
+    ...steppedMotion,
+    position: previousMotion.position.clone(),
+    speed: 0,
+    distanceTravelled: previousMotion.distanceTravelled,
+    moving: false,
+  };
+
+  const reachedWaypoint = !acceptedMotion.moving
+    && acceptedMotion.position.distanceTo(target) <= config.arrivalRadius;
+  if (!reachedWaypoint) return { motion: acceptedMotion, waypointIndex, complete: false };
+
+  if (!isSafeGardenSegment(
+    { x: acceptedMotion.position.x, z: acceptedMotion.position.z },
+    waypoint,
+    obstacles,
+  )) return { motion: acceptedMotion, waypointIndex, complete: false };
+
+  const snapDistance = acceptedMotion.position.distanceTo(target);
+  const snappedMotion: LocomotionState = {
+    ...acceptedMotion,
+    position: target,
+    speed: 0,
+    distanceTravelled: acceptedMotion.distanceTravelled + snapDistance,
+    moving: false,
+  };
+  const complete = waypointIndex === route.length - 1;
+  return {
+    motion: snappedMotion,
+    waypointIndex: complete ? waypointIndex : waypointIndex + 1,
+    complete,
   };
 }

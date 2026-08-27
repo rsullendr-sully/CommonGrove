@@ -17,6 +17,15 @@ export type GardenObstacle = GardenPoint & {
   radius: number;
 };
 
+export const GARDEN_OBSTACLES: readonly GardenObstacle[] = [
+  { x: 0, z: 0, radius: 6.7 },
+  { x: 0, z: -15.2, radius: 6.8 },
+  { x: -12.2, z: -12.4, radius: 3.2 },
+  { x: 11.8, z: -9.2, radius: 1.15 },
+  { x: 14.4, z: 5.8, radius: 1.15 },
+  { x: -14.8, z: 4.5, radius: 1.15 },
+];
+
 export type GardenInterest = {
   id: string;
   position: GardenPoint;

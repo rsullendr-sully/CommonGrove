@@ -5,23 +5,14 @@ import Image from 'next/image';
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import PipCharacter from './garden/PipCharacter';
-import { EMPLOYEE_WALK_SPEED, stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
-import { createSafeGardenRoute, isSafeGardenSegment, selectCurrentGardenInterests, type GardenInterest, type GardenObstacle, type GardenPoint } from './garden/navigation';
+import { EMPLOYEE_WALK_SPEED, PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
+import { createSafeGardenRoute, GARDEN_OBSTACLES, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import { getPipPose, type PipPose } from './garden/pipPose';
 import { type GardenChoice } from './garden/rewardState';
 import { usePipBehavior, type PipPriorityMission } from './garden/usePipBehavior';
 
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
-
-const obstacles: readonly GardenObstacle[] = [
-  { x: 0, z: 0, radius: 6.7 },
-  { x: 0, z: -15.2, radius: 6.8 },
-  { x: -12.2, z: -12.4, radius: 3.2 },
-  { x: 11.8, z: -9.2, radius: 1.15 },
-  { x: 14.4, z: 5.8, radius: 1.15 },
-  { x: -14.8, z: 4.5, radius: 1.15 },
-];
 
 type MovementInput = MutableRefObject<Set<string>>;
 
@@ -163,7 +154,7 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
     candidatePosition.x = THREE.MathUtils.clamp(candidatePosition.x, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
     candidatePosition.z = THREE.MathUtils.clamp(candidatePosition.z, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
 
-    obstacles.forEach((obstacle) => {
+    GARDEN_OBSTACLES.forEach((obstacle) => {
       const dx = candidatePosition.x - obstacle.x;
       const dz = candidatePosition.z - obstacle.z;
       const distance = Math.hypot(dx, dz);
@@ -606,20 +597,6 @@ const gardenInterestDefinitions: readonly GardenInterest[] = [
   { id: 'wander-west', position: { x: -6.3, z: 7.1 } },
 ];
 
-const pipMotionConfig: LocomotionConfig = {
-  maxSpeed: 1.2,
-  acceleration: 3,
-  deceleration: 4,
-  turnSpeed: Math.PI * 2,
-  arrivalRadius: 0.16,
-  brakingRadius: 0.9,
-};
-
-const pipRewardMotionConfig: LocomotionConfig = {
-  ...pipMotionConfig,
-  maxSpeed: 1.65,
-};
-
 function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean }) {
   const pip = useRef<THREE.Group>(null);
   const pipMotion = useRef<LocomotionState>({
@@ -636,7 +613,6 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
     attentive: false,
     reducedMotion,
   }));
-  const target = useMemo(() => new THREE.Vector3(), []);
   const routeTargetKey = useRef<string | null>(null);
   const routeWaypoints = useRef<readonly GardenPoint[]>([]);
   const routeIndex = useRef(0);
@@ -689,39 +665,22 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
           routeWaypoints.current = createSafeGardenRoute(
             { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
             behavior.target,
-            obstacles,
+            GARDEN_OBSTACLES,
           );
           routeIndex.current = 0;
         }
-        const routeTarget = routeWaypoints.current[routeIndex.current] ?? behavior.target;
-        target.set(routeTarget.x, 0, routeTarget.z);
-        const previousMotion = pipMotion.current;
-        const steppedMotion = stepLocomotion(
-          previousMotion,
-          target,
+        const routeProgress = stepSafeRouteLocomotion(
+          { motion: pipMotion.current, waypointIndex: routeIndex.current, complete: false },
+          routeWaypoints.current,
           delta,
-          behavior.mode === 'priority' ? pipRewardMotionConfig : pipMotionConfig,
+          behavior.mode === 'priority' ? PIP_REWARD_MOTION_CONFIG : PIP_MOTION_CONFIG,
+          GARDEN_OBSTACLES,
         );
-        pipMotion.current = isSafeGardenSegment(
-          { x: previousMotion.position.x, z: previousMotion.position.z },
-          { x: steppedMotion.position.x, z: steppedMotion.position.z },
-          obstacles,
-        ) ? steppedMotion : {
-          ...steppedMotion,
-          position: previousMotion.position.clone(),
-          speed: 0,
-          distanceTravelled: previousMotion.distanceTravelled,
-          moving: false,
-        };
+        pipMotion.current = routeProgress.motion;
+        routeIndex.current = routeProgress.waypointIndex;
         pip.current.position.copy(pipMotion.current.position);
         pip.current.rotation.y = pipMotion.current.facing;
-        const waypointComplete = !pipMotion.current.moving
-          && pipMotion.current.position.distanceTo(target) <= pipMotionConfig.arrivalRadius;
-        if (waypointComplete && routeIndex.current < routeWaypoints.current.length - 1) {
-          routeIndex.current += 1;
-        } else {
-          locomotionComplete = waypointComplete;
-        }
+        locomotionComplete = routeProgress.complete;
       } else if (pipMotion.current.moving || pipMotion.current.speed > 0) {
         pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
         routeTargetKey.current = null;

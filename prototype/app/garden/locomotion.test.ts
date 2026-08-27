@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   EMPLOYEE_WALK_SPEED,
+  PIP_REWARD_MOTION_CONFIG,
   shortestAngleDelta,
   stepLocomotion,
+  stepSafeRouteLocomotion,
   type LocomotionConfig,
   type LocomotionState,
 } from './locomotion';
+import { createSafeGardenRoute, GARDEN_OBSTACLES, isSafeGardenSegment } from './navigation';
 
 const config: LocomotionConfig = {
   maxSpeed: 1.2,
@@ -118,5 +121,49 @@ describe('grounded locomotion', () => {
     const state = { ...idle(), position: new THREE.Vector3(0, 2, 0) };
     const result = stepLocomotion(state, new THREE.Vector3(0, 9, 0), 1 / 60, config);
     expect(result.position.y).toBe(2);
+  });
+
+  it('completes the full reward-one to reward-two route without unsafe steps or corner deadlock', () => {
+    const start = { x: 8.2, z: 6.6 };
+    const end = { x: -8.65, z: -8.1 };
+    const route = createSafeGardenRoute(start, end, GARDEN_OBSTACLES);
+    let progress = {
+      motion: {
+        position: new THREE.Vector3(start.x, 0, start.z),
+        facing: Math.PI,
+        speed: 0,
+        distanceTravelled: 0,
+        moving: false,
+      },
+      waypointIndex: 0,
+      complete: false,
+    };
+
+    for (let frame = 0; frame < 60 * 60 && !progress.complete; frame += 1) {
+      const previousPosition = progress.motion.position.clone();
+      const previousWaypointIndex = progress.waypointIndex;
+      progress = stepSafeRouteLocomotion(
+        progress,
+        route,
+        1 / 60,
+        PIP_REWARD_MOTION_CONFIG,
+        GARDEN_OBSTACLES,
+      );
+
+      expect(isSafeGardenSegment(
+        { x: previousPosition.x, z: previousPosition.z },
+        { x: progress.motion.position.x, z: progress.motion.position.z },
+        GARDEN_OBSTACLES,
+      )).toBe(true);
+      if (progress.waypointIndex > previousWaypointIndex) {
+        expect(progress.motion.position.x).toBeCloseTo(route[previousWaypointIndex].x, 8);
+        expect(progress.motion.position.z).toBeCloseTo(route[previousWaypointIndex].z, 8);
+      }
+    }
+
+    expect(route.length).toBeGreaterThan(1);
+    expect(progress.complete).toBe(true);
+    expect(progress.motion.position.x).toBeCloseTo(end.x, 8);
+    expect(progress.motion.position.z).toBeCloseTo(end.z, 8);
   });
 });
