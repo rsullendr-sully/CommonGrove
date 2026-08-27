@@ -4,8 +4,16 @@ import {
   type InteractionState,
   type InteractableId,
 } from './interaction';
-import type { GardenPoint } from './navigation';
-import type { PipInteractionPhase } from './pipInteraction';
+import {
+  GARDEN_OBSTACLES,
+  nearestSafePoint,
+  type GardenPoint,
+} from './navigation';
+import {
+  PIP_EATING_REACTION_SECONDS,
+  PIP_PLAYING_REACTION_SECONDS,
+  type PipInteractionPhase,
+} from './pipInteraction';
 import {
   GARDEN_SNACK_AUTHORED_POSITION,
   GARDEN_TOY_AUTHORED_POSITION,
@@ -40,6 +48,14 @@ export type PipInteractionSceneEvent =
   | { type: 'object-reaction-complete' };
 
 export function createPipInteractionSceneState(): PipInteractionSceneState {
+  const foodRecovery = nearestSafePoint(
+    { x: GARDEN_SNACK_AUTHORED_POSITION[0], z: GARDEN_SNACK_AUTHORED_POSITION[2] },
+    GARDEN_OBSTACLES,
+  );
+  const toyRecovery = nearestSafePoint(
+    { x: GARDEN_TOY_AUTHORED_POSITION[0], z: GARDEN_TOY_AUTHORED_POSITION[2] },
+    GARDEN_OBSTACLES,
+  );
   return {
     interaction: {
       mode: 'idle',
@@ -57,8 +73,8 @@ export function createPipInteractionSceneState(): PipInteractionSceneState {
       toy: [...GARDEN_TOY_AUTHORED_POSITION],
     },
     objectLastSafePositions: {
-      food: [...GARDEN_SNACK_AUTHORED_POSITION],
-      toy: [...GARDEN_TOY_AUTHORED_POSITION],
+      food: [foodRecovery.x, GARDEN_SNACK_AUTHORED_POSITION[1], foodRecovery.z],
+      toy: [toyRecovery.x, GARDEN_TOY_AUTHORED_POSITION[1], toyRecovery.z],
     },
     reactionStarted: false,
     toyNudged: false,
@@ -176,6 +192,7 @@ export function pipInteractionSceneReducer(
     case 'object-reaction-complete': {
       if (
         (state.phase !== 'eating' && state.phase !== 'playing') ||
+        (state.phase === 'playing' && !state.toyNudged) ||
         state.interaction.mode !== 'reacting' ||
         state.interaction.offered === null
       ) return state;
@@ -196,6 +213,27 @@ export function pipInteractionSceneReducer(
       };
     }
   }
+}
+
+export function scheduleObjectReactionCompletion<Handle>(
+  state: PipInteractionSceneState,
+  dispatch: (event: PipInteractionSceneEvent) => void,
+  schedule: (callback: () => void, delayMs: number) => Handle,
+  cancel: (handle: Handle) => void,
+): () => void {
+  const delayMs = state.phase === 'eating'
+    ? PIP_EATING_REACTION_SECONDS * 1000
+    : state.phase === 'playing' && state.toyNudged
+      ? PIP_PLAYING_REACTION_SECONDS * 1000
+      : null;
+  if (delayMs === null) return () => {};
+  return schedulePipSceneEvent(
+    dispatch,
+    { type: 'object-reaction-complete' },
+    delayMs,
+    schedule,
+    cancel,
+  );
 }
 
 export function eligibleInteractionTarget(

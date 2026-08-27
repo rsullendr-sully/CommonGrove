@@ -4,12 +4,15 @@ import {
   GARDEN_OBJECT_CARRY_ANCHOR,
   GARDEN_SNACK_AUTHORED_POSITION,
   GARDEN_TOY_AUTHORED_POSITION,
+  TOY_NUDGE_STANDOFF_DISTANCE,
+  createToyPlayApproach,
   projectGardenObjectOffer,
   resetGardenObjectPosition,
   resolveGardenObjectPlacement,
   updateCarriedGardenObjectTransform,
 } from './GardenObjects';
 import { GARDEN_OBSTACLES, isSafeGardenPoint } from './navigation';
+import { PIP_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './locomotion';
 
 describe('garden snack and ring toy presentation', () => {
   it('restores authored session positions for refresh and snack completion', () => {
@@ -78,5 +81,43 @@ describe('garden snack and ring toy presentation', () => {
 
     expect(point).toEqual({ x: 10, z: 8.6 });
     expect(isSafeGardenPoint(point, GARDEN_OBSTACLES)).toBe(true);
+  });
+
+  it('routes Pip to a canonical safe standoff beside the toy without center overlap', () => {
+    const start = { x: 8.4, z: 1.5 };
+    const toy = { x: 10, z: 8.6 };
+    const approach = createToyPlayApproach(start, toy, GARDEN_OBSTACLES);
+
+    expect(isSafeGardenPoint(approach.standoff, GARDEN_OBSTACLES)).toBe(true);
+    expect(Math.hypot(approach.standoff.x - toy.x, approach.standoff.z - toy.z))
+      .toBeGreaterThanOrEqual(TOY_NUDGE_STANDOFF_DISTANCE - 0.000_001);
+    expect(Math.hypot(approach.standoff.x - start.x, approach.standoff.z - start.z))
+      .toBeLessThan(Math.hypot(toy.x - start.x, toy.z - start.z));
+    expect(approach.route.at(-1)).toEqual(approach.standoff);
+
+    let progress = {
+      motion: {
+        position: new THREE.Vector3(start.x, 0, start.z),
+        facing: 0,
+        speed: 0,
+        distanceTravelled: 0,
+        moving: false,
+      } satisfies LocomotionState,
+      waypointIndex: 0,
+      complete: false,
+    };
+    for (let frame = 0; frame < 1_200 && !progress.complete; frame += 1) {
+      progress = stepSafeRouteLocomotion(
+        progress,
+        approach.route,
+        1 / 60,
+        PIP_MOTION_CONFIG,
+        GARDEN_OBSTACLES,
+      );
+    }
+
+    expect(progress.complete).toBe(true);
+    expect(Math.hypot(progress.motion.position.x - toy.x, progress.motion.position.z - toy.z))
+      .toBeGreaterThanOrEqual(TOY_NUDGE_STANDOFF_DISTANCE - 0.000_001);
   });
 });

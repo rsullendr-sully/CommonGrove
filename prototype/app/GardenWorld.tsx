@@ -8,6 +8,7 @@ import InteractionPrompt from './garden/InteractionPrompt';
 import {
   GardenSnack,
   GardenToy,
+  createToyPlayApproach,
   projectGardenObjectOffer,
   resolveGardenObjectPlacement,
   type GardenObjectId,
@@ -20,8 +21,6 @@ import { createSafeGardenRoute, GARDEN_OBSTACLES, nearestSafePoint, selectCurren
 import {
   PIP_PET_MESSAGE,
   PIP_PET_REACTION_SECONDS,
-  PIP_EATING_REACTION_SECONDS,
-  PIP_PLAYING_REACTION_SECONDS,
   CAMERA_CONTROLS_FRAME_PRIORITY,
   PIP_INTERACTION_FRAME_PRIORITY,
   canDirectlyInteractWithPip,
@@ -40,6 +39,7 @@ import {
   createPipInteractionSceneState,
   eligibleInteractionTarget,
   pipInteractionSceneReducer,
+  scheduleObjectReactionCompletion,
   schedulePipSceneEvent,
 } from './garden/pipInteractionScene';
 import { getPipPose, type PipPose } from './garden/pipPose';
@@ -713,11 +713,12 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
           const targetKey = `interaction-toy:${target.x},${target.z}`;
           if (routeTargetKey.current !== targetKey) {
             routeTargetKey.current = targetKey;
-            routeWaypoints.current = createSafeGardenRoute(
+            const approach = createToyPlayApproach(
               { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
               target,
               GARDEN_OBSTACLES,
             );
+            routeWaypoints.current = approach.route;
             routeIndex.current = 0;
           }
           const routeProgress = stepSafeRouteLocomotion(
@@ -732,6 +733,10 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
           pip.current.position.copy(pipMotion.current.position);
           pip.current.rotation.y = pipMotion.current.facing;
           if (routeProgress.complete && !toyNudgeSent.current) {
+            pip.current.rotation.y = Math.atan2(
+              target.x - pip.current.position.x,
+              target.z - pip.current.position.z,
+            );
             toyNudgeSent.current = true;
             onToyNudged();
           }
@@ -1079,17 +1084,13 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
 
   useEffect(() => {
     if (pipInteractionPhase !== 'eating' && pipInteractionPhase !== 'playing') return;
-    const delaySeconds = pipInteractionPhase === 'eating'
-      ? PIP_EATING_REACTION_SECONDS
-      : PIP_PLAYING_REACTION_SECONDS;
-    return schedulePipSceneEvent(
+    return scheduleObjectReactionCompletion(
+      pipInteractionScene,
       dispatchPipInteractionScene,
-      { type: 'object-reaction-complete' },
-      delaySeconds * 1000,
       window.setTimeout,
       window.clearTimeout,
     );
-  }, [pipInteractionPhase]);
+  }, [pipInteractionPhase, pipInteractionScene, toyNudged]);
 
   useEffect(() => {
     if (pipInteractionPhase !== 'placed') return;

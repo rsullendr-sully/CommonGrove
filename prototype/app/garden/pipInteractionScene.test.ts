@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
+import * as THREE from 'three';
 import type { InteractionEvent } from './interaction';
-import { shouldSuspendPipMotion } from './pipInteraction';
+import { PIP_EATING_REACTION_SECONDS, PIP_PLAYING_REACTION_SECONDS, shouldSuspendPipMotion } from './pipInteraction';
+import { createToyPlayApproach, resolveGardenObjectPlacement } from './GardenObjects';
+import { GARDEN_OBSTACLES, isSafeGardenPoint } from './navigation';
+import { PIP_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './locomotion';
 import {
   consumePipResumeSequence,
   createPipInteractionSceneState,
   eligibleInteractionTarget,
   pipInteractionSceneReducer,
   schedulePipSceneEvent,
+  scheduleObjectReactionCompletion,
   type PipInteractionSceneEvent,
 } from './pipInteractionScene';
 
@@ -155,5 +160,136 @@ describe('Pip interaction scene lifecycle', () => {
     expect(unavailable).toBe(held);
     expect(placed).toMatchObject({ interaction: { mode: 'idle', focused: null, held: null }, focusRepublishSequence: 1 });
     expect(republished.interaction.focused).toBe('food');
+  });
+
+  it('keeps authored display positions while initializing canonical safe recovery points', () => {
+    const state = createPipInteractionSceneState();
+
+    expect(state.objectPositions).toEqual({
+      food: [4.8, 0.25, -4.5],
+      toy: [-3.8, 0.2, 5.4],
+    });
+    for (const id of ['food', 'toy'] as const) {
+      const safe = state.objectLastSafePositions[id];
+      expect(isSafeGardenPoint({ x: safe[0], z: safe[2] }, GARDEN_OBSTACLES)).toBe(true);
+      expect(() => resolveGardenObjectPlacement(
+        id,
+        { x: 0, z: 0 },
+        { x: safe[0], z: safe[2] },
+        GARDEN_OBSTACLES,
+        () => ({ x: 0, z: 0 }),
+      )).not.toThrow();
+    }
+  });
+
+  it('does not start the four-second play timer until routed arrival produces one nudge', () => {
+    vi.useFakeTimers();
+    try {
+      const initial = createPipInteractionSceneState();
+      const focused = pipInteractionSceneReducer(initial, { type: 'focus', target: 'toy' });
+      const held = pipInteractionSceneReducer(focused, {
+        type: 'activate', event: { type: 'pick-up', target: 'toy', safePosition: [10, 0.2, 8] },
+      });
+      let state = pipInteractionSceneReducer(held, {
+        type: 'offer-object', target: 'toy', reactionPoint: { x: 10, z: 8.6 }, pipAvailable: true,
+      });
+      const dispatch = (event: PipInteractionSceneEvent) => {
+        state = pipInteractionSceneReducer(state, event);
+      };
+
+      expect(pipInteractionSceneReducer(state, { type: 'object-reaction-complete' })).toBe(state);
+      const beforeArrivalCleanup = scheduleObjectReactionCompletion(
+        state,
+        dispatch,
+        setTimeout,
+        clearTimeout,
+      );
+      vi.advanceTimersByTime(10_000);
+      expect(state.phase).toBe('playing');
+      expect(state.toyNudged).toBe(false);
+
+      const start = { x: 8.4, z: 1.5 };
+      const approach = createToyPlayApproach(start, { x: 10, z: 8.6 }, GARDEN_OBSTACLES);
+      let progress = {
+        motion: {
+          position: new THREE.Vector3(start.x, 0, start.z),
+          facing: 0,
+          speed: 0,
+          distanceTravelled: 0,
+          moving: false,
+        } satisfies LocomotionState,
+        waypointIndex: 0,
+        complete: false,
+      };
+      let nudgeDispatches = 0;
+      for (let frame = 0; frame < 1_200 && !progress.complete; frame += 1) {
+        progress = stepSafeRouteLocomotion(progress, approach.route, 1 / 60, PIP_MOTION_CONFIG, GARDEN_OBSTACLES);
+        if (progress.complete) {
+          dispatch({ type: 'toy-nudged' });
+          nudgeDispatches += 1;
+        }
+      }
+      expect(progress.complete).toBe(true);
+      expect(nudgeDispatches).toBe(1);
+      expect(state.toyNudged).toBe(true);
+
+      const afterNudgeCleanup = scheduleObjectReactionCompletion(
+        state,
+        dispatch,
+        setTimeout,
+        clearTimeout,
+      );
+      vi.advanceTimersByTime(PIP_PLAYING_REACTION_SECONDS * 1000 - 1);
+      expect(state.phase).toBe('playing');
+      vi.advanceTimersByTime(1);
+      expect(state.phase).toBe('none');
+      expect(state.resumeSequence).toBe(1);
+
+      beforeArrivalCleanup();
+      afterNudgeCleanup();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('completes eating at the 3000ms boundary and cleanup prevents a late completion', () => {
+    vi.useFakeTimers();
+    try {
+      const createEating = () => {
+        const initial = createPipInteractionSceneState();
+        const focused = pipInteractionSceneReducer(initial, { type: 'focus', target: 'food' });
+        const held = pipInteractionSceneReducer(focused, {
+          type: 'activate', event: { type: 'pick-up', target: 'food', safePosition: [8, 0.25, 2] },
+        });
+        return pipInteractionSceneReducer(held, {
+          type: 'offer-object', target: 'food', reactionPoint: { x: 8, z: 2 }, pipAvailable: true,
+        });
+      };
+      let state = createEating();
+      scheduleObjectReactionCompletion(
+        state,
+        (event) => { state = pipInteractionSceneReducer(state, event); },
+        setTimeout,
+        clearTimeout,
+      );
+
+      vi.advanceTimersByTime(PIP_EATING_REACTION_SECONDS * 1000 - 1);
+      expect(state.phase).toBe('eating');
+      vi.advanceTimersByTime(1);
+      expect(state.phase).toBe('none');
+
+      state = createEating();
+      const cleanup = scheduleObjectReactionCompletion(
+        state,
+        (event) => { state = pipInteractionSceneReducer(state, event); },
+        setTimeout,
+        clearTimeout,
+      );
+      cleanup();
+      vi.advanceTimersByTime(PIP_EATING_REACTION_SECONDS * 1000);
+      expect(state.phase).toBe('eating');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

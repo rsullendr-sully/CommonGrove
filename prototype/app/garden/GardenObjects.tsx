@@ -7,6 +7,7 @@ import type { SafePosition } from './interaction';
 import { PIP_INTERACTION_FRAME_PRIORITY, projectPipPlacement } from './pipInteraction';
 import {
   isSafeGardenPoint,
+  createSafeGardenRoute,
   nearestSafePoint,
   type GardenObstacle,
   type GardenPoint,
@@ -15,6 +16,7 @@ import {
 export const GARDEN_SNACK_AUTHORED_POSITION = [4.8, 0.25, -4.5] as const;
 export const GARDEN_TOY_AUTHORED_POSITION = [-3.8, 0.2, 5.4] as const;
 export const GARDEN_OBJECT_CARRY_ANCHOR = [0.42, -0.34, -1.05] as const;
+export const TOY_NUDGE_STANDOFF_DISTANCE = 0.72;
 
 export type GardenObjectId = 'food' | 'toy';
 
@@ -81,6 +83,43 @@ export function projectGardenObjectOffer(
     projectPipPlacement(cameraPosition, cameraForward),
     obstacles,
   );
+}
+
+export type ToyPlayApproach = {
+  standoff: GardenPoint;
+  route: readonly GardenPoint[];
+};
+
+export function createToyPlayApproach(
+  start: GardenPoint,
+  toy: GardenPoint,
+  obstacles: readonly GardenObstacle[],
+): ToyPlayApproach {
+  const towardStart = Math.atan2(start.z - toy.z, start.x - toy.x);
+  const angularStep = Math.PI / 36;
+  const offsets = [0];
+  for (let step = 1; step < 36; step += 1) offsets.push(step, -step);
+
+  for (const distance of [TOY_NUDGE_STANDOFF_DISTANCE, 0.82, 0.92, 1.02, 1.12]) {
+    for (const offset of offsets) {
+      const angle = towardStart + offset * angularStep;
+      const standoff = {
+        x: toy.x + Math.cos(angle) * distance,
+        z: toy.z + Math.sin(angle) * distance,
+      };
+      if (!isSafeGardenPoint(standoff, obstacles)) continue;
+      try {
+        return {
+          standoff,
+          route: createSafeGardenRoute(start, standoff, obstacles),
+        };
+      } catch {
+        // Try the next deterministic standoff candidate.
+      }
+    }
+  }
+
+  throw new Error('No safe toy-play standoff is reachable.');
 }
 
 type GardenObjectProps = {
