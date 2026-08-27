@@ -15,6 +15,40 @@ describe('first-person interaction state', () => {
     expect(actionLabelFor(focused)).toBe('Pet Pip');
   });
 
+  it('progresses a focused Pip from petting to a discoverable pick-up action', () => {
+    const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
+    const petting = interactionReducer(focused, { type: 'pet' });
+    const readyToCarry = interactionReducer(petting, { type: 'reaction-complete' });
+
+    expect(petting.mode).toBe('reacting');
+    expect(readyToCarry).toMatchObject({ mode: 'idle', focused: 'pip', held: null });
+    expect(actionLabelFor(readyToCarry)).toBe('Pick up Pip');
+
+    const held = interactionReducer(readyToCarry, {
+      type: 'pick-up',
+      target: 'pip',
+      safePosition: [1, 0, 2],
+    });
+
+    expect(held).toMatchObject({ mode: 'carrying', focused: null, held: 'pip' });
+  });
+
+  it('clears an ordinary completed reaction while preserving its safe position', () => {
+    const reacting: InteractionState = {
+      mode: 'reacting',
+      focused: null,
+      held: null,
+      lastSafePosition: [4, 0, 5],
+    };
+
+    expect(interactionReducer(reacting, { type: 'reaction-complete' })).toEqual({
+      mode: 'idle',
+      focused: null,
+      held: null,
+      lastSafePosition: [4, 0, 5],
+    });
+  });
+
   it('picks up and safely places Pip', () => {
     const held = interactionReducer(
       { ...idle, focused: 'pip' },
