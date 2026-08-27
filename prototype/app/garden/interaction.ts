@@ -143,3 +143,26 @@ export function actionLabelFor(state: InteractionState): string | null {
       return null;
   }
 }
+
+export function actionLabelForLiveTarget(
+  state: InteractionState,
+  liveTarget: InteractableId | null,
+): string | null {
+  if (state.mode === 'carrying') return actionLabelFor(state);
+  if (state.mode !== 'idle' || state.focused === null || state.focused !== liveTarget) return null;
+  return actionLabelFor(state);
+}
+
+export function actionEventForLiveTarget(
+  state: InteractionState,
+  liveTarget: InteractableId | null,
+  safePosition: SafePosition | null,
+): InteractionEvent | null {
+  if (state.mode !== 'idle' || state.focused === null || state.focused !== liveTarget) return null;
+
+  if (state.focused === 'pip' && state.pipFocusedAction !== 'pick-up') {
+    return { type: 'pet' };
+  }
+  if (safePosition === null) return null;
+  return { type: 'pick-up', target: state.focused, safePosition };
+}

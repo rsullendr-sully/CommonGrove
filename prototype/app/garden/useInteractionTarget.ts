@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { type RefObject, useMemo, useState } from 'react';
+import { type RefObject, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { type InteractableId } from './interaction';
 
@@ -65,9 +65,12 @@ export function useInteractionTarget(
   maxDistance: number,
 ): InteractionTargetResult | null {
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const latestTarget = useRef<InteractionTargetResult | null>(null);
+  const publishedTarget = useRef<InteractionTargetResult | null>(null);
+  const lastDistancePublication = useRef(Number.NEGATIVE_INFINITY);
   const [currentTarget, setCurrentTarget] = useState<InteractionTargetResult | null>(null);
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
     const roots = new Map<THREE.Object3D, InteractableId>();
     for (const registration of registrations) {
       if (registration.ref.current) roots.set(registration.ref.current, registration.target);
@@ -80,16 +83,20 @@ export function useInteractionTarget(
       distance: intersection.distance,
     }));
     const nextTarget = selectNearestInteractionTarget(candidates, maxDistance);
+    const previousTarget = latestTarget.current;
+    const targetChanged = previousTarget?.target !== nextTarget?.target;
+    const distanceChanged = publishedTarget.current !== null && nextTarget !== null &&
+      Math.abs(publishedTarget.current.distance - nextTarget.distance) >= 0.01;
+    latestTarget.current = nextTarget;
 
-    setCurrentTarget((previousTarget) => {
-      if (
-        previousTarget?.target === nextTarget?.target &&
-        previousTarget?.distance === nextTarget?.distance
-      ) {
-        return previousTarget;
-      }
-      return nextTarget;
-    });
+    if (
+      targetChanged ||
+      (distanceChanged && clock.elapsedTime - lastDistancePublication.current >= 0.1)
+    ) {
+      lastDistancePublication.current = clock.elapsedTime;
+      publishedTarget.current = nextTarget;
+      setCurrentTarget(nextTarget);
+    }
   });
 
   return currentTarget;

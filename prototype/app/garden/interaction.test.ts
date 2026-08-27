@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { actionLabelFor, interactionReducer, type InteractionState } from './interaction';
+import {
+  actionEventForLiveTarget,
+  actionLabelFor,
+  actionLabelForLiveTarget,
+  interactionReducer,
+  type InteractionState,
+} from './interaction';
 
 const idle: InteractionState = {
   mode: 'idle',
@@ -31,6 +37,31 @@ describe('first-person interaction state', () => {
     });
 
     expect(held).toMatchObject({ mode: 'carrying', focused: null, held: 'pip' });
+  });
+
+  it.each([null, 'food', 'toy'] as const)(
+    'does not expose or activate Pip pick-up after petting when the live target is %s',
+    (liveTarget) => {
+      const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
+      const petting = interactionReducer(focused, { type: 'pet' });
+      const readyToCarry = interactionReducer(petting, { type: 'reaction-complete' });
+
+      expect(actionLabelForLiveTarget(readyToCarry, liveTarget)).toBeNull();
+      expect(actionEventForLiveTarget(readyToCarry, liveTarget, [1, 0, 2])).toBeNull();
+    },
+  );
+
+  it('restores the legal pick-up-ready action when live targeting reacquires Pip', () => {
+    const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
+    const petting = interactionReducer(focused, { type: 'pet' });
+    const readyToCarry = interactionReducer(petting, { type: 'reaction-complete' });
+
+    expect(actionLabelForLiveTarget(readyToCarry, 'pip')).toBe('Pick up Pip');
+    expect(actionEventForLiveTarget(readyToCarry, 'pip', [1, 0, 2])).toEqual({
+      type: 'pick-up',
+      target: 'pip',
+      safePosition: [1, 0, 2],
+    });
   });
 
   it('clears an ordinary completed reaction while preserving its safe position', () => {

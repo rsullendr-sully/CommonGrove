@@ -6,7 +6,8 @@ import { MutableRefObject, useCallback, useEffect, useMemo, useReducer, useRef, 
 import * as THREE from 'three';
 import InteractionPrompt from './garden/InteractionPrompt';
 import PipCharacter from './garden/PipCharacter';
-import { actionLabelFor, interactionReducer, type InteractionState, type InteractableId } from './garden/interaction';
+import { actionEventForLiveTarget, actionLabelForLiveTarget, interactionReducer, type InteractionState, type InteractableId } from './garden/interaction';
+import { getFirstPersonMovementVector } from './garden/firstPersonMovement';
 import { EMPLOYEE_WALK_SPEED, PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, GARDEN_OBSTACLES, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import { getPipPose, type PipPose } from './garden/pipPose';
@@ -92,8 +93,6 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
   const pitch = useRef(-0.05);
   const dragging = useRef(false);
   const previousPointer = useRef({ x: 0, y: 0 });
-  const forward = useRef(new THREE.Vector3());
-  const right = useRef(new THREE.Vector3());
   const nextPosition = useRef(new THREE.Vector3());
 
   useEffect(() => {
@@ -147,20 +146,16 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
   }, [camera, gl, movement]);
 
   useFrame((_, delta) => {
-    const forwardVector = forward.current;
-    const rightVector = right.current;
     const candidatePosition = nextPosition.current;
     const pressed = movement.current;
     const forwardAmount = Number(pressed.has('w') || pressed.has('arrowup')) - Number(pressed.has('s') || pressed.has('arrowdown'));
     const sideAmount = Number(pressed.has('d') || pressed.has('arrowright')) - Number(pressed.has('a') || pressed.has('arrowleft'));
-    const length = Math.hypot(forwardAmount, sideAmount) || 1;
+    const movementVector = getFirstPersonMovementVector(yaw.current, forwardAmount, sideAmount);
     const frameDistance = EMPLOYEE_WALK_SPEED * Math.min(delta, 0.05);
 
-    forwardVector.set(Math.sin(yaw.current), 0, -Math.cos(yaw.current));
-    rightVector.set(Math.cos(yaw.current), 0, Math.sin(yaw.current));
     candidatePosition.copy(camera.position);
-    candidatePosition.addScaledVector(forwardVector, (forwardAmount / length) * frameDistance);
-    candidatePosition.addScaledVector(rightVector, (sideAmount / length) * frameDistance);
+    candidatePosition.x += movementVector.x * frameDistance;
+    candidatePosition.z += movementVector.z * frameDistance;
     candidatePosition.x = THREE.MathUtils.clamp(candidatePosition.x, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
     candidatePosition.z = THREE.MathUtils.clamp(candidatePosition.z, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
 
@@ -806,27 +801,23 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
   const pip = useRef<THREE.Group>(null);
   const [pipMessage, setPipMessage] = useState<string | null>(null);
   const [interaction, dispatchInteraction] = useReducer(interactionReducer, INITIAL_INTERACTION_STATE);
+  const [liveInteractionTarget, setLiveInteractionTarget] = useState<InteractableId | null>(null);
   const reducedMotion = useReducedMotion();
-  const interactionLabel = actionLabelFor(interaction);
+  const interactionLabel = actionLabelForLiveTarget(interaction, liveInteractionTarget);
   const onInteractionTargetChange = useCallback((target: InteractableId | null) => {
+    setLiveInteractionTarget(target);
     dispatchInteraction({ type: 'focus', target });
   }, []);
   const onPipMount = useCallback((node: THREE.Group | null) => {
     pip.current = node;
   }, []);
   const activateInteraction = useCallback(() => {
-    if (interaction.mode !== 'idle' || interaction.focused !== 'pip') return;
-
-    if (interaction.pipFocusedAction === 'pick-up' && pip.current) {
-      dispatchInteraction({
-        type: 'pick-up',
-        target: 'pip',
-        safePosition: [pip.current.position.x, 0, pip.current.position.z],
-      });
-      return;
-    }
-    dispatchInteraction({ type: 'pet' });
-  }, [interaction]);
+    const safePosition = liveInteractionTarget === 'pip' && pip.current
+      ? [pip.current.position.x, 0, pip.current.position.z] as const
+      : null;
+    const event = actionEventForLiveTarget(interaction, liveInteractionTarget, safePosition);
+    if (event) dispatchInteraction(event);
+  }, [interaction, liveInteractionTarget]);
   const startMoving = (key: string) => movement.current.add(key);
   const stopMoving = (key: string) => movement.current.delete(key);
 
