@@ -41,6 +41,17 @@ describe('grounded locomotion', () => {
     expect(state.position.z).toBeLessThan(-1);
   });
 
+  it('travels nearly the same distance at 30 and 60 fps', () => {
+    const run = (delta: number, frames: number) => {
+      let state = idle();
+      const target = new THREE.Vector3(0, 0, -20);
+      for (let index = 0; index < frames; index += 1) state = stepLocomotion(state, target, delta, config);
+      return state.position.z;
+    };
+
+    expect(run(1 / 30, 60)).toBeCloseTo(run(1 / 60, 120), 1);
+  });
+
   it('brakes to a stop inside the arrival radius', () => {
     let state = { ...idle(), speed: 1.2 };
     const target = new THREE.Vector3(0, 0, -0.5);

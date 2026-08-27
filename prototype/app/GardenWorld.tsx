@@ -5,12 +5,11 @@ import Image from 'next/image';
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import PipCharacter from './garden/PipCharacter';
-import { stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
+import { EMPLOYEE_WALK_SPEED, stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
 import { getPipPose, type PipPose } from './garden/pipPose';
 
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
-const WALK_SPEED = 2;
 
 const obstacles = [
   { x: 0, z: 0, radius: 6.7 },
@@ -152,7 +151,7 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
     const forwardAmount = Number(pressed.has('w') || pressed.has('arrowup')) - Number(pressed.has('s') || pressed.has('arrowdown'));
     const sideAmount = Number(pressed.has('d') || pressed.has('arrowright')) - Number(pressed.has('a') || pressed.has('arrowleft'));
     const length = Math.hypot(forwardAmount, sideAmount) || 1;
-    const frameDistance = WALK_SPEED * Math.min(delta, 0.05);
+    const frameDistance = EMPLOYEE_WALK_SPEED * Math.min(delta, 0.05);
 
     forwardVector.set(Math.sin(yaw.current), 0, -Math.cos(yaw.current));
     rightVector.set(Math.cos(yaw.current), 0, Math.sin(yaw.current));
@@ -598,18 +597,23 @@ const pipWaypoints: Array<[number, number]> = [
   [-8.1, -5.2], [-8.2, 2.4], [-6.3, 7.1], [0.4, 8], [6.4, 7],
 ];
 
-const pipLocomotionConfig: LocomotionConfig = {
+const pipMotionConfig: LocomotionConfig = {
   maxSpeed: 1.2,
   acceleration: 3,
   deceleration: 4,
   turnSpeed: Math.PI * 2,
-  arrivalRadius: 0.12,
+  arrivalRadius: 0.16,
   brakingRadius: 0.9,
+};
+
+const pipRewardMotionConfig: LocomotionConfig = {
+  ...pipMotionConfig,
+  maxSpeed: 1.65,
 };
 
 function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const pip = useRef<THREE.Group>(null);
-  const locomotion = useRef<LocomotionState>({
+  const pipMotion = useRef<LocomotionState>({
     position: new THREE.Vector3(8.4, 0, 1.5),
     facing: Math.PI,
     speed: 0,
@@ -726,14 +730,19 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
       }
 
       if (hasMovementTarget) {
-        locomotion.current = stepLocomotion(locomotion.current, target, delta, pipLocomotionConfig);
-        pip.current.position.copy(locomotion.current.position);
-        pip.current.rotation.y = locomotion.current.facing;
-      } else if (locomotion.current.moving || locomotion.current.speed > 0) {
-        locomotion.current = { ...locomotion.current, speed: 0, moving: false };
+        pipMotion.current = stepLocomotion(
+          pipMotion.current,
+          target,
+          delta,
+          rewardMission.current ? pipRewardMotionConfig : pipMotionConfig,
+        );
+        pip.current.position.copy(pipMotion.current.position);
+        pip.current.rotation.y = pipMotion.current.facing;
+      } else if (pipMotion.current.moving || pipMotion.current.speed > 0) {
+        pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
       }
 
-      const currentLocomotion = locomotion.current;
+      const currentLocomotion = pipMotion.current;
       setPose(getPipPose({
         speed: currentLocomotion.moving ? currentLocomotion.speed : 0,
         distanceTravelled: currentLocomotion.distanceTravelled,
