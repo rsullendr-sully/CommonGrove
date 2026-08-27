@@ -56,8 +56,8 @@ describe('Pip pose', () => {
     expect(pose.bodyLift).toBeGreaterThan(0);
   });
 
-  it('uses a neutral grounded pose immediately after placement, including reduced motion', () => {
-    const pose = getPipPose({ poseKind: 'placed', speed: 2, distanceTravelled: 0.3, attentive: true, reducedMotion: true });
+  it.each([false, true])('uses a neutral grounded pose immediately after placement (reduced motion: %s)', (reducedMotion) => {
+    const pose = getPipPose({ poseKind: 'placed', speed: 2, distanceTravelled: 0.3, attentive: true, reducedMotion });
 
     expect(pose).toMatchObject({
       leftLeg: 0,

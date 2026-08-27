@@ -17,6 +17,8 @@ export const PIP_PLACEMENT_FALLBACK_MESSAGE = "There wasn't a safe spot there, s
 export const PIP_CARRY_ANCHOR = [0.48, -0.42, -1.35] as const;
 export const PIP_PLACEMENT_DISTANCE = 1.4;
 export const PIP_CARRY_WALK_SPEED = 3;
+export const CAMERA_CONTROLS_FRAME_PRIORITY = -1;
+export const PIP_INTERACTION_FRAME_PRIORITY = 0;
 
 export function hasPetReactionCompleted(startedAt: number, now: number): boolean {
   return now - startedAt >= PIP_PET_REACTION_SECONDS;
@@ -52,8 +54,26 @@ export function interactionPoseKind(phase: PipInteractionPhase) {
   return phase === 'none' ? null : phase;
 }
 
-export function cameraRelativeCarryPosition(camera: THREE.Camera): THREE.Vector3 {
+function cameraRelativeCarryPosition(camera: THREE.Camera): THREE.Vector3 {
   return camera.localToWorld(new THREE.Vector3(...PIP_CARRY_ANCHOR));
+}
+
+export function updateCarriedPipTransform(camera: THREE.Camera, pip: THREE.Object3D): void {
+  pip.position.copy(cameraRelativeCarryPosition(camera));
+  pip.rotation.set(0, camera.rotation.y, 0);
+}
+
+export function yawTowardEmployee(pip: GardenPoint, employee: GardenPoint): number {
+  return Math.atan2(employee.x - pip.x, employee.z - pip.z);
+}
+
+export function updatePlacedPipTransform(
+  pip: THREE.Object3D,
+  point: GardenPoint,
+  obstacles: readonly GardenObstacle[],
+): void {
+  if (!isSafeGardenPoint(point, obstacles)) throw new Error('Pip placement requires a safe garden point.');
+  pip.position.set(point.x, 0, point.z);
 }
 
 export function projectPipPlacement(

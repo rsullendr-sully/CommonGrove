@@ -4,10 +4,11 @@ import { createPipBehaviorState, resumePipBehaviorAfterInteraction } from './use
 import { GARDEN_OBSTACLES, isSafeGardenPoint, type GardenInterest } from './navigation';
 import {
   PIP_CARRY_ANCHOR,
+  CAMERA_CONTROLS_FRAME_PRIORITY,
+  PIP_INTERACTION_FRAME_PRIORITY,
   PIP_PET_MESSAGE,
   PIP_PET_REACTION_SECONDS,
   PIP_PLACEMENT_FALLBACK_MESSAGE,
-  cameraRelativeCarryPosition,
   canDirectlyInteractWithPip,
   employeeWalkSpeedWhileHolding,
   handleHeldPipEscape,
@@ -16,6 +17,9 @@ import {
   projectPipPlacement,
   resolvePipPlacement,
   shouldSuspendPipMotion,
+  updateCarriedPipTransform,
+  updatePlacedPipTransform,
+  yawTowardEmployee,
 } from './pipInteraction';
 
 const interests: readonly GardenInterest[] = [
@@ -44,17 +48,54 @@ describe('direct Pip interactions', () => {
     expect(employeeWalkSpeedWhileHolding(null)).toBe(4);
   });
 
-  it('presents Pip at the exact camera-relative carry anchor', () => {
+  it('follows camera translation and rotation in the same frame at the exact carry anchor', () => {
     const camera = new THREE.PerspectiveCamera();
-    camera.position.set(3, 1.7, 5);
-    camera.rotation.set(0, Math.PI / 2, 0, 'YXZ');
-    camera.updateMatrixWorld(true);
+    const pip = new THREE.Group();
+    const frames = [
+      { position: [3, 1.7, 5] as const, rotation: [0, Math.PI / 2, 0] as const },
+      { position: [-4, 1.7, 8] as const, rotation: [-0.2, -Math.PI / 3, 0] as const },
+    ];
 
-    const carried = cameraRelativeCarryPosition(camera);
-    const expected = camera.localToWorld(new THREE.Vector3(...PIP_CARRY_ANCHOR));
+    for (const frame of frames) {
+      const callbacks = [
+        {
+          priority: PIP_INTERACTION_FRAME_PRIORITY,
+          run: () => updateCarriedPipTransform(camera, pip),
+        },
+        {
+          priority: CAMERA_CONTROLS_FRAME_PRIORITY,
+          run: () => {
+            camera.position.set(...frame.position);
+            camera.rotation.set(...frame.rotation, 'YXZ');
+          },
+        },
+      ].sort((left, right) => left.priority - right.priority);
+      callbacks.forEach(({ run }) => run());
 
-    expect(carried.toArray()).toEqual(expected.toArray());
+      const expected = new THREE.Vector3(...PIP_CARRY_ANCHOR)
+        .applyQuaternion(camera.quaternion)
+        .add(camera.position);
+      expect(pip.position.x).toBeCloseTo(expected.x, 12);
+      expect(pip.position.y).toBeCloseTo(expected.y, 12);
+      expect(pip.position.z).toBeCloseTo(expected.z, 12);
+    }
+
+    expect(CAMERA_CONTROLS_FRAME_PRIORITY).toBeLessThan(PIP_INTERACTION_FRAME_PRIORITY);
     expect(PIP_CARRY_ANCHOR).toEqual([0.48, -0.42, -1.35]);
+  });
+
+  it.each([
+    [{ x: 0, z: 4 }, 0],
+    [{ x: 4, z: 0 }, Math.PI / 2],
+    [{ x: 0, z: -4 }, Math.PI],
+    [{ x: -4, z: 0 }, -Math.PI / 2],
+  ] as const)('turns Pip toward an employee at %o before applying the pet tilt', (employee, expectedYaw) => {
+    const yaw = yawTowardEmployee({ x: 0, z: 0 }, employee);
+    const facing = { x: Math.sin(yaw), z: Math.cos(yaw) };
+    const distance = Math.hypot(employee.x, employee.z);
+
+    expect(yaw).toBeCloseTo(expectedYaw, 12);
+    expect(facing.x * (employee.x / distance) + facing.z * (employee.z / distance)).toBeCloseTo(1, 12);
   });
 
   it('projects placement exactly 1.4 meters along corrected planar camera forward', () => {
@@ -92,6 +133,28 @@ describe('direct Pip interactions', () => {
 
     expect(result.usedFallback).toBe(false);
     expect(isSafeGardenPoint(result.point, GARDEN_OBSTACLES)).toBe(true);
+  });
+
+  it('moves the existing Pip object through carry and placement without duplication or loss', () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const pip = new THREE.Group();
+    const originalId = pip.uuid;
+    scene.add(pip);
+    camera.position.set(1, 1.7, 6);
+    camera.rotation.set(0, -0.4, 0, 'YXZ');
+
+    updateCarriedPipTransform(camera, pip);
+    updatePlacedPipTransform(pip, { x: 8.4, z: 1.5 }, GARDEN_OBSTACLES);
+
+    let occurrences = 0;
+    scene.traverse((object) => {
+      if (object.uuid === originalId) occurrences += 1;
+    });
+    expect(pip.uuid).toBe(originalId);
+    expect(pip.parent).toBe(scene);
+    expect(occurrences).toBe(1);
+    expect(pip.position.toArray()).toEqual([8.4, 0, 1.5]);
   });
 
   it('restores Pip’s recorded last-safe point and explains recovery if placement cannot validate', () => {
