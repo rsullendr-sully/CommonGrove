@@ -8,6 +8,7 @@ import {
   createToyPlayApproach,
   projectGardenObjectOffer,
   resetGardenObjectPosition,
+  resolveToyPlayFrame,
   resolveGardenObjectPlacement,
   updateCarriedGardenObjectTransform,
 } from './GardenObjects';
@@ -119,5 +120,50 @@ describe('garden snack and ring toy presentation', () => {
     expect(progress.complete).toBe(true);
     expect(Math.hypot(progress.motion.position.x - toy.x, progress.motion.position.z - toy.z))
       .toBeGreaterThanOrEqual(TOY_NUDGE_STANDOFF_DISTANCE - 0.000_001);
+  });
+
+  it.each([
+    ['open ground', { x: 8.4, z: 1.5 }, { x: 10, z: 8.6 }],
+    ['scenery obstacle', { x: 14, z: -6 }, { x: 10, z: -9.2 }],
+    ['garden boundary', { x: 12, z: 10 }, { x: 18.4, z: 10 }],
+    ['pond edge', { x: -10, z: 0 }, { x: 7.3, z: 0 }],
+  ] as const)('keeps Pip facing the toy after %s approach while emitting one nudge', (_label, start, toy) => {
+    const approach = createToyPlayApproach(start, toy, GARDEN_OBSTACLES);
+    let progress = {
+      motion: {
+        position: new THREE.Vector3(start.x, 0, start.z),
+        facing: 0,
+        speed: 0,
+        distanceTravelled: 0,
+        moving: false,
+      } satisfies LocomotionState,
+      waypointIndex: 0,
+      complete: false,
+    };
+    for (let frame = 0; frame < 2_400 && !progress.complete; frame += 1) {
+      progress = stepSafeRouteLocomotion(progress, approach.route, 1 / 60, PIP_MOTION_CONFIG, GARDEN_OBSTACLES);
+    }
+    expect(progress.complete).toBe(true);
+
+    let nudgeSent = false;
+    let nudgeCount = 0;
+    for (let frame = 0; frame < 6; frame += 1) {
+      const settled = resolveToyPlayFrame(
+        { x: progress.motion.position.x, z: progress.motion.position.z },
+        toy,
+        progress.motion.facing,
+        progress.complete,
+        nudgeSent,
+      );
+      nudgeSent = settled.nudgeSent;
+      if (settled.shouldNudge) nudgeCount += 1;
+
+      const dx = toy.x - progress.motion.position.x;
+      const dz = toy.z - progress.motion.position.z;
+      const distance = Math.hypot(dx, dz);
+      expect(Math.sin(settled.facing) * (dx / distance) + Math.cos(settled.facing) * (dz / distance))
+        .toBeCloseTo(1, 12);
+    }
+    expect(nudgeCount).toBe(1);
   });
 });

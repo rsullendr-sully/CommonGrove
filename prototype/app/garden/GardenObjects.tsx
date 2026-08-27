@@ -122,6 +122,33 @@ export function createToyPlayApproach(
   throw new Error('No safe toy-play standoff is reachable.');
 }
 
+export type ToyPlayFrame = {
+  facing: number;
+  shouldNudge: boolean;
+  nudgeSent: boolean;
+};
+
+export function resolveToyPlayFrame(
+  pip: GardenPoint,
+  toy: GardenPoint,
+  routeFacing: number,
+  arrived: boolean,
+  nudgeAlreadySent: boolean,
+): ToyPlayFrame {
+  if (!arrived) {
+    return {
+      facing: routeFacing,
+      shouldNudge: false,
+      nudgeSent: nudgeAlreadySent,
+    };
+  }
+  return {
+    facing: Math.atan2(toy.x - pip.x, toy.z - pip.z),
+    shouldNudge: !nudgeAlreadySent,
+    nudgeSent: true,
+  };
+}
+
 type GardenObjectProps = {
   position: SafePosition;
   carried: boolean;

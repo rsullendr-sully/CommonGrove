@@ -10,6 +10,7 @@ import {
   GardenToy,
   createToyPlayApproach,
   projectGardenObjectOffer,
+  resolveToyPlayFrame,
   resolveGardenObjectPlacement,
   type GardenObjectId,
 } from './garden/GardenObjects';
@@ -731,13 +732,16 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
           pipMotion.current = routeProgress.motion;
           routeIndex.current = routeProgress.waypointIndex;
           pip.current.position.copy(pipMotion.current.position);
-          pip.current.rotation.y = pipMotion.current.facing;
-          if (routeProgress.complete && !toyNudgeSent.current) {
-            pip.current.rotation.y = Math.atan2(
-              target.x - pip.current.position.x,
-              target.z - pip.current.position.z,
-            );
-            toyNudgeSent.current = true;
+          const playFrame = resolveToyPlayFrame(
+            { x: pip.current.position.x, z: pip.current.position.z },
+            target,
+            pipMotion.current.facing,
+            routeProgress.complete,
+            toyNudgeSent.current,
+          );
+          pip.current.rotation.y = playFrame.facing;
+          toyNudgeSent.current = playFrame.nudgeSent;
+          if (playFrame.shouldNudge) {
             onToyNudged();
           }
           setPose(getPipPose({
