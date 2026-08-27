@@ -764,7 +764,7 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
   );
 }
 
-function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible, gardenChoice, reducedMotion }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
+function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const grassTexture = useGrassTexture();
   return (
     <>
@@ -800,7 +800,7 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
       <GardenTree position={[-14.8, 0, 4.5]} scale={0.94} color="#5f8558" />
       <StarflowerPatch visible={starflowersVisible} reducedMotion={reducedMotion} />
       <CuriousSeed visible={seedVisible} reducedMotion={reducedMotion} />
-      <ChoiceDestination choice={gardenChoice} reducedMotion={reducedMotion} />
+      <ChoiceDestination choice={destinationVisible} reducedMotion={reducedMotion} />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
       <Pip onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} reducedMotion={reducedMotion} />
 
@@ -809,7 +809,7 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
   );
 }
 
-export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved, seedVisible, gardenChoice }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; gardenChoice: GardenChoice | null }) {
+export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null }) {
   const movement = useRef(new Set<string>());
   const [pipMessage, setPipMessage] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
@@ -826,6 +826,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
           starflowersVisible={starflowersVisible}
           pavilionImproved={pavilionImproved}
           seedVisible={seedVisible}
+          destinationVisible={destinationVisible}
           gardenChoice={gardenChoice}
           reducedMotion={reducedMotion}
         />

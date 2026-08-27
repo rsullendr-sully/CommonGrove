@@ -25,6 +25,20 @@ const idle = (): LocomotionState => ({
   moving: false,
 });
 
+function turnUntilMoving(target: THREE.Vector3) {
+  let state = idle();
+  const stationarySpeeds: number[] = [];
+
+  for (let index = 0; index < 120; index += 1) {
+    const next = stepLocomotion(state, target, 1 / 60, config);
+    if (next.moving) return { stationarySpeeds, launchSpeed: next.speed };
+    stationarySpeeds.push(next.speed);
+    state = next;
+  }
+
+  throw new Error('Pip never began translating toward the target');
+}
+
 describe('locomotion constants', () => {
   it('sets employee travel to four meters per second', () => {
     expect(EMPLOYEE_WALK_SPEED).toBe(4);
@@ -70,6 +84,20 @@ describe('grounded locomotion', () => {
     expect(state.position.x).toBe(0);
     expect(state.position.z).toBe(0);
     expect(state.facing).toBeGreaterThan(0);
+  });
+
+  it('does not bank launch speed during a stationary 90-degree turn', () => {
+    const result = turnUntilMoving(new THREE.Vector3(10, 0, 0));
+
+    expect(Math.max(...result.stationarySpeeds)).toBe(0);
+    expect(result.launchSpeed).toBeCloseTo(0.05, 5);
+  });
+
+  it('does not bank launch speed during a stationary 180-degree turn', () => {
+    const result = turnUntilMoving(new THREE.Vector3(0, 0, -10));
+
+    expect(Math.max(...result.stationarySpeeds)).toBe(0);
+    expect(result.launchSpeed).toBeCloseTo(0.05, 5);
   });
 
   it('reaches arrival without teleporting from outside the radius', () => {

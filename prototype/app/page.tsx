@@ -56,7 +56,7 @@ export default function Home() {
   };
 
   const activeReward = rewardStage === 3 ? 'seed' : rewardStage === 2 ? 'pavilion' : 'starflowers';
-  const { starflowersVisible, pavilionImproved, seedVisible } = deriveGardenVisibility({ rewardStage, gardenView, gardenChoice });
+  const { starflowersVisible, pavilionImproved, seedVisible, destinationVisible } = deriveGardenVisibility({ rewardStage, gardenView, gardenChoice });
 
   const confirmChoice = () => {
     if (!pendingChoice) return;
@@ -97,6 +97,7 @@ export default function Home() {
           starflowersVisible={starflowersVisible}
           pavilionImproved={pavilionImproved}
           seedVisible={seedVisible}
+          destinationVisible={destinationVisible}
           gardenChoice={gardenChoice}
         />
       </section>
