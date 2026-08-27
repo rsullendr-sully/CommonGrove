@@ -61,7 +61,7 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 - Bounded first-person garden exploration with keyboard and on-screen movement controls
 - Pip enlarged to a close, conversational scale within the garden view
 - Garden spatial inspiration captured in `docs/design/garden-visual-direction.md`; use its composition and scale principles without copying source art or assets
-- Approved spatial scale: a bounded 40 × 40 meter square with approximately 20 seconds of walking from side to side
+- Approved spatial scale: a bounded 40 × 40 meter square with approximately 10 seconds of walking from side to side
 - First true-3D shell limited to ground, sky, boundaries, center marker, smooth movement, and camera look
 - Product owner confirmed the garden shell is a good size on 2026-08-26; the Release 0 footprint and walking pace are now locked
 - Central pond slice added at twelve meters across with a low stone rim and a contained water-edge movement boundary
