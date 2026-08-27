@@ -40,29 +40,35 @@ describe('Pip interaction scene lifecycle', () => {
     });
   });
 
-  it('keeps reducer state and visual phase synchronized through pet and carry activation', () => {
+  it('keeps reducer state and visual phase synchronized through greet, pet, and carry activation', () => {
     const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'pip' });
-    const petting = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'pet' } });
+    const greeting = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'greet' } });
+    const readyToPet = pipInteractionSceneReducer(greeting, { type: 'greet-complete' });
+    const petting = pipInteractionSceneReducer(readyToPet, { type: 'activate', event: { type: 'pet' } });
     const ready = pipInteractionSceneReducer(petting, { type: 'pet-complete' });
     const carrying = pipInteractionSceneReducer(ready, {
       type: 'activate',
       event: { type: 'pick-up', target: 'pip', safePosition: [8.4, 0, 1.5] },
     });
 
+    expect(greeting).toMatchObject({ phase: 'greet', interaction: { mode: 'reacting', reaction: 'greet' } });
+    expect(readyToPet).toMatchObject({ phase: 'none', resumeSequence: 1, interaction: { mode: 'idle', pipFocusedAction: 'pet' } });
     expect(petting).toMatchObject({ phase: 'pet', interaction: { mode: 'reacting', focused: 'pip' } });
     expect(shouldSuspendPipMotion(petting.phase)).toBe(true);
-    expect(ready).toMatchObject({ phase: 'none', resumeSequence: 1, interaction: { mode: 'idle', pipFocusedAction: 'pick-up' } });
+    expect(ready).toMatchObject({ phase: 'none', resumeSequence: 2, interaction: { mode: 'idle', pipFocusedAction: 'pick-up' } });
     expect(shouldSuspendPipMotion(ready.phase)).toBe(false);
     expect(carrying).toMatchObject({ phase: 'carried', interaction: { mode: 'carrying', held: 'pip' } });
   });
 
   it('completes pet and placed phases once and requests exactly one fresh resume each', () => {
     const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'pip' });
-    const petting = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'pet' } });
+    const greeting = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'greet' } });
+    const readyToPet = pipInteractionSceneReducer(greeting, { type: 'greet-complete' });
+    const petting = pipInteractionSceneReducer(readyToPet, { type: 'activate', event: { type: 'pet' } });
     const petComplete = pipInteractionSceneReducer(petting, { type: 'pet-complete' });
     const latePetComplete = pipInteractionSceneReducer(petComplete, { type: 'pet-complete' });
     const resume = vi.fn();
-    let consumed = consumePipResumeSequence(0, latePetComplete.resumeSequence, resume);
+    let consumed = consumePipResumeSequence(1, latePetComplete.resumeSequence, resume);
     consumed = consumePipResumeSequence(consumed, latePetComplete.resumeSequence, resume);
 
     const carrying = pipInteractionSceneReducer(petComplete, {
@@ -77,10 +83,29 @@ describe('Pip interaction scene lifecycle', () => {
     const placedComplete = pipInteractionSceneReducer(placed, { type: 'placed-complete' });
 
     expect(latePetComplete).toBe(petComplete);
-    expect(consumed).toBe(1);
+    expect(consumed).toBe(2);
     expect(resume).toHaveBeenCalledOnce();
     expect(placed).toMatchObject({ phase: 'placed', interaction: { mode: 'idle', held: null } });
-    expect(placedComplete.resumeSequence).toBe(2);
+    expect(placedComplete.resumeSequence).toBe(3);
+  });
+
+  it('cleans up the direct greeting timer so no completion can fire after unmount', () => {
+    let callback: (() => void) | null = null;
+    const dispatch = vi.fn();
+    const cancel = vi.fn();
+    const cleanup = schedulePipSceneEvent(
+      dispatch,
+      { type: 'greet-complete' },
+      1400,
+      (scheduled) => { callback = scheduled; return 29; },
+      cancel,
+    );
+
+    cleanup();
+    (callback as (() => void) | null)?.();
+
+    expect(cancel).toHaveBeenCalledWith(29);
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it('cancels timers defensively so cleanup cannot dispatch a late completion', () => {

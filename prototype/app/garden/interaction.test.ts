@@ -15,17 +15,22 @@ const idle: InteractionState = {
 };
 
 describe('first-person interaction state', () => {
-  it('offers petting when Pip is focused', () => {
+  it('offers the approved greeting first when Pip is focused', () => {
     const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
 
-    expect(actionLabelFor(focused)).toBe('Pet Pip');
+    expect(actionLabelFor(focused)).toBe('Greet Pip');
+    expect(actionEventForLiveTarget(focused, 'pip', [1, 0, 2])).toEqual({ type: 'greet' });
   });
 
-  it('progresses a focused Pip from petting to a discoverable pick-up action', () => {
+  it('progresses one live-target-gated action at a time from greet to pet to pick-up', () => {
     const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
-    const petting = interactionReducer(focused, { type: 'pet' });
+    const greeting = interactionReducer(focused, { type: 'greet' });
+    const readyToPet = interactionReducer(greeting, { type: 'reaction-complete' });
+    const petting = interactionReducer(readyToPet, { type: 'pet' });
     const readyToCarry = interactionReducer(petting, { type: 'reaction-complete' });
 
+    expect(greeting).toMatchObject({ mode: 'reacting', reaction: 'greet' });
+    expect(actionLabelFor(readyToPet)).toBe('Pet Pip');
     expect(petting.mode).toBe('reacting');
     expect(readyToCarry).toMatchObject({ mode: 'idle', focused: 'pip', held: null });
     expect(actionLabelFor(readyToCarry)).toBe('Pick up Pip');
@@ -43,7 +48,9 @@ describe('first-person interaction state', () => {
     'does not expose or activate Pip pick-up after petting when the live target is %s',
     (liveTarget) => {
       const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
-      const petting = interactionReducer(focused, { type: 'pet' });
+      const greeting = interactionReducer(focused, { type: 'greet' });
+      const readyToPet = interactionReducer(greeting, { type: 'reaction-complete' });
+      const petting = interactionReducer(readyToPet, { type: 'pet' });
       const readyToCarry = interactionReducer(petting, { type: 'reaction-complete' });
 
       expect(actionLabelForLiveTarget(readyToCarry, liveTarget)).toBeNull();
@@ -53,7 +60,9 @@ describe('first-person interaction state', () => {
 
   it('restores the legal pick-up-ready action when live targeting reacquires Pip', () => {
     const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
-    const petting = interactionReducer(focused, { type: 'pet' });
+    const greeting = interactionReducer(focused, { type: 'greet' });
+    const readyToPet = interactionReducer(greeting, { type: 'reaction-complete' });
+    const petting = interactionReducer(readyToPet, { type: 'pet' });
     const readyToCarry = interactionReducer(petting, { type: 'reaction-complete' });
 
     expect(actionLabelForLiveTarget(readyToCarry, 'pip')).toBe('Pick up Pip');
@@ -86,7 +95,9 @@ describe('first-person interaction state', () => {
     'keeps Pip ready for pick-up when the reticle changes to %s during petting',
     (target) => {
       const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
-      const petting = interactionReducer(focused, { type: 'pet' });
+      const greeting = interactionReducer(focused, { type: 'greet' });
+      const readyToPet = interactionReducer(greeting, { type: 'reaction-complete' });
+      const petting = interactionReducer(readyToPet, { type: 'pet' });
       const afterFocusChange = interactionReducer(petting, { type: 'focus', target });
       const readyToCarry = interactionReducer(afterFocusChange, { type: 'reaction-complete' });
 

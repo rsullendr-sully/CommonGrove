@@ -8,6 +8,8 @@ import {
   type PipActivityKind,
 } from './behavior';
 import {
+  createSafeGreetingApproach,
+  GARDEN_OBSTACLES,
   hasActivityTimedOut,
   PIP_ACTIVITY_TIMEOUT_SECONDS,
   type GardenInterest,
@@ -47,14 +49,16 @@ export type PipBehaviorFrameInput = {
   now: number;
   interests: readonly GardenInterest[];
   employeeDistance: number;
+  employeePosition: GardenPoint | null;
+  pipPosition: GardenPoint;
   locomotionComplete: boolean;
   rewardMission: PipPriorityMission | null;
   choiceMission: PipPriorityMission | null;
   randomValue: number;
 };
 
-const GREETING_DISTANCE = 3.15;
-const GREETING_EXIT_DISTANCE = 4.1;
+const GREETING_DISTANCE = 1.35;
+const GREETING_EXIT_DISTANCE = 2;
 const PRIORITY_PAUSE_SECONDS = 6;
 
 const poseForActivity = (kind: PipActivityKind): PipPoseKind => {
@@ -186,19 +190,39 @@ function selectGreeting(state: PipBehaviorState, input: PipBehaviorFrameInput) {
     cooldownUntil: state.cooldownUntil,
   }, input.randomValue);
   if (!greeting) return state;
+  const approach = input.employeePosition
+    ? createSafeGreetingApproach(input.pipPosition, input.employeePosition, GARDEN_OBSTACLES)
+    : { target: { ...input.pipPosition }, route: [{ ...input.pipPosition }] };
   return {
     ...state,
     activity: greeting,
-    target: null,
+    target: approach.target,
     message: greetingMessage(state.hasGreeted),
-    poseKind: 'greet' as const,
-    phase: 'performing' as const,
+    poseKind: 'walk' as const,
+    phase: 'traveling' as const,
     startedAt: input.now,
     cooldownUntil: {
       ...state.cooldownUntil,
       greet: input.now + greeting.cooldownSeconds,
     },
     hasGreeted: true,
+  };
+}
+
+export function recordDirectPipGreeting(
+  state: PipBehaviorState,
+  now: number,
+): PipBehaviorState {
+  if (state.mode === 'priority') return state;
+  const greeting = activityDefinitions.find(({ kind }) => kind === 'greet')!;
+  return {
+    ...state,
+    employeeNearby: true,
+    hasGreeted: true,
+    cooldownUntil: {
+      ...state.cooldownUntil,
+      greet: Math.max(state.cooldownUntil.greet ?? 0, now + greeting.cooldownSeconds),
+    },
   };
 }
 
@@ -322,12 +346,13 @@ export function advancePipBehavior(
 
 export type UsePipBehaviorResult = Pick<
   PipBehaviorState,
-  'activity' | 'target' | 'message' | 'poseKind' | 'mode'
+  'activity' | 'target' | 'message' | 'poseKind' | 'mode' | 'phase'
 > & {
   advance: (input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => PipBehaviorState;
   completeActivity: (input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => PipBehaviorState;
   interruptWithReward: (mission: PipPriorityMission, now: number) => PipBehaviorState;
   resumeAfterInteraction: (input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => PipBehaviorState;
+  recordDirectGreeting: (now: number) => PipBehaviorState;
 };
 
 export function usePipBehavior(
@@ -374,15 +399,21 @@ export function usePipBehavior(
     commit(resumePipBehaviorAfterInteraction(stateRef.current, withLocalInputs(input)))
   ), [commit, withLocalInputs]);
 
+  const recordDirectGreeting = useCallback((now: number) => (
+    commit(recordDirectPipGreeting(stateRef.current, now))
+  ), [commit]);
+
   return {
     activity: snapshot.activity,
     target: snapshot.target,
     message: snapshot.message,
     poseKind: snapshot.poseKind,
     mode: snapshot.mode,
+    phase: snapshot.phase,
     advance,
     completeActivity,
     interruptWithReward,
     resumeAfterInteraction,
+    recordDirectGreeting,
   };
 }

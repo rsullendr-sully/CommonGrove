@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createSafeGardenRoute,
+  createSafeGreetingApproach,
   GARDEN_OBSTACLES,
   hasActivityTimedOut,
   isSafeGardenPoint,
@@ -32,6 +33,26 @@ function expectSafeRoute(
 }
 
 describe('Pip garden navigation', () => {
+  it.each([
+    ['pond edge', { x: 7.3, z: 0 }, { x: 10, z: 0 }],
+    ['boundary', { x: 18, z: 10 }, { x: 15.8, z: 10 }],
+    ['tree obstacle', { x: 13.5, z: -9.2 }, { x: 15.8, z: -9.2 }],
+  ] as const)('creates a slight, fully safe greeting approach near the %s', (_label, pip, employee) => {
+    const approach = createSafeGreetingApproach(pip, employee, GARDEN_OBSTACLES);
+
+    expectSafeRoute(pip, approach.route, GARDEN_OBSTACLES);
+    expect(Math.hypot(approach.target.x - employee.x, approach.target.z - employee.z))
+      .toBeLessThan(Math.hypot(pip.x - employee.x, pip.z - employee.z));
+  });
+
+  it('stays put instead of crowding or taking an unsafe greeting step', () => {
+    const pip = { x: 8.2, z: 0 };
+    const approach = createSafeGreetingApproach(pip, { x: 9.4, z: 0 }, GARDEN_OBSTACLES);
+
+    expect(approach.target).toEqual(pip);
+    expectSafeRoute(pip, approach.route, GARDEN_OBSTACLES);
+  });
+
   it('excludes points in the protected pond radius', () => {
     expect(isSafeGardenPoint({ x: SAFE_POND_RADIUS - 0.01, z: 0 }, scenery)).toBe(false);
   });

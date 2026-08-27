@@ -39,6 +39,7 @@ export type PipInteractionSceneState = {
 export type PipInteractionSceneEvent =
   | { type: 'focus'; target: InteractableId | null }
   | { type: 'activate'; event: InteractionActivationEvent }
+  | { type: 'greet-complete' }
   | { type: 'pet-complete' }
   | { type: 'place-pip'; point: GardenPoint; message: string | null }
   | { type: 'placed-complete' }
@@ -93,8 +94,10 @@ export function pipInteractionSceneReducer(
     case 'activate': {
       const interaction = interactionReducer(state.interaction, event.event);
       if (interaction === state.interaction) return state;
-      const phase = event.event.type === 'pet'
-        ? 'pet'
+      const phase = event.event.type === 'greet'
+        ? 'greet'
+        : event.event.type === 'pet'
+          ? 'pet'
         : event.event.type === 'pick-up' && event.event.target === 'pip'
           ? 'carried'
           : state.phase;
@@ -112,6 +115,15 @@ export function pipInteractionSceneReducer(
               },
             }
           : {}),
+      };
+    }
+    case 'greet-complete': {
+      if (state.phase !== 'greet') return state;
+      return {
+        ...state,
+        interaction: interactionReducer(state.interaction, { type: 'reaction-complete' }),
+        phase: 'none',
+        resumeSequence: state.resumeSequence + 1,
       };
     }
     case 'pet-complete': {

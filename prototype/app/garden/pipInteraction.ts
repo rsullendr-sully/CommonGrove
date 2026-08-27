@@ -7,15 +7,16 @@ import {
   type GardenPoint,
 } from './navigation';
 import type { InteractableId } from './interaction';
-import type { PipBehaviorState } from './usePipBehavior';
 
-export type PipInteractionPhase = 'none' | 'pet' | 'carried' | 'placed' | 'eating' | 'playing';
+export type PipInteractionPhase = 'none' | 'greet' | 'pet' | 'carried' | 'placed' | 'eating' | 'playing';
 
 export const PIP_EATING_REACTION_SECONDS = 3;
 export const PIP_PLAYING_REACTION_SECONDS = 4;
 
 export const PIP_PET_REACTION_SECONDS = 1.8;
 export const PIP_PET_MESSAGE = 'Pip leans into your hand, listening ear tipped toward you.';
+export const PIP_DIRECT_GREET_REACTION_SECONDS = 1.4;
+export const PIP_DIRECT_GREET_MESSAGE = 'Pip steps closer, listening ear lifted in hello.';
 export const PIP_PLACEMENT_FALLBACK_MESSAGE = "There wasn't a safe spot there, so Pip returned to the path.";
 export const PIP_CARRY_ANCHOR = [0.48, -0.42, -1.35] as const;
 export const PIP_PLACEMENT_DISTANCE = 1.4;
@@ -37,8 +38,11 @@ export function employeeWalkSpeedWhileHolding(held: InteractableId | null): numb
   return held === 'pip' ? PIP_CARRY_WALK_SPEED : EMPLOYEE_WALK_SPEED;
 }
 
-export function canDirectlyInteractWithPip(mode: PipBehaviorState['mode']): boolean {
-  return mode === 'ordinary';
+export function canDirectlyInteractWithPip(
+  mode: 'ordinary' | 'priority',
+  activityKind: string | null = null,
+): boolean {
+  return mode === 'ordinary' && activityKind !== 'greet';
 }
 
 export function handleHeldPipEscape(

@@ -4,6 +4,7 @@ import {
   advancePipBehavior,
   createPipBehaviorState,
   interruptPipBehaviorWithReward,
+  recordDirectPipGreeting,
   type PipPriorityMission,
 } from './usePipBehavior';
 
@@ -18,6 +19,8 @@ const interests: readonly GardenInterest[] = [
 const ordinaryInput = {
   interests,
   employeeDistance: Number.POSITIVE_INFINITY,
+  employeePosition: null,
+  pipPosition: { x: 8.4, z: 1.5 },
   locomotionComplete: false,
   rewardMission: null,
   choiceMission: null,
@@ -258,26 +261,30 @@ describe('Pip behavior lifecycle', () => {
       ...ordinaryInput,
       now: 2,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
     const priorityArrives = advancePipBehavior(employeeArrives, {
       ...ordinaryInput,
       now: 3,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
       locomotionComplete: true,
     });
     const ordinaryResumes = advancePipBehavior(priorityArrives, {
       ...ordinaryInput,
       now: 9,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
     const greeted = advancePipBehavior(ordinaryResumes, {
       ...ordinaryInput,
       now: 9.1,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
 
     expect(employeeArrives.employeeNearby).toBe(false);
@@ -345,16 +352,27 @@ describe('Pip behavior lifecycle', () => {
       ...ordinaryInput,
       now: 1,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
-    const stillGreeting = advancePipBehavior(greeted, {
+    const arrived = advancePipBehavior(greeted, {
       ...ordinaryInput,
-      now: 5,
+      now: 1.1,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
+      locomotionComplete: true,
+    });
+    const stillGreeting = advancePipBehavior(arrived, {
+      ...ordinaryInput,
+      now: 5.101,
+      randomValue: 0,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
 
     expect(greeted.activity?.kind).toBe('greet');
+    expect(greeted.target).toEqual({ x: 8.4, z: 1.5 });
     expect(greeted.message).toBe('Oh! You’re here. I saved the quiet spot by the spring for you.');
     expect(stillGreeting.activity?.kind).not.toBe('greet');
   });
@@ -369,27 +387,62 @@ describe('Pip behavior lifecycle', () => {
       ...ordinaryInput,
       now: 1,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
     const finishedGreeting = advancePipBehavior(greeted, {
       ...ordinaryInput,
       now: 5,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
     const employeeLeaves = advancePipBehavior(finishedGreeting, {
       ...ordinaryInput,
       now: 6,
       randomValue: 0,
-      employeeDistance: 5,
+      employeeDistance: 3,
     });
     const employeeReturns = advancePipBehavior(employeeLeaves, {
       ...ordinaryInput,
       now: 7,
       randomValue: 0,
-      employeeDistance: 2,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
     });
 
     expect(employeeReturns.activity?.kind).not.toBe('greet');
+  });
+
+  it.each([
+    [{ x: 10, z: 1.5 }, { x: 8.4, z: 1.5 }],
+    [{ x: 8.4, z: 3.1 }, { x: 8.4, z: 1.5 }],
+  ] as const)('autonomous greeting safely approaches an employee at %o', (employeePosition, pipPosition) => {
+    const greeted = advancePipBehavior(createPipBehaviorState(), {
+      ...ordinaryInput,
+      now: 1,
+      randomValue: 0,
+      employeeDistance: 1,
+      employeePosition,
+      pipPosition,
+    });
+
+    expect(greeted.activity?.kind).toBe('greet');
+    expect(greeted.poseKind).toBe(greeted.target ? 'walk' : 'greet');
+  });
+
+  it('records a direct greeting edge so proximity cannot immediately duplicate it', () => {
+    const directGreeting = recordDirectPipGreeting(createPipBehaviorState(), 2);
+    const nextFrame = advancePipBehavior(directGreeting, {
+      ...ordinaryInput,
+      now: 3.5,
+      randomValue: 0,
+      employeeDistance: 1,
+      employeePosition: { x: 9.4, z: 1.5 },
+    });
+
+    expect(directGreeting.employeeNearby).toBe(true);
+    expect(directGreeting.hasGreeted).toBe(true);
+    expect(nextFrame.activity?.kind).not.toBe('greet');
   });
 });

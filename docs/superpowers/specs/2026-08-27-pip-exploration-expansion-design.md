@@ -117,6 +117,8 @@ Supported interactions are:
 - **Place an object** — the object is placed at a valid nearby ground position.
 - **Offer an object** — Pip receives an eligible carried food or toy when close enough.
 
+For a newly focused Pip, the contextual sequence is **Greet Pip → Pet Pip → Pick up Pip**. Each completed brief reaction reveals the next action; only one E/button action is shown at a time, and every activation still requires Pip to be the current live target.
+
 The employee may continue moving while carrying Pip, but movement slows modestly to keep the pose readable. Pressing Escape cancels carrying and safely places the held character or object.
 
 Placement validates the garden boundary, pond edge, and scenery obstacles. If the requested position is invalid, the system chooses the nearest safe position. If no nearby safe position is available, it returns the held item to its last safe position and explains the result without an error dialog.

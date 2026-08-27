@@ -18,8 +18,9 @@ import PipCharacter from './garden/PipCharacter';
 import { actionEventForLiveTarget, actionLabelForLiveTarget, type InteractableId } from './garden/interaction';
 import { getFirstPersonMovementVector } from './garden/firstPersonMovement';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
-import { createSafeGardenRoute, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
+import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import {
+  PIP_DIRECT_GREET_REACTION_SECONDS,
   PIP_PET_REACTION_SECONDS,
   CAMERA_CONTROLS_FRAME_PRIORITY,
   PIP_INTERACTION_FRAME_PRIORITY,
@@ -34,7 +35,7 @@ import {
   yawTowardEmployee,
   type PipInteractionPhase,
 } from './garden/pipInteraction';
-import { pipInteractionStatusText } from './garden/pipInteractionPresentation';
+import { pipInteractionStatusText, pipLiveRegionLabel } from './garden/pipInteractionPresentation';
 import {
   consumePipResumeSequence,
   createPipInteractionSceneState,
@@ -656,6 +657,7 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
   const consumedResumeSequence = useRef(0);
   const interactionStartedAt = useRef<number | null>(null);
   const toyNudgeSent = useRef(false);
+  const directGreetingRecorded = useRef(false);
   const rewardMission = useMemo<PipPriorityMission | null>(() => {
     if (rewardStage === 1) return {
       id: 'reward-1',
@@ -690,7 +692,10 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
   const behavior = usePipBehavior(interests);
 
   useEffect(() => onMessage(behavior.message), [behavior.message, onMessage]);
-  useEffect(() => onPriorityModeChange(!canDirectlyInteractWithPip(behavior.mode)), [behavior.mode, onPriorityModeChange]);
+  useEffect(
+    () => onPriorityModeChange(!canDirectlyInteractWithPip(behavior.mode, behavior.activity?.kind ?? null)),
+    [behavior.activity?.kind, behavior.mode, onPriorityModeChange],
+  );
 
   useFrame(({ clock, camera }, delta) => {
     if (pip.current) {
@@ -698,6 +703,47 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
         pip.current.position.x - camera.position.x,
         pip.current.position.z - camera.position.z,
       );
+      if (interactionPhase === 'greet') {
+        if (!directGreetingRecorded.current) {
+          behavior.recordDirectGreeting(clock.elapsedTime);
+          directGreetingRecorded.current = true;
+        }
+        const targetKey = 'interaction-greet';
+        if (routeTargetKey.current !== targetKey) {
+          routeTargetKey.current = targetKey;
+          const approach = createSafeGreetingApproach(
+            { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
+            { x: camera.position.x, z: camera.position.z },
+            GARDEN_OBSTACLES,
+          );
+          routeWaypoints.current = approach.route;
+          routeIndex.current = 0;
+        }
+        const routeProgress = stepSafeRouteLocomotion(
+          { motion: pipMotion.current, waypointIndex: routeIndex.current, complete: false },
+          routeWaypoints.current,
+          delta,
+          PIP_MOTION_CONFIG,
+          GARDEN_OBSTACLES,
+        );
+        pipMotion.current = routeProgress.motion;
+        routeIndex.current = routeProgress.waypointIndex;
+        pip.current.position.copy(pipMotion.current.position);
+        pip.current.rotation.y = yawTowardEmployee(
+          { x: pip.current.position.x, z: pip.current.position.z },
+          { x: camera.position.x, z: camera.position.z },
+        );
+        setPose(getPipPose({
+          poseKind: routeProgress.complete ? 'greet' : 'walk',
+          speed: pipMotion.current.speed,
+          distanceTravelled: pipMotion.current.distanceTravelled,
+          attentive: true,
+          reducedMotion,
+        }));
+        return;
+      }
+
+      directGreetingRecorded.current = false;
       if (interactionPhase === 'eating' || interactionPhase === 'playing') {
         const startedAt = interactionStartedAt.current ?? clock.elapsedTime;
         interactionStartedAt.current = startedAt;
@@ -809,6 +855,8 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
         () => behavior.resumeAfterInteraction({
           now: clock.elapsedTime,
           employeeDistance: distanceToVisitor,
+          employeePosition: { x: camera.position.x, z: camera.position.z },
+          pipPosition: { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
           locomotionComplete: false,
           rewardMission,
           choiceMission,
@@ -861,9 +909,18 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
         routeIndex.current = 0;
       }
 
+      if (behavior.activity?.kind === 'greet' && (behavior.phase === 'performing' || locomotionComplete)) {
+        pip.current.rotation.y = yawTowardEmployee(
+          { x: pip.current.position.x, z: pip.current.position.z },
+          { x: camera.position.x, z: camera.position.z },
+        );
+      }
+
       behavior.advance({
         now: clock.elapsedTime,
         employeeDistance: distanceToVisitor,
+        employeePosition: { x: camera.position.x, z: camera.position.z },
+        pipPosition: { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
         locomotionComplete,
         rewardMission,
         choiceMission,
@@ -988,6 +1045,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
     placementMessage,
     pipMessage,
   );
+  const pipLiveLabel = pipLiveRegionLabel(visiblePipMessage);
   const onInteractionTargetChange = useCallback((target: InteractableId | null) => {
     setLiveInteractionTarget(target);
     dispatchPipInteractionScene({ type: 'focus', target });
@@ -1074,6 +1132,17 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
   }, [eligibleLiveTarget, interaction, liveInteractionTarget, pipPriorityMissionActive, placeObject, placePip]);
 
   useEffect(() => {
+    if (pipInteractionPhase !== 'greet') return;
+    return schedulePipSceneEvent(
+      dispatchPipInteractionScene,
+      { type: 'greet-complete' },
+      PIP_DIRECT_GREET_REACTION_SECONDS * 1000,
+      window.setTimeout,
+      window.clearTimeout,
+    );
+  }, [pipInteractionPhase]);
+
+  useEffect(() => {
     if (pipInteractionPhase !== 'pet') return;
     return schedulePipSceneEvent(
       dispatchPipInteractionScene,
@@ -1151,10 +1220,12 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
       </Canvas>
       <div className="world-reticle" aria-hidden="true" />
       <InteractionPrompt label={interactionLabel} onActivate={activateInteraction} />
-      <div className={`pip-presence ${visiblePipMessage ? 'visible' : ''}`} role="status" aria-live="polite">
-        <Image src="/pip-detailed-v2.png" width={43} height={43} alt="" aria-hidden="true" />
-        <span><strong>Pip</strong>{visiblePipMessage}</span>
-      </div>
+      {visiblePipMessage && pipLiveLabel ? (
+        <div className="pip-presence visible" role="status" aria-live="polite" aria-label={pipLiveLabel}>
+          <Image src="/pip-detailed-v2.png" width={43} height={43} alt="" aria-hidden="true" />
+          <span aria-hidden="true"><strong>Pip</strong>{' '}{visiblePipMessage}</span>
+        </div>
+      ) : null}
       <div className="world-instructions">
         <strong>Walk the grove</strong>
         <span>WASD or arrow keys · drag to look</span>

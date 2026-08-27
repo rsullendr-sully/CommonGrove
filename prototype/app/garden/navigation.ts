@@ -1,6 +1,7 @@
 export const SAFE_GARDEN_HALF_SIZE = 18.7;
 export const SAFE_POND_RADIUS = 7.1;
 export const PIP_ACTIVITY_TIMEOUT_SECONDS = 8;
+export const PIP_GREETING_STANDOFF_DISTANCE = 1.65;
 
 const SCENERY_CLEARANCE = 0.35;
 const RECOVERY_PADDING = 0.001;
@@ -176,6 +177,36 @@ export function createSafeGardenRoute(
   gridPath.push(grid.get(startKey)!);
   gridPath.reverse();
   return compressedSafeRoute(start, [...gridPath, { ...end }], obstacles);
+}
+
+export function createSafeGreetingApproach(
+  pip: GardenPoint,
+  employee: GardenPoint,
+  obstacles: readonly GardenObstacle[],
+): { target: GardenPoint; route: GardenPoint[] } {
+  if (!isSafeGardenPoint(pip, obstacles)) {
+    throw new Error('Greeting approaches require Pip to start on safe garden ground.');
+  }
+  const dx = pip.x - employee.x;
+  const dz = pip.z - employee.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance <= PIP_GREETING_STANDOFF_DISTANCE || distance <= SEGMENT_EPSILON) {
+    return { target: { ...pip }, route: [{ ...pip }] };
+  }
+
+  const requested = {
+    x: employee.x + (dx / distance) * PIP_GREETING_STANDOFF_DISTANCE,
+    z: employee.z + (dz / distance) * PIP_GREETING_STANDOFF_DISTANCE,
+  };
+  const candidate = nearestSafePoint(requested, obstacles);
+  const candidateDistance = Math.hypot(candidate.x - employee.x, candidate.z - employee.z);
+  if (candidateDistance >= distance - SEGMENT_EPSILON) {
+    return { target: { ...pip }, route: [{ ...pip }] };
+  }
+  return {
+    target: candidate,
+    route: createSafeGardenRoute(pip, candidate, obstacles),
+  };
 }
 
 export function selectCurrentGardenInterests(

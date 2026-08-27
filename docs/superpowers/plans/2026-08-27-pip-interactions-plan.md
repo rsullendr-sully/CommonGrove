@@ -12,6 +12,8 @@
 
 ## Global Constraints
 
+**Approved final-review amendment (2026-08-27):** The historical Task 1 sample below is superseded for Pip. A newly focused Pip exposes `Greet Pip`; its brief reaction advances to `Pet Pip`; pet completion advances to `Pick up Pip`. Each label and activation remains live-target gated and uses one E/button action at a time.
+
 - Complete the 3D locomotion and autonomous behavior plans first.
 - Interactions remain optional and local to the current session.
 - Food and toys cause temporary reactions only.

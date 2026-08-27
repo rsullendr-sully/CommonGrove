@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { pipInteractionStatusText } from './pipInteractionPresentation';
+import { pipInteractionStatusText, pipLiveRegionLabel } from './pipInteractionPresentation';
 
 describe('Pip interaction presentation', () => {
   it.each([
+    ['greet', 'Pip steps closer, listening ear lifted in hello.'],
     ['pet', 'Pip leans into your hand, listening ear tipped toward you.'],
     ['eating', 'Pip takes a few pleased bites, listening ear bobbing.'],
     ['playing', 'Pip trots over and gives the wooden rings one careful nudge.'],
@@ -18,5 +19,10 @@ describe('Pip interaction presentation', () => {
   it('keeps ordinary behavior copy readable outside a direct interaction', () => {
     expect(pipInteractionStatusText('none', null, 'Pip pauses beside the pond.'))
       .toBe('Pip pauses beside the pond.');
+  });
+
+  it('omits an empty live region and separates Pip semantically from real message copy', () => {
+    expect(pipLiveRegionLabel(null)).toBeNull();
+    expect(pipLiveRegionLabel('One ear lifts.')).toBe('Pip: One ear lifts.');
   });
 });

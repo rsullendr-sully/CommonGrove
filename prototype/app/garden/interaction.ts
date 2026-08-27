@@ -1,6 +1,6 @@
 export type InteractableId = 'pip' | 'food' | 'toy';
-type PipFocusedAction = 'pet' | 'pick-up';
-export type InteractionReaction = 'pet' | 'eating' | 'playing';
+type PipFocusedAction = 'greet' | 'pet' | 'pick-up';
+export type InteractionReaction = 'greet' | 'pet' | 'eating' | 'playing';
 
 export type SafePosition = readonly [number, number, number];
 
@@ -29,6 +29,7 @@ export type InteractionState =
 
 export type InteractionEvent =
   | { type: 'focus'; target: InteractableId | null }
+  | { type: 'greet' }
   | { type: 'pet' }
   | { type: 'offer'; target: Extract<InteractableId, 'food' | 'toy'>; pipAvailable: boolean }
   | { type: 'reaction-complete' }
@@ -36,7 +37,7 @@ export type InteractionEvent =
   | { type: 'place'; position: SafePosition }
   | { type: 'cancel' };
 
-export type InteractionActivationEvent = Extract<InteractionEvent, { type: 'pet' | 'pick-up' }>;
+export type InteractionActivationEvent = Extract<InteractionEvent, { type: 'greet' | 'pet' | 'pick-up' }>;
 
 function copyPosition(position: SafePosition): SafePosition {
   return [position[0], position[1], position[2]];
@@ -56,14 +57,29 @@ export function interactionReducer(state: InteractionState, event: InteractionEv
         focused: event.target,
         held: null,
         lastSafePosition: state.lastSafePosition,
-        ...(event.target === 'pip' ? { pipFocusedAction: 'pet' as const } : {}),
+        ...(event.target === 'pip' ? { pipFocusedAction: 'greet' as const } : {}),
+      };
+
+    case 'greet':
+      if (
+        state.mode !== 'idle' ||
+        state.focused !== 'pip' ||
+        state.pipFocusedAction !== 'greet'
+      ) return state;
+      return {
+        mode: 'reacting',
+        focused: 'pip',
+        held: null,
+        lastSafePosition: state.lastSafePosition,
+        reaction: 'greet',
+        offered: null,
       };
 
     case 'pet':
       if (
         state.mode !== 'idle' ||
         state.focused !== 'pip' ||
-        state.pipFocusedAction === 'pick-up'
+        state.pipFocusedAction !== 'pet'
       ) {
         return state;
       }
@@ -93,6 +109,15 @@ export function interactionReducer(state: InteractionState, event: InteractionEv
 
     case 'reaction-complete':
       if (state.mode !== 'reacting') return state;
+      if (state.reaction === 'greet') {
+        return {
+          mode: 'idle',
+          focused: 'pip',
+          held: null,
+          lastSafePosition: state.lastSafePosition,
+          pipFocusedAction: 'pet',
+        };
+      }
       if (state.reaction === 'pet') {
         return {
           mode: 'idle',
@@ -157,7 +182,9 @@ export function actionLabelFor(state: InteractionState): string | null {
 
   switch (state.focused) {
     case 'pip':
-      return state.pipFocusedAction === 'pick-up' ? 'Pick up Pip' : 'Pet Pip';
+      if (state.pipFocusedAction === 'pick-up') return 'Pick up Pip';
+      if (state.pipFocusedAction === 'pet') return 'Pet Pip';
+      return 'Greet Pip';
     case 'food':
       return 'Pick up snack';
     case 'toy':
@@ -188,7 +215,7 @@ export function actionEventForLiveTarget(
   if (state.mode !== 'idle' || state.focused === null || state.focused !== liveTarget) return null;
 
   if (state.focused === 'pip' && state.pipFocusedAction !== 'pick-up') {
-    return { type: 'pet' };
+    return state.pipFocusedAction === 'pet' ? { type: 'pet' } : { type: 'greet' };
   }
   if (safePosition === null) return null;
   return { type: 'pick-up', target: state.focused, safePosition };
