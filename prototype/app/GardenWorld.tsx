@@ -8,8 +8,20 @@ import InteractionPrompt from './garden/InteractionPrompt';
 import PipCharacter from './garden/PipCharacter';
 import { actionEventForLiveTarget, actionLabelForLiveTarget, interactionReducer, type InteractionState, type InteractableId } from './garden/interaction';
 import { getFirstPersonMovementVector } from './garden/firstPersonMovement';
-import { EMPLOYEE_WALK_SPEED, PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
-import { createSafeGardenRoute, GARDEN_OBSTACLES, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
+import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
+import { createSafeGardenRoute, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
+import {
+  PIP_PET_MESSAGE,
+  PIP_PET_REACTION_SECONDS,
+  cameraRelativeCarryPosition,
+  canDirectlyInteractWithPip,
+  employeeWalkSpeedWhileHolding,
+  handleHeldPipEscape,
+  projectPipPlacement,
+  resolvePipPlacement,
+  shouldSuspendPipMotion,
+  type PipInteractionPhase,
+} from './garden/pipInteraction';
 import { getPipPose, type PipPose } from './garden/pipPose';
 import { type GardenChoice } from './garden/rewardState';
 import { useInteractionTarget, type InteractionTargetRegistration } from './garden/useInteractionTarget';
@@ -87,7 +99,7 @@ function useGrassTexture() {
   return texture;
 }
 
-function FirstPersonControls({ movement }: { movement: MovementInput }) {
+function FirstPersonControls({ movement, speed, onCameraMount }: { movement: MovementInput; speed: number; onCameraMount: (camera: THREE.Camera | null) => void }) {
   const { camera, gl } = useThree();
   const yaw = useRef(0);
   const pitch = useRef(-0.05);
@@ -97,6 +109,7 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
 
   useEffect(() => {
     camera.position.set(0, 1.7, 17);
+    onCameraMount(camera);
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -136,6 +149,7 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
     gl.domElement.addEventListener('pointercancel', onPointerUp);
 
     return () => {
+      onCameraMount(null);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       gl.domElement.removeEventListener('pointerdown', onPointerDown);
@@ -143,7 +157,7 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
       gl.domElement.removeEventListener('pointerup', onPointerUp);
       gl.domElement.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [camera, gl, movement]);
+  }, [camera, gl, movement, onCameraMount]);
 
   useFrame((_, delta) => {
     const candidatePosition = nextPosition.current;
@@ -151,7 +165,7 @@ function FirstPersonControls({ movement }: { movement: MovementInput }) {
     const forwardAmount = Number(pressed.has('w') || pressed.has('arrowup')) - Number(pressed.has('s') || pressed.has('arrowdown'));
     const sideAmount = Number(pressed.has('d') || pressed.has('arrowright')) - Number(pressed.has('a') || pressed.has('arrowleft'));
     const movementVector = getFirstPersonMovementVector(yaw.current, forwardAmount, sideAmount);
-    const frameDistance = EMPLOYEE_WALK_SPEED * Math.min(delta, 0.05);
+    const frameDistance = speed * Math.min(delta, 0.05);
 
     candidatePosition.copy(camera.position);
     candidatePosition.x += movementVector.x * frameDistance;
@@ -602,7 +616,7 @@ const gardenInterestDefinitions: readonly GardenInterest[] = [
   { id: 'wander-west', position: { x: -6.3, z: 7.1 } },
 ];
 
-function Pip({ onPipMount, onMessage, rewardStage, gardenChoice, interests, reducedMotion }: { onPipMount: (pip: THREE.Group | null) => void; onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean }) {
+function Pip({ onPipMount, onMessage, onPriorityModeChange, rewardStage, gardenChoice, interests, reducedMotion, interactionPhase, placedPosition }: { onPipMount: (pip: THREE.Group | null) => void; onMessage: (message: string | null) => void; onPriorityModeChange: (priority: boolean) => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean; interactionPhase: PipInteractionPhase; placedPosition: GardenPoint | null }) {
   const pip = useRef<THREE.Group>(null);
   const setPipRef = useCallback((node: THREE.Group | null) => {
     pip.current = node;
@@ -625,6 +639,7 @@ function Pip({ onPipMount, onMessage, rewardStage, gardenChoice, interests, redu
   const routeTargetKey = useRef<string | null>(null);
   const routeWaypoints = useRef<readonly GardenPoint[]>([]);
   const routeIndex = useRef(0);
+  const previousInteractionPhase = useRef<PipInteractionPhase>('none');
   const rewardMission = useMemo<PipPriorityMission | null>(() => {
     if (rewardStage === 1) return {
       id: 'reward-1',
@@ -659,6 +674,7 @@ function Pip({ onPipMount, onMessage, rewardStage, gardenChoice, interests, redu
   const behavior = usePipBehavior(interests);
 
   useEffect(() => onMessage(behavior.message), [behavior.message, onMessage]);
+  useEffect(() => onPriorityModeChange(!canDirectlyInteractWithPip(behavior.mode)), [behavior.mode, onPriorityModeChange]);
 
   useFrame(({ clock, camera }, delta) => {
     if (pip.current) {
@@ -666,6 +682,54 @@ function Pip({ onPipMount, onMessage, rewardStage, gardenChoice, interests, redu
         pip.current.position.x - camera.position.x,
         pip.current.position.z - camera.position.z,
       );
+      const previousPhase = previousInteractionPhase.current;
+      previousInteractionPhase.current = interactionPhase;
+
+      if (shouldSuspendPipMotion(interactionPhase)) {
+        pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
+        routeTargetKey.current = null;
+        routeWaypoints.current = [];
+        routeIndex.current = 0;
+
+        if (interactionPhase === 'carried') {
+          pip.current.position.copy(cameraRelativeCarryPosition(camera));
+          pip.current.rotation.y = camera.rotation.y;
+        } else if (interactionPhase === 'placed' && placedPosition) {
+          pipMotion.current = {
+            ...pipMotion.current,
+            position: new THREE.Vector3(placedPosition.x, 0, placedPosition.z),
+          };
+          pip.current.position.set(placedPosition.x, 0, placedPosition.z);
+        }
+
+        setPose(getPipPose({
+          poseKind: interactionPhase,
+          speed: 0,
+          distanceTravelled: pipMotion.current.distanceTravelled,
+          attentive: true,
+          reducedMotion,
+        }));
+        return;
+      }
+
+      if (shouldSuspendPipMotion(previousPhase)) {
+        behavior.resumeAfterInteraction({
+          now: clock.elapsedTime,
+          employeeDistance: distanceToVisitor,
+          locomotionComplete: false,
+          rewardMission,
+          choiceMission,
+        });
+        setPose(getPipPose({
+          poseKind: 'idle',
+          speed: 0,
+          distanceTravelled: pipMotion.current.distanceTravelled,
+          attentive: distanceToVisitor < 3.15,
+          reducedMotion,
+        }));
+        return;
+      }
+
       let locomotionComplete = false;
       if (behavior.target) {
         const targetKey = `${behavior.target.x},${behavior.target.z}`;
@@ -722,7 +786,7 @@ function Pip({ onPipMount, onMessage, rewardStage, gardenChoice, interests, redu
 
   return (
     <group ref={setPipRef} position={[8.4, 0, 1.5]} rotation={[0, Math.PI, 0]} userData={{ interactableId: 'pip' }}>
-      <mesh name="blobShadow" position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.48, 0.31, 1]}>
+      <mesh visible={interactionPhase !== 'carried'} name="blobShadow" position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.48, 0.31, 1]}>
         <circleGeometry args={[0.9, 24]} />
         <meshBasicMaterial color="#34483b" transparent opacity={0.24} />
       </mesh>
@@ -739,7 +803,7 @@ function InteractionTargetTracker({ registrations, onTargetChange }: { registrat
   return null;
 }
 
-function GardenWorldScene({ movement, pip, onPipMount, onPipMessage, onInteractionTargetChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; pip: MutableRefObject<THREE.Group | null>; onPipMount: (pip: THREE.Group | null) => void; onPipMessage: (message: string | null) => void; onInteractionTargetChange: (target: InteractableId | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
+function GardenWorldScene({ movement, movementSpeed, pip, onPipMount, onPipMessage, onPipPriorityModeChange, onInteractionTargetChange, onCameraMount, interactionPhase, placedPosition, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; movementSpeed: number; pip: MutableRefObject<THREE.Group | null>; onPipMount: (pip: THREE.Group | null) => void; onPipMessage: (message: string | null) => void; onPipPriorityModeChange: (priority: boolean) => void; onInteractionTargetChange: (target: InteractableId | null) => void; onCameraMount: (camera: THREE.Camera | null) => void; interactionPhase: PipInteractionPhase; placedPosition: GardenPoint | null; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const grassTexture = useGrassTexture();
   const interactionTargets = useMemo<readonly InteractionTargetRegistration[]>(
     () => [{ target: 'pip', ref: pip }],
@@ -788,9 +852,9 @@ function GardenWorldScene({ movement, pip, onPipMount, onPipMessage, onInteracti
       <CuriousSeed visible={seedVisible} reducedMotion={reducedMotion} />
       <ChoiceDestination choice={destinationVisible} reducedMotion={reducedMotion} />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
-      <Pip onPipMount={onPipMount} onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} />
+      <Pip onPipMount={onPipMount} onMessage={onPipMessage} onPriorityModeChange={onPipPriorityModeChange} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} interactionPhase={interactionPhase} placedPosition={placedPosition} />
 
-      <FirstPersonControls movement={movement} />
+      <FirstPersonControls movement={movement} speed={movementSpeed} onCameraMount={onCameraMount} />
       <InteractionTargetTracker registrations={interactionTargets} onTargetChange={onInteractionTargetChange} />
     </>
   );
@@ -799,11 +863,23 @@ function GardenWorldScene({ movement, pip, onPipMount, onPipMessage, onInteracti
 export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null }) {
   const movement = useRef(new Set<string>());
   const pip = useRef<THREE.Group>(null);
+  const camera = useRef<THREE.Camera | null>(null);
   const [pipMessage, setPipMessage] = useState<string | null>(null);
+  const [placementMessage, setPlacementMessage] = useState<string | null>(null);
+  const [pipInteractionPhase, setPipInteractionPhase] = useState<PipInteractionPhase>('none');
+  const [placedPosition, setPlacedPosition] = useState<GardenPoint | null>(null);
+  const [pipPriorityMissionActive, setPipPriorityMissionActive] = useState(false);
   const [interaction, dispatchInteraction] = useReducer(interactionReducer, INITIAL_INTERACTION_STATE);
   const [liveInteractionTarget, setLiveInteractionTarget] = useState<InteractableId | null>(null);
   const reducedMotion = useReducedMotion();
-  const interactionLabel = actionLabelForLiveTarget(interaction, liveInteractionTarget);
+  const eligibleLiveTarget = pipPriorityMissionActive && liveInteractionTarget === 'pip'
+    ? null
+    : liveInteractionTarget;
+  const interactionLabel = actionLabelForLiveTarget(interaction, eligibleLiveTarget);
+  const movementSpeed = employeeWalkSpeedWhileHolding(interaction.held);
+  const visiblePipMessage = pipInteractionPhase === 'pet'
+    ? PIP_PET_MESSAGE
+    : placementMessage ?? pipMessage;
   const onInteractionTargetChange = useCallback((target: InteractableId | null) => {
     setLiveInteractionTarget(target);
     dispatchInteraction({ type: 'focus', target });
@@ -811,13 +887,74 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
   const onPipMount = useCallback((node: THREE.Group | null) => {
     pip.current = node;
   }, []);
+  const onCameraMount = useCallback((node: THREE.Camera | null) => {
+    camera.current = node;
+  }, []);
+  const placePip = useCallback(() => {
+    if (interaction.mode !== 'carrying' || interaction.held !== 'pip' || !camera.current || !pip.current) return;
+    const recordedPosition = interaction.lastSafePosition;
+    if (!recordedPosition) return;
+
+    const forward = camera.current.getWorldDirection(new THREE.Vector3());
+    const requested = projectPipPlacement(camera.current.position, forward);
+    const result = resolvePipPlacement(
+      requested,
+      { x: recordedPosition[0], z: recordedPosition[2] },
+      GARDEN_OBSTACLES,
+    );
+    pip.current.position.set(result.point.x, 0, result.point.z);
+    setPlacedPosition(result.point);
+    setPipInteractionPhase('placed');
+    setPlacementMessage(result.message);
+    dispatchInteraction({ type: 'place', position: [result.point.x, 0, result.point.z] });
+  }, [interaction]);
   const activateInteraction = useCallback(() => {
-    const safePosition = liveInteractionTarget === 'pip' && pip.current
-      ? [pip.current.position.x, 0, pip.current.position.z] as const
+    if (interaction.mode === 'carrying' && interaction.held === 'pip') {
+      placePip();
+      return;
+    }
+    if (pipPriorityMissionActive && liveInteractionTarget === 'pip') return;
+
+    const pipSafePoint = liveInteractionTarget === 'pip' && pip.current
+      ? nearestSafePoint({ x: pip.current.position.x, z: pip.current.position.z }, GARDEN_OBSTACLES)
+      : null;
+    const safePosition = pipSafePoint
+      ? [pipSafePoint.x, 0, pipSafePoint.z] as const
       : null;
     const event = actionEventForLiveTarget(interaction, liveInteractionTarget, safePosition);
-    if (event) dispatchInteraction(event);
-  }, [interaction, liveInteractionTarget]);
+    if (!event) return;
+
+    setPlacementMessage(null);
+    dispatchInteraction(event);
+    if (event.type === 'pet') setPipInteractionPhase('pet');
+    if (event.type === 'pick-up' && event.target === 'pip') {
+      setPlacedPosition(null);
+      setPipInteractionPhase('carried');
+    }
+  }, [interaction, liveInteractionTarget, pipPriorityMissionActive, placePip]);
+
+  useEffect(() => {
+    if (pipInteractionPhase !== 'pet') return;
+    const timeout = window.setTimeout(() => {
+      dispatchInteraction({ type: 'reaction-complete' });
+      setPipInteractionPhase('none');
+    }, PIP_PET_REACTION_SECONDS * 1000);
+    return () => window.clearTimeout(timeout);
+  }, [pipInteractionPhase]);
+
+  useEffect(() => {
+    if (pipInteractionPhase !== 'placed') return;
+    const timeout = window.setTimeout(() => setPipInteractionPhase('none'), 350);
+    return () => window.clearTimeout(timeout);
+  }, [pipInteractionPhase]);
+
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      handleHeldPipEscape(event, interaction.held, placePip);
+    };
+    window.addEventListener('keydown', onEscape, true);
+    return () => window.removeEventListener('keydown', onEscape, true);
+  }, [interaction.held, placePip]);
   const startMoving = (key: string) => movement.current.add(key);
   const stopMoving = (key: string) => movement.current.delete(key);
 
@@ -826,10 +963,15 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
       <Canvas frameloop="demand" shadows={false} camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.7} gl={{ antialias: false, powerPreference: 'high-performance' }}>
         <GardenWorldScene
           movement={movement}
+          movementSpeed={movementSpeed}
           pip={pip}
           onPipMount={onPipMount}
           onPipMessage={setPipMessage}
+          onPipPriorityModeChange={setPipPriorityMissionActive}
           onInteractionTargetChange={onInteractionTargetChange}
+          onCameraMount={onCameraMount}
+          interactionPhase={pipInteractionPhase}
+          placedPosition={placedPosition}
           rewardStage={rewardStage}
           starflowersVisible={starflowersVisible}
           pavilionImproved={pavilionImproved}
@@ -841,9 +983,9 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
       </Canvas>
       <div className="world-reticle" aria-hidden="true" />
       <InteractionPrompt label={interactionLabel} onActivate={activateInteraction} />
-      <div className={`pip-presence ${pipMessage ? 'visible' : ''}`} role="status" aria-live="polite">
+      <div className={`pip-presence ${visiblePipMessage ? 'visible' : ''}`} role="status" aria-live="polite">
         <Image src="/pip-detailed-v2.png" width={43} height={43} alt="" aria-hidden="true" />
-        <span><strong>Pip</strong>{pipMessage}</span>
+        <span><strong>Pip</strong>{visiblePipMessage}</span>
       </div>
       <div className="world-instructions">
         <strong>Walk the grove</strong>

@@ -37,7 +37,7 @@ export default function PipCharacter({ pose }: { pose: PipPose }): React.JSX.Ele
           <sphereGeometry args={[1, 24, 18]} />
           <meshStandardMaterial color={CLAY} roughness={0.96} />
         </mesh>
-        <group rotation={[0, 0, pose.headTilt]}>
+        <group position={[0, -pose.headLower, 0]} rotation={[0, 0, pose.headTilt]}>
           <mesh position={[0, 0.22, 0]} scale={[0.31, 0.3, 0.27]} castShadow>
             <sphereGeometry args={[1, 24, 18]} />
             <meshStandardMaterial color={CLAY} roughness={0.96} />

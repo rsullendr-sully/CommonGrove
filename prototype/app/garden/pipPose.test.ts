@@ -37,4 +37,38 @@ describe('Pip pose', () => {
     expect(pose.leftLeg).toBe(0);
     expect(pose.rightLeg).toBe(0);
   });
+
+  it('lowers and tips Pip’s head toward the employee while being petted', () => {
+    const pose = getPipPose({ poseKind: 'pet', speed: 1, distanceTravelled: 0.3, attentive: true, reducedMotion: false });
+
+    expect(pose.headLower).toBeGreaterThan(0);
+    expect(pose.headTilt).toBeGreaterThan(0.16);
+    expect(pose.leftLeg).toBe(0);
+    expect(pose.rightLeg).toBe(0);
+  });
+
+  it('stops the foot cycle and tucks both legs while Pip is carried', () => {
+    const pose = getPipPose({ poseKind: 'carried', speed: 2, distanceTravelled: 0.3, attentive: true, reducedMotion: false });
+
+    expect(pose.leftLeg).toBeLessThan(0);
+    expect(pose.rightLeg).toBeLessThan(0);
+    expect(pose.leftLeg).toBe(pose.rightLeg);
+    expect(pose.bodyLift).toBeGreaterThan(0);
+  });
+
+  it('uses a neutral grounded pose immediately after placement, including reduced motion', () => {
+    const pose = getPipPose({ poseKind: 'placed', speed: 2, distanceTravelled: 0.3, attentive: true, reducedMotion: true });
+
+    expect(pose).toMatchObject({
+      leftLeg: 0,
+      rightLeg: 0,
+      leftArm: 0,
+      rightArm: 0,
+      bodyLift: 0,
+      bodyLean: 0,
+      earSway: 0,
+      headTilt: 0,
+      headLower: 0,
+    });
+  });
 });

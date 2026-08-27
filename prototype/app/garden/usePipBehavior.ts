@@ -261,6 +261,14 @@ export function completePipBehaviorActivity(
   return selectOrdinaryActivity(state, input, completedActivityKind(state));
 }
 
+export function resumePipBehaviorAfterInteraction(
+  state: PipBehaviorState,
+  input: PipBehaviorFrameInput,
+): PipBehaviorState {
+  if (state.mode === 'priority') return state;
+  return selectOrdinaryActivity(state, input, state.activity?.kind ?? state.recentKind);
+}
+
 export function advancePipBehavior(
   state: PipBehaviorState,
   input: PipBehaviorFrameInput,
@@ -319,6 +327,7 @@ export type UsePipBehaviorResult = Pick<
   advance: (input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => PipBehaviorState;
   completeActivity: (input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => PipBehaviorState;
   interruptWithReward: (mission: PipPriorityMission, now: number) => PipBehaviorState;
+  resumeAfterInteraction: (input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => PipBehaviorState;
 };
 
 export function usePipBehavior(
@@ -361,6 +370,10 @@ export function usePipBehavior(
     commit(interruptPipBehaviorWithReward(stateRef.current, mission, now))
   ), [commit]);
 
+  const resumeAfterInteraction = useCallback((input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => (
+    commit(resumePipBehaviorAfterInteraction(stateRef.current, withLocalInputs(input)))
+  ), [commit, withLocalInputs]);
+
   return {
     activity: snapshot.activity,
     target: snapshot.target,
@@ -370,5 +383,6 @@ export function usePipBehavior(
     advance,
     completeActivity,
     interruptWithReward,
+    resumeAfterInteraction,
   };
 }
