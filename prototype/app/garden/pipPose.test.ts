@@ -71,4 +71,26 @@ describe('Pip pose', () => {
       headLower: 0,
     });
   });
+
+  it('alternates small eating head dips over the three-second reaction', () => {
+    const first = getPipPose({ poseKind: 'eating', reactionElapsed: 0.25, speed: 0, distanceTravelled: 0, attentive: true, reducedMotion: false });
+    const second = getPipPose({ poseKind: 'eating', reactionElapsed: 0.75, speed: 0, distanceTravelled: 0, attentive: true, reducedMotion: false });
+
+    expect(first.headLower).toBeGreaterThan(0);
+    expect(second.headLower).toBeGreaterThan(0);
+    expect(first.headTilt).toBeGreaterThan(0);
+    expect(second.headTilt).toBeLessThan(0);
+    expect(Math.abs(first.headTilt)).toBeLessThanOrEqual(0.14);
+    expect(first.mouthOpen).toBeGreaterThan(0);
+    expect(first.leftLeg).toBe(0);
+  });
+
+  it('uses a grounded play nudge pose without restarting the walking cycle', () => {
+    const pose = getPipPose({ poseKind: 'playing', reactionElapsed: 2, speed: 0, distanceTravelled: 3, attentive: true, reducedMotion: false });
+
+    expect(pose.leftLeg).toBe(0);
+    expect(pose.rightLeg).toBe(0);
+    expect(pose.bodyLean).toBeGreaterThan(0);
+    expect(pose.headLower).toBeGreaterThan(0);
+  });
 });

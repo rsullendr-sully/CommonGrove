@@ -8,10 +8,13 @@ import {
   PIP_INTERACTION_FRAME_PRIORITY,
   PIP_PET_MESSAGE,
   PIP_PET_REACTION_SECONDS,
+  PIP_EATING_REACTION_SECONDS,
+  PIP_PLAYING_REACTION_SECONDS,
   PIP_PLACEMENT_FALLBACK_MESSAGE,
   canDirectlyInteractWithPip,
   employeeWalkSpeedWhileHolding,
   handleHeldPipEscape,
+  handleHeldInteractionEscape,
   hasPetReactionCompleted,
   interactionPoseKind,
   projectPipPlacement,
@@ -121,6 +124,23 @@ describe('direct Pip interactions', () => {
     expect(handleHeldPipEscape(event, 'pip', () => order.push('place'))).toBe(true);
     expect(order).toEqual(['prevent', 'stop', 'place']);
     expect(handleHeldPipEscape(event, null, () => order.push('unexpected'))).toBe(false);
+  });
+
+  it.each(['pip', 'food', 'toy'] as const)('safely places held %s on Escape before unrelated handlers', (held) => {
+    const order: string[] = [];
+    const event = {
+      key: 'Escape',
+      preventDefault: () => order.push('prevent'),
+      stopImmediatePropagation: () => order.push('stop'),
+    };
+
+    expect(handleHeldInteractionEscape(event, held, () => order.push('place'))).toBe(true);
+    expect(order).toEqual(['prevent', 'stop', 'place']);
+  });
+
+  it('uses exact temporary food and toy reaction durations without creating upkeep state', () => {
+    expect(PIP_EATING_REACTION_SECONDS).toBe(3);
+    expect(PIP_PLAYING_REACTION_SECONDS).toBe(4);
   });
 
   it.each([

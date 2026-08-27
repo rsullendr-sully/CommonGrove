@@ -14,7 +14,7 @@ import {
   type GardenPoint,
 } from './navigation';
 
-export type PipPoseKind = 'idle' | 'walk' | 'inspect' | 'rest' | 'greet';
+export type PipPoseKind = 'idle' | 'walk' | 'inspect' | 'rest' | 'greet' | 'eating' | 'playing';
 
 export type PipPriorityMission = {
   id: string;

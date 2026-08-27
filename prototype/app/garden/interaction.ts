@@ -1,5 +1,6 @@
 export type InteractableId = 'pip' | 'food' | 'toy';
 type PipFocusedAction = 'pet' | 'pick-up';
+export type InteractionReaction = 'pet' | 'eating' | 'playing';
 
 export type SafePosition = readonly [number, number, number];
 
@@ -16,6 +17,8 @@ export type InteractionState =
       focused: InteractableId | null;
       held: null;
       lastSafePosition: SafePosition | null;
+      reaction: InteractionReaction;
+      offered: Extract<InteractableId, 'food' | 'toy'> | null;
     }
   | {
       mode: 'carrying';
@@ -27,10 +30,13 @@ export type InteractionState =
 export type InteractionEvent =
   | { type: 'focus'; target: InteractableId | null }
   | { type: 'pet' }
+  | { type: 'offer'; target: Extract<InteractableId, 'food' | 'toy'>; pipAvailable: boolean }
   | { type: 'reaction-complete' }
   | { type: 'pick-up'; target: InteractableId; safePosition: SafePosition }
   | { type: 'place'; position: SafePosition }
   | { type: 'cancel' };
+
+export type InteractionActivationEvent = Extract<InteractionEvent, { type: 'pet' | 'pick-up' }>;
 
 function copyPosition(position: SafePosition): SafePosition {
   return [position[0], position[1], position[2]];
@@ -66,11 +72,28 @@ export function interactionReducer(state: InteractionState, event: InteractionEv
         focused: 'pip',
         held: null,
         lastSafePosition: state.lastSafePosition,
+        reaction: 'pet',
+        offered: null,
+      };
+
+    case 'offer':
+      if (
+        state.mode !== 'carrying' ||
+        state.held !== event.target ||
+        !event.pipAvailable
+      ) return state;
+      return {
+        mode: 'reacting',
+        focused: null,
+        held: null,
+        lastSafePosition: state.lastSafePosition,
+        reaction: event.target === 'food' ? 'eating' : 'playing',
+        offered: event.target,
       };
 
     case 'reaction-complete':
       if (state.mode !== 'reacting') return state;
-      if (state.focused === 'pip') {
+      if (state.reaction === 'pet') {
         return {
           mode: 'idle',
           focused: 'pip',
@@ -148,7 +171,11 @@ export function actionLabelForLiveTarget(
   state: InteractionState,
   liveTarget: InteractableId | null,
 ): string | null {
-  if (state.mode === 'carrying') return actionLabelFor(state);
+  if (state.mode === 'carrying') {
+    if (liveTarget === 'pip' && state.held === 'food') return 'Offer snack';
+    if (liveTarget === 'pip' && state.held === 'toy') return 'Offer toy';
+    return actionLabelFor(state);
+  }
   if (state.mode !== 'idle' || state.focused === null || state.focused !== liveTarget) return null;
   return actionLabelFor(state);
 }
@@ -157,7 +184,7 @@ export function actionEventForLiveTarget(
   state: InteractionState,
   liveTarget: InteractableId | null,
   safePosition: SafePosition | null,
-): InteractionEvent | null {
+): InteractionActivationEvent | null {
   if (state.mode !== 'idle' || state.focused === null || state.focused !== liveTarget) return null;
 
   if (state.focused === 'pip' && state.pipFocusedAction !== 'pick-up') {

@@ -70,6 +70,8 @@ describe('first-person interaction state', () => {
       focused: null,
       held: null,
       lastSafePosition: [4, 0, 5],
+      reaction: 'eating',
+      offered: 'food',
     };
 
     expect(interactionReducer(reacting, { type: 'reaction-complete' })).toEqual({
@@ -154,6 +156,8 @@ describe('first-person interaction state', () => {
       focused: 'pip',
       held: null,
       lastSafePosition: [1, 0, 2],
+      reaction: 'pet',
+      offered: null,
     };
 
     expect(interactionReducer(reacting, { type: 'cancel' })).toEqual(reacting);
@@ -184,5 +188,58 @@ describe('first-person interaction state', () => {
     safePosition[0] = 99;
 
     expect(held.lastSafePosition).toEqual([1, 0, 2]);
+  });
+
+  it.each([
+    ['food', 'eating'],
+    ['toy', 'playing'],
+  ] as const)('offers held %s to an available Pip as a temporary %s reaction', (held, reaction) => {
+    const carrying: InteractionState = {
+      mode: 'carrying',
+      focused: null,
+      held,
+      lastSafePosition: [4, 0, 5],
+    };
+
+    const offered = interactionReducer(carrying, { type: 'offer', target: held, pipAvailable: true });
+
+    expect(offered).toEqual({
+      mode: 'reacting',
+      focused: null,
+      held: null,
+      lastSafePosition: [4, 0, 5],
+      reaction,
+      offered: held,
+    });
+  });
+
+  it.each(['food', 'toy'] as const)('keeps held %s when Pip is unavailable', (held) => {
+    const carrying: InteractionState = {
+      mode: 'carrying',
+      focused: null,
+      held,
+      lastSafePosition: [4, 0, 5],
+    };
+
+    expect(interactionReducer(carrying, { type: 'offer', target: held, pipAvailable: false }))
+      .toBe(carrying);
+    expect(interactionReducer(carrying, { type: 'offer', target: held === 'food' ? 'toy' : 'food', pipAvailable: true }))
+      .toBe(carrying);
+  });
+
+  it.each([
+    ['food', 'Offer snack'],
+    ['toy', 'Offer toy'],
+  ] as const)('shows one offer action for held %s only while Pip is the live target', (held, offerLabel) => {
+    const carrying: InteractionState = {
+      mode: 'carrying',
+      focused: null,
+      held,
+      lastSafePosition: [4, 0, 5],
+    };
+
+    expect(actionLabelForLiveTarget(carrying, 'pip')).toBe(offerLabel);
+    expect(actionLabelForLiveTarget(carrying, null)).toBe(actionLabelFor(carrying));
+    expect(actionLabelForLiveTarget(carrying, held)).toBe(actionLabelFor(carrying));
   });
 });

@@ -92,4 +92,68 @@ describe('Pip interaction scene lifecycle', () => {
 
     expect(pipInteractionSceneReducer(state, { type: 'activate', event: illegalPickup })).toBe(state);
   });
+
+  it('runs food for exactly three seconds, resets it to authored position, and resumes once', () => {
+    const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'food' });
+    const held = pipInteractionSceneReducer(focused, {
+      type: 'activate', event: { type: 'pick-up', target: 'food', safePosition: [4.8, 0.25, -4.5] },
+    });
+    const eating = pipInteractionSceneReducer(held, {
+      type: 'offer-object', target: 'food', reactionPoint: { x: 8.7, z: 1.5 }, pipAvailable: true,
+    });
+    const complete = pipInteractionSceneReducer(eating, { type: 'object-reaction-complete' });
+    const late = pipInteractionSceneReducer(complete, { type: 'object-reaction-complete' });
+
+    expect(eating).toMatchObject({ phase: 'eating', reactionStarted: true, interaction: { mode: 'reacting', reaction: 'eating', offered: 'food' } });
+    expect(eating.objectPositions.food).toEqual([8.7, 0.25, 1.5]);
+    expect(complete.objectPositions.food).toEqual([4.8, 0.25, -4.5]);
+    expect(complete.resumeSequence).toBe(1);
+    expect(complete.focusRepublishSequence).toBe(1);
+    expect(late).toBe(complete);
+  });
+
+  it('nudges the offered ring exactly once and returns it to its last safe point after four seconds', () => {
+    const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'toy' });
+    const held = pipInteractionSceneReducer(focused, {
+      type: 'activate', event: { type: 'pick-up', target: 'toy', safePosition: [-3.8, 0.2, 5.4] },
+    });
+    const placed = pipInteractionSceneReducer(held, {
+      type: 'place-object', target: 'toy', point: { x: 10, z: 8 }, message: null,
+    });
+    const refocused = pipInteractionSceneReducer(placed, { type: 'focus', target: 'toy' });
+    const heldAgain = pipInteractionSceneReducer(refocused, {
+      type: 'activate', event: { type: 'pick-up', target: 'toy', safePosition: [10, 0.2, 8] },
+    });
+    const playing = pipInteractionSceneReducer(heldAgain, {
+      type: 'offer-object', target: 'toy', reactionPoint: { x: 9.5, z: 8 }, pipAvailable: true,
+    });
+    const nudged = pipInteractionSceneReducer(playing, { type: 'toy-nudged' });
+    const lateNudge = pipInteractionSceneReducer(nudged, { type: 'toy-nudged' });
+    const complete = pipInteractionSceneReducer(lateNudge, { type: 'object-reaction-complete' });
+
+    expect(playing).toMatchObject({ phase: 'playing', toyNudged: false });
+    expect(nudged.toyNudged).toBe(true);
+    expect(lateNudge).toBe(nudged);
+    expect(complete.objectPositions.toy).toEqual([10, 0.2, 8]);
+    expect(complete.toyNudged).toBe(false);
+    expect(complete.resumeSequence).toBe(1);
+  });
+
+  it('keeps an object held when offer is unavailable and recovers focus after placement without look-away', () => {
+    const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'food' });
+    const held = pipInteractionSceneReducer(focused, {
+      type: 'activate', event: { type: 'pick-up', target: 'food', safePosition: [4.8, 0.25, -4.5] },
+    });
+    const unavailable = pipInteractionSceneReducer(held, {
+      type: 'offer-object', target: 'food', reactionPoint: { x: 8, z: 2 }, pipAvailable: false,
+    });
+    const placed = pipInteractionSceneReducer(unavailable, {
+      type: 'place-object', target: 'food', point: { x: 8, z: 2 }, message: null,
+    });
+    const republished = pipInteractionSceneReducer(placed, { type: 'focus', target: 'food' });
+
+    expect(unavailable).toBe(held);
+    expect(placed).toMatchObject({ interaction: { mode: 'idle', focused: null, held: null }, focusRepublishSequence: 1 });
+    expect(republished.interaction.focused).toBe('food');
+  });
 });

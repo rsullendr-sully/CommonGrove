@@ -9,7 +9,10 @@ import {
 import type { InteractableId } from './interaction';
 import type { PipBehaviorState } from './usePipBehavior';
 
-export type PipInteractionPhase = 'none' | 'pet' | 'carried' | 'placed';
+export type PipInteractionPhase = 'none' | 'pet' | 'carried' | 'placed' | 'eating' | 'playing';
+
+export const PIP_EATING_REACTION_SECONDS = 3;
+export const PIP_PLAYING_REACTION_SECONDS = 4;
 
 export const PIP_PET_REACTION_SECONDS = 1.8;
 export const PIP_PET_MESSAGE = 'Pip leans into your hand, listening ear tipped toward you.';
@@ -47,6 +50,18 @@ export function handleHeldPipEscape(
   event.preventDefault();
   event.stopImmediatePropagation();
   placePip();
+  return true;
+}
+
+export function handleHeldInteractionEscape(
+  event: Pick<KeyboardEvent, 'key' | 'preventDefault' | 'stopImmediatePropagation'>,
+  held: InteractableId | null,
+  placeHeld: () => void,
+): boolean {
+  if (event.key !== 'Escape' || held === null) return false;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  placeHeld();
   return true;
 }
 

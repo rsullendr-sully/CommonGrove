@@ -84,6 +84,14 @@ export default function PipCharacter({ pose }: { pose: PipPose }): React.JSX.Ele
             <tubeGeometry args={[smile, 10, 0.012, 6, false]} />
             <meshStandardMaterial color={FEATURES} roughness={0.9} />
           </mesh>
+          <mesh
+            visible={pose.mouthOpen > 0}
+            position={[-0.01, 0.12, 0.283]}
+            scale={[0.045, pose.mouthOpen, 0.012]}
+          >
+            <sphereGeometry args={[1, 12, 8]} />
+            <meshStandardMaterial color={FEATURES} roughness={0.9} />
+          </mesh>
         </group>
       </group>
 

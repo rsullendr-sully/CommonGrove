@@ -1,11 +1,19 @@
 import {
   interactionReducer,
-  type InteractionEvent,
+  type InteractionActivationEvent,
   type InteractionState,
   type InteractableId,
 } from './interaction';
 import type { GardenPoint } from './navigation';
 import type { PipInteractionPhase } from './pipInteraction';
+import {
+  GARDEN_SNACK_AUTHORED_POSITION,
+  GARDEN_TOY_AUTHORED_POSITION,
+  resetGardenObjectPosition,
+  type GardenObjectId,
+} from './GardenObjects';
+
+export type GardenObjectPositions = Record<GardenObjectId, readonly [number, number, number]>;
 
 export type PipInteractionSceneState = {
   interaction: InteractionState;
@@ -13,16 +21,23 @@ export type PipInteractionSceneState = {
   placedPosition: GardenPoint | null;
   placementMessage: string | null;
   resumeSequence: number;
+  focusRepublishSequence: number;
+  objectPositions: GardenObjectPositions;
+  objectLastSafePositions: GardenObjectPositions;
+  reactionStarted: boolean;
+  toyNudged: boolean;
 };
-
-type PipSceneActivationEvent = Extract<InteractionEvent, { type: 'pet' | 'pick-up' }>;
 
 export type PipInteractionSceneEvent =
   | { type: 'focus'; target: InteractableId | null }
-  | { type: 'activate'; event: PipSceneActivationEvent }
+  | { type: 'activate'; event: InteractionActivationEvent }
   | { type: 'pet-complete' }
   | { type: 'place-pip'; point: GardenPoint; message: string | null }
-  | { type: 'placed-complete' };
+  | { type: 'placed-complete' }
+  | { type: 'place-object'; target: GardenObjectId; point: GardenPoint; message: string | null }
+  | { type: 'offer-object'; target: GardenObjectId; reactionPoint: GardenPoint; pipAvailable: boolean }
+  | { type: 'toy-nudged' }
+  | { type: 'object-reaction-complete' };
 
 export function createPipInteractionSceneState(): PipInteractionSceneState {
   return {
@@ -36,6 +51,17 @@ export function createPipInteractionSceneState(): PipInteractionSceneState {
     placedPosition: null,
     placementMessage: null,
     resumeSequence: 0,
+    focusRepublishSequence: 0,
+    objectPositions: {
+      food: [...GARDEN_SNACK_AUTHORED_POSITION],
+      toy: [...GARDEN_TOY_AUTHORED_POSITION],
+    },
+    objectLastSafePositions: {
+      food: [...GARDEN_SNACK_AUTHORED_POSITION],
+      toy: [...GARDEN_TOY_AUTHORED_POSITION],
+    },
+    reactionStarted: false,
+    toyNudged: false,
   };
 }
 
@@ -62,6 +88,14 @@ export function pipInteractionSceneReducer(
         phase,
         placedPosition: phase === 'carried' ? null : state.placedPosition,
         placementMessage: null,
+        ...(event.event.type === 'pick-up' && event.event.target !== 'pip'
+          ? {
+              objectLastSafePositions: {
+                ...state.objectLastSafePositions,
+                [event.event.target]: [...event.event.safePosition],
+              },
+            }
+          : {}),
       };
     }
     case 'pet-complete': {
@@ -84,6 +118,7 @@ export function pipInteractionSceneReducer(
         phase: 'placed',
         placedPosition: { ...event.point },
         placementMessage: event.message,
+        focusRepublishSequence: state.focusRepublishSequence + 1,
       };
     }
     case 'placed-complete':
@@ -93,6 +128,73 @@ export function pipInteractionSceneReducer(
         phase: 'none',
         resumeSequence: state.resumeSequence + 1,
       };
+    case 'place-object': {
+      if (
+        state.interaction.mode !== 'carrying' ||
+        state.interaction.held !== event.target
+      ) return state;
+      const y = event.target === 'food'
+        ? GARDEN_SNACK_AUTHORED_POSITION[1]
+        : GARDEN_TOY_AUTHORED_POSITION[1];
+      const position = [event.point.x, y, event.point.z] as const;
+      return {
+        ...state,
+        interaction: interactionReducer(state.interaction, { type: 'place', position }),
+        phase: 'none',
+        placementMessage: event.message,
+        objectPositions: { ...state.objectPositions, [event.target]: position },
+        objectLastSafePositions: { ...state.objectLastSafePositions, [event.target]: position },
+        focusRepublishSequence: state.focusRepublishSequence + 1,
+      };
+    }
+    case 'offer-object': {
+      const interaction = interactionReducer(state.interaction, {
+        type: 'offer',
+        target: event.target,
+        pipAvailable: event.pipAvailable,
+      });
+      if (interaction === state.interaction) return state;
+      const y = event.target === 'food'
+        ? GARDEN_SNACK_AUTHORED_POSITION[1]
+        : GARDEN_TOY_AUTHORED_POSITION[1];
+      return {
+        ...state,
+        interaction,
+        phase: event.target === 'food' ? 'eating' : 'playing',
+        objectPositions: {
+          ...state.objectPositions,
+          [event.target]: [event.reactionPoint.x, y, event.reactionPoint.z],
+        },
+        placementMessage: null,
+        reactionStarted: true,
+        toyNudged: false,
+      };
+    }
+    case 'toy-nudged':
+      if (state.phase !== 'playing' || state.toyNudged) return state;
+      return { ...state, toyNudged: true };
+    case 'object-reaction-complete': {
+      if (
+        (state.phase !== 'eating' && state.phase !== 'playing') ||
+        state.interaction.mode !== 'reacting' ||
+        state.interaction.offered === null
+      ) return state;
+      const offered = state.interaction.offered;
+      const resetPosition = resetGardenObjectPosition(
+        offered,
+        state.objectLastSafePositions[offered],
+      );
+      return {
+        ...state,
+        interaction: interactionReducer(state.interaction, { type: 'reaction-complete' }),
+        phase: 'none',
+        objectPositions: { ...state.objectPositions, [offered]: resetPosition },
+        reactionStarted: false,
+        toyNudged: false,
+        resumeSequence: state.resumeSequence + 1,
+        focusRepublishSequence: state.focusRepublishSequence + 1,
+      };
+    }
   }
 }
 
