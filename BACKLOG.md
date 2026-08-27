@@ -16,7 +16,7 @@ Only these items are active.
 - The three garden changes have a deliberate visual hierarchy.
 - The neutral identity area does not imply health or performance status.
 
-**Progress:** Garden-change hierarchy, the detailed compact Pip design, the constrained 3D-space treatment, procedural 3D Pip locomotion, and autonomous activity selection are complete. First-person interaction is now the only active expansion outcome. Staff invitations remain paused.
+**Progress:** The Pip exploration expansion is implementation-complete: grounded procedural 3D locomotion, autonomous activity selection, first-person pet/carry/place interactions, and temporary snack/toy reactions are implemented with automated coverage. The full owner walkthrough and explicit owner approval remain outstanding. Staff invitations remain paused.
 
 ## Completed
 
@@ -28,7 +28,7 @@ Only these items are active.
 
 ## Next
 
-- Begin first-person interaction expansion in `docs/superpowers/plans/2026-08-27-pip-interactions-plan.md`
+- Complete the Release 0 owner walkthrough, including direct interactions, both choice paths, keyboard-only use, unsafe placement recovery, reduced motion, refresh, and console review
 - Run voluntary staff validation with 6–10 participants only after invitations resume
 - Summarize findings and evaluate the Release 0 gate
 

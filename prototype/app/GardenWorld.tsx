@@ -20,7 +20,6 @@ import { getFirstPersonMovementVector } from './garden/firstPersonMovement';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import {
-  PIP_PET_MESSAGE,
   PIP_PET_REACTION_SECONDS,
   CAMERA_CONTROLS_FRAME_PRIORITY,
   PIP_INTERACTION_FRAME_PRIORITY,
@@ -35,6 +34,7 @@ import {
   yawTowardEmployee,
   type PipInteractionPhase,
 } from './garden/pipInteraction';
+import { pipInteractionStatusText } from './garden/pipInteractionPresentation';
 import {
   consumePipResumeSequence,
   createPipInteractionSceneState,
@@ -983,13 +983,11 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
   const interactionLabel = unavailableOffer ? null : actionLabelForLiveTarget(interaction, eligibleLiveTarget);
   const offeredObject = interaction.mode === 'reacting' ? interaction.offered : null;
   const movementSpeed = employeeWalkSpeedWhileHolding(interaction.held);
-  const visiblePipMessage = pipInteractionPhase === 'pet'
-    ? PIP_PET_MESSAGE
-    : pipInteractionPhase === 'eating'
-      ? 'Pip takes a few pleased bites, listening ear bobbing.'
-      : pipInteractionPhase === 'playing'
-        ? 'Pip trots over and gives the wooden rings one careful nudge.'
-        : placementMessage ?? pipMessage;
+  const visiblePipMessage = pipInteractionStatusText(
+    pipInteractionPhase,
+    placementMessage,
+    pipMessage,
+  );
   const onInteractionTargetChange = useCallback((target: InteractableId | null) => {
     setLiveInteractionTarget(target);
     dispatchPipInteractionScene({ type: 'focus', target });

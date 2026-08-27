@@ -16,6 +16,30 @@ import {
 } from './pipInteractionScene';
 
 describe('Pip interaction scene lifecycle', () => {
+  it('creates the complete authored opening state for refresh or restart', () => {
+    const opening = createPipInteractionSceneState();
+
+    expect(opening).toMatchObject({
+      interaction: {
+        mode: 'idle',
+        focused: null,
+        held: null,
+        lastSafePosition: null,
+      },
+      phase: 'none',
+      placedPosition: null,
+      placementMessage: null,
+      resumeSequence: 0,
+      focusRepublishSequence: 0,
+      objectPositions: {
+        food: [4.8, 0.25, -4.5],
+        toy: [-3.8, 0.2, 5.4],
+      },
+      reactionStarted: false,
+      toyNudged: false,
+    });
+  });
+
   it('keeps reducer state and visual phase synchronized through pet and carry activation', () => {
     const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'pip' });
     const petting = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'pet' } });

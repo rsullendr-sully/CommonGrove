@@ -81,7 +81,14 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 - Procedural 3D Pip locomotion pass completed: original clay character, grounded foot cycle, natural facing, acceleration, arrival braking, and reduced-motion treatment. Live OS-level reduced-motion review remains outstanding.
 - Employee garden movement increased from 2 to 4 meters per second while preserving the approved 40 × 40 meter footprint and collision boundaries.
 - Discovery-seed transition completed and privacy comfort feedback clarified as temporary local research input.
+- Pip exploration expansion implementation completed: Pip can autonomously greet, accept petting, be carried and safely placed, and temporarily react to one snack and one wooden-ring toy. These session-local interactions add no scores, needs, upkeep, inventory, or persistent penalties.
+
+## Verification evidence
+
+- **Automated technical verification:** 168 tests cover locomotion, safe navigation, autonomous priorities and recovery, contextual input, interaction state, carry/place recovery, food/toy reactions, opening-state reset, and text alternatives for temporary reactions. Lint and the production build pass.
+- **Short live smoke at `localhost:3010`:** all three accomplishment controls advanced; Lantern Orchard and Tinker Workshop each confirmed in separate restarted sessions; the privacy explanation and local comfort selection rendered; restart and refresh returned the journal and reward controls to their opening state; no application console errors appeared. The existing `THREE.Clock` deprecation warning remains non-blocking technical debt. A WebGL context-lost log appeared only during the deliberate refresh.
+- **Full owner walkthrough:** still pending. Before/Now comparison after every reward, direct greet/pet/carry/place/snack/toy use, full keyboard traversal, unsafe-placement attempts, and an operating-system reduced-motion pass have not been claimed as manually complete.
 
 ## Resume here
 
-Begin first-person interaction expansion in `docs/superpowers/plans/2026-08-27-pip-interactions-plan.md`. The autonomy evidence above is automated/runtime simulation; no five-minute live observation is claimed here. Staff invitations and testing remain paused. Do not begin production architecture, integrations, or hosted access.
+Run the full Release 0 owner walkthrough in `docs/releases/release-0-validation.md`. The Pip exploration expansion is implementation-complete, but owner acceptance is not yet recorded. Staff invitations and testing remain paused until the owner explicitly approves the complete journey. Do not begin production architecture, integrations, or hosted access.

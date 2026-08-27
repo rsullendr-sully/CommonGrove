@@ -1,4 +1,7 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import InteractionPrompt from './InteractionPrompt';
 import {
   activateFromInteractionKey,
   createInteractionHandlers,
@@ -6,6 +9,16 @@ import {
 } from './InteractionPrompt';
 
 describe('contextual interaction input', () => {
+  it('uses the same contextual action as the button accessible and visible label', () => {
+    const markup = renderToStaticMarkup(createElement(InteractionPrompt, {
+      label: 'Offer snack',
+      onActivate: vi.fn(),
+    }));
+
+    expect(markup).toContain('aria-label="Offer snack"');
+    expect(markup).toContain('>Offer snack</button>');
+  });
+
   it.each(['input', 'select', 'textarea', 'button', 'summary'])(
     'suppresses E when the event target is a %s control',
     (tagName) => {

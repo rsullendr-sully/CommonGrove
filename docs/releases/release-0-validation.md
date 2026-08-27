@@ -19,6 +19,9 @@ The prototype is a scripted, web-first bounded 3D experience. It is allowed to f
 - One personal garden
 - A first-person employee viewpoint with bounded movement
 - Keyboard and on-screen directional controls
+- An original procedural 3D Pip with grounded locomotion and autonomous garden activities
+- Optional first-person greeting, petting, carrying, and safe placement
+- One session-local snack and one session-local toy with temporary reactions and no needs or scores
 - Before and after garden states
 - Representative accomplishments from all four role groups
 - Three visible garden outcomes
@@ -89,13 +92,22 @@ The interactive prototype now includes this static preview after the seed choice
 
 Before inviting staff, complete one uninterrupted local walkthrough:
 
-- Restart the prototype and confirm the camera, garden, Pip, journal, and responses return to their opening state.
-- Complete all three simulated accomplishments and compare Before/Now after each one.
-- Confirm both seed-choice options are understandable; select one and verify its destination appears.
-- Open the privacy preview and confirm the visible/private boundary is unambiguous.
-- Navigate each dialog by keyboard only, including Tab, Shift+Tab, Enter, and Escape.
-- Repeat with reduced motion enabled at the operating-system level and confirm ambient movement is subdued without hiding garden outcomes.
-- Confirm no response persists after refresh and no network-backed product feature is implied.
+- Restart the prototype and confirm the camera, garden, Pip, journal, interaction prompt, carried items, object positions, and responses return to their authored opening state.
+- Complete all three simulated accomplishments in order. After each reward, switch to **Before** and **Now** and verify the comparison stays coherent while Pip completes the corresponding priority reaction.
+- In separate restarted sessions, confirm Lantern Orchard and Tinker Workshop. For each path, verify the discovery seed remains in historical **Before**, is consumed in **Now**, and the selected destination appears without a deadline or upkeep message.
+- Open the privacy preview and confirm the visible/private boundary is unambiguous. Select **Comfortable**, **Unsure**, and **Invasive** in turn and verify the copy says the response is temporary, enables no visit, contacts nobody, and leaves no state after refresh.
+- Approach Pip and observe the proximity greeting. Use the contextual action to pet Pip, then pick him up, move while carrying, and place him on open ground. Repeat placement toward the pond edge and garden boundary; confirm Pip finishes grounded at a valid point. Press Escape while carrying and confirm placement happens before any unrelated dialog dismissal.
+- Pick up the snack and wooden-ring toy separately. For each object, carry it, place it on safe ground, offer it to Pip, and verify the eating or single-nudge play reaction is narrated in text. Press Escape during each carrying state and confirm safe placement. Refresh and confirm the snack and toy return to their authored opening positions.
+- Navigate each dialog by keyboard only with Tab and Shift+Tab, activate controls with Enter, trigger eligible contextual actions with **E**, and verify held targets place with Escape. Confirm **E** never activates from input, select, textarea, button, or summary controls and a held key does not repeat the action.
+- Repeat the reward, placement, and interaction checks with reduced motion enabled at the operating-system level. Confirm secondary bounce, sway, and decorative transitions are subdued while foot changes, turning, prompts, status copy, and every outcome remain readable.
+- Refresh and confirm the opening reward state, choice, comfort response, interaction state, camera, Pip, snack, and toy are restored. Confirm no network-backed product feature or persistence is implied.
+- Inspect the console throughout. Require zero application errors; record the known `THREE.Clock` deprecation warning separately as non-blocking technical debt.
+
+## Current verification record — 2026-08-27
+
+- **Automated:** 168 tests pass across the full suite. Coverage includes prompt input suppression and repeat-key handling, accessible/visible prompt label parity, Escape placement ordering, canonical safe placement, interaction lifecycle and timers, opening interaction state, and readable text for pet/eat/play outcomes. Lint and the production build pass.
+- **Short live smoke:** the three reward controls advanced; each choice path was confirmed in a separately restarted session; privacy copy and a local comfort selection rendered; restart and refresh restored the opening journal and disabled **Now** control. No error-level console entries appeared. The existing `THREE.Clock` deprecation warning remains; deliberate refresh also emitted a WebGL context-lost log.
+- **Owner walkthrough:** not yet complete. The detailed Before/Now, direct interaction, keyboard-only, unsafe-placement, and operating-system reduced-motion checks above still require owner observation before staff invitations resume.
 
 ## Research prompts
 
