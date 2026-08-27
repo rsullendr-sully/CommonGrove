@@ -53,4 +53,31 @@ describe('grounded locomotion', () => {
   it('uses the shortest turn across the pi boundary', () => {
     expect(shortestAngleDelta(Math.PI - 0.1, -Math.PI + 0.1)).toBeCloseTo(0.2, 5);
   });
+
+  it('does not translate sideways while turning toward a target', () => {
+    const state = stepLocomotion(idle(), new THREE.Vector3(1, 0, 0), 1 / 60, config);
+    expect(state.position.x).toBe(0);
+    expect(state.position.z).toBe(0);
+    expect(state.facing).toBeGreaterThan(0);
+  });
+
+  it('reaches arrival without teleporting from outside the radius', () => {
+    const target = new THREE.Vector3(0, 0, -0.5);
+    let state = { ...idle(), speed: 1.2 };
+    let maximumStep = 0;
+    for (let index = 0; index < 120; index += 1) {
+      const previous = state.position.clone();
+      state = stepLocomotion(state, target, 1 / 60, config);
+      maximumStep = Math.max(maximumStep, previous.distanceTo(state.position));
+    }
+    expect(maximumStep).toBeLessThan(0.1);
+    expect(state.position.distanceTo(target)).toBeLessThanOrEqual(config.arrivalRadius);
+    expect(state.distanceTravelled).toBeGreaterThan(0);
+  });
+
+  it('preserves the grounded y coordinate on arrival', () => {
+    const state = { ...idle(), position: new THREE.Vector3(0, 2, 0) };
+    const result = stepLocomotion(state, new THREE.Vector3(0, 9, 0), 1 / 60, config);
+    expect(result.position.y).toBe(2);
+  });
 });

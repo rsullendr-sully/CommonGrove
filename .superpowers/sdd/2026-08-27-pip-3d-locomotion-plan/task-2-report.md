@@ -20,3 +20,18 @@ Implemented and verified frame-rate-independent grounded locomotion math.
 ## Notes
 
 The brief's interpolation formula approached max speed asymptotically and missed its required precision assertion. The implementation uses bounded per-frame acceleration/deceleration instead, while preserving the configured speed cap. A low-speed near-arrival snap prevents numerical stalling outside the arrival radius.
+
+## Round 1/5 Fixes
+
+- Translation now follows the updated facing direction and only advances once sufficiently aligned with the target, preventing sideways movement while turning.
+- Removed the near-arrival teleport snap; arrival retains the current position inside the radius, so no displacement is unaccounted for.
+- Arrival preserves the current grounded Y coordinate.
+- Added regression tests covering forward-only turning, bounded arrival steps and travel accounting, and grounded Y preservation.
+
+Focused verification command:
+
+```text
+$env:Path = 'C:\Users\rsull\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin;' + $env:Path; & '.\node_modules\.bin\vitest.cmd' run 'app/garden/locomotion.test.ts'
+```
+
+Output: `app/garden/locomotion.test.ts` — 7 tests passed.

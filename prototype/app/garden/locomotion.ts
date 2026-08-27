@@ -33,11 +33,13 @@ export function stepLocomotion(
   const offset = target.clone().sub(state.position);
   offset.y = 0;
   const distance = offset.length();
-  if (
-    distance <= config.arrivalRadius
-    || (distance <= config.arrivalRadius * 2 && state.speed < config.deceleration * dt)
-  ) {
-    return { ...state, position: target.clone(), speed: 0, moving: false };
+  if (distance <= config.arrivalRadius) {
+    return {
+      ...state,
+      position: state.position.clone(),
+      speed: 0,
+      moving: false,
+    };
   }
   const desiredFacing = Math.atan2(offset.x, offset.z);
   const turn = THREE.MathUtils.clamp(
@@ -46,14 +48,20 @@ export function stepLocomotion(
     config.turnSpeed * dt,
   );
   const facing = state.facing + turn;
-  const desiredSpeed = config.maxSpeed * THREE.MathUtils.smoothstep(distance, config.arrivalRadius, config.brakingRadius);
+  const desiredSpeed = Math.max(
+    config.maxSpeed * THREE.MathUtils.smoothstep(distance, config.arrivalRadius, config.brakingRadius),
+    config.maxSpeed * 0.25,
+  );
   const speed = THREE.MathUtils.clamp(
     state.speed + THREE.MathUtils.clamp(desiredSpeed - state.speed, -config.deceleration * dt, config.acceleration * dt),
     0,
     config.maxSpeed,
   );
-  const stepDistance = Math.min(distance, speed * dt);
-  const position = state.position.clone().addScaledVector(offset.normalize(), stepDistance);
+  const direction = offset.normalize();
+  const forward = new THREE.Vector3(Math.sin(facing), 0, Math.cos(facing));
+  const alignment = forward.dot(direction);
+  const stepDistance = alignment > 0.999 ? Math.min(distance, speed * dt) : 0;
+  const position = state.position.clone().addScaledVector(forward, stepDistance);
   return {
     position,
     facing,
