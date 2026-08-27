@@ -85,7 +85,7 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 
 ## Verification evidence
 
-- **Automated technical verification:** 168 tests cover locomotion, safe navigation, autonomous priorities and recovery, contextual input, interaction state, carry/place recovery, food/toy reactions, opening-state reset, and text alternatives for temporary reactions. Lint and the production build pass.
+- **Automated technical verification:** 168 tests cover locomotion, safe navigation, autonomous priorities and recovery, contextual input, interaction state, carry/place recovery, food/toy reactions, the authored opening interaction state, and text alternatives for temporary reactions. Lint and the production build pass.
 - **Short live smoke at `localhost:3010`:** all three accomplishment controls advanced; Lantern Orchard and Tinker Workshop each confirmed in separate restarted sessions; the privacy explanation and local comfort selection rendered; restart and refresh returned the journal and reward controls to their opening state; no application console errors appeared. The existing `THREE.Clock` deprecation warning remains non-blocking technical debt. A WebGL context-lost log appeared only during the deliberate refresh.
 - **Full owner walkthrough:** still pending. Before/Now comparison after every reward, direct greet/pet/carry/place/snack/toy use, full keyboard traversal, unsafe-placement attempts, and an operating-system reduced-motion pass have not been claimed as manually complete.
 
