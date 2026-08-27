@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createSafeGardenRoute,
   hasActivityTimedOut,
   isSafeGardenPoint,
+  isSafeGardenSegment,
   nearestSafePoint,
   PIP_ACTIVITY_TIMEOUT_SECONDS,
   SAFE_GARDEN_HALF_SIZE,
@@ -14,6 +16,28 @@ import {
 const scenery: readonly GardenObstacle[] = [
   { x: 13, z: 8, radius: 1.2 },
 ];
+
+const sceneObstacles: readonly GardenObstacle[] = [
+  { x: 0, z: 0, radius: 6.7 },
+  { x: 0, z: -15.2, radius: 6.8 },
+  { x: -12.2, z: -12.4, radius: 3.2 },
+  { x: 11.8, z: -9.2, radius: 1.15 },
+  { x: 14.4, z: 5.8, radius: 1.15 },
+  { x: -14.8, z: 4.5, radius: 1.15 },
+];
+
+function expectSafeRoute(
+  start: { x: number; z: number },
+  route: readonly { x: number; z: number }[],
+  obstacles: readonly GardenObstacle[],
+) {
+  let previous = start;
+  for (const point of route) {
+    expect(isSafeGardenPoint(point, obstacles)).toBe(true);
+    expect(isSafeGardenSegment(previous, point, obstacles)).toBe(true);
+    previous = point;
+  }
+}
 
 describe('Pip garden navigation', () => {
   it('excludes points in the protected pond radius', () => {
@@ -89,5 +113,48 @@ describe('Pip garden navigation', () => {
       .toEqual(['destination', 'flowers']);
     expect(selectCurrentGardenInterests(interests, { seedVisible: true, destinationVisible: true }).map(({ id }) => id))
       .toEqual(['destination', 'flowers']);
+  });
+
+  it('routes reward one to reward two without crossing the pond or scenery', () => {
+    const rewardOne = { x: 8.2, z: 6.6 };
+    const rewardTwo = { x: -8.65, z: -8.1 };
+
+    expect(isSafeGardenSegment(rewardOne, rewardTwo, sceneObstacles)).toBe(false);
+    const route = createSafeGardenRoute(rewardOne, rewardTwo, sceneObstacles);
+
+    expect(route.length).toBeGreaterThan(1);
+    expect(route.at(-1)).toEqual(rewardTwo);
+    expectSafeRoute(rewardOne, route, sceneObstacles);
+  });
+
+  it('builds safe routes from Pip’s start to every ordinary garden interest', () => {
+    const start = { x: 8.4, z: 1.5 };
+    const ordinaryTargets = [
+      { x: 8.8, z: -5.9 },
+      { x: 8.2, z: 6.6 },
+      { x: -8.65, z: -8.1 },
+      { x: -8.5, z: 7.4 },
+      { x: -10.6, z: 9.2 },
+      { x: 8.4, z: 1.5 },
+      { x: 6.8, z: -7.2 },
+      { x: -6.3, z: 7.1 },
+    ];
+
+    for (const target of ordinaryTargets) {
+      const route = createSafeGardenRoute(start, target, sceneObstacles);
+      expect(route.at(-1)).toEqual(target);
+      expectSafeRoute(start, route, sceneObstacles);
+    }
+  });
+
+  it('routes around declared scenery and rejects endpoints outside the boundary', () => {
+    const start = { x: 10, z: 8 };
+    const end = { x: 16, z: 8 };
+    const route = createSafeGardenRoute(start, end, scenery);
+
+    expect(isSafeGardenSegment(start, end, scenery)).toBe(false);
+    expectSafeRoute(start, route, scenery);
+    expect(() => createSafeGardenRoute(start, { x: SAFE_GARDEN_HALF_SIZE + 1, z: 8 }, scenery))
+      .toThrow('Safe garden routes require safe endpoints.');
   });
 });

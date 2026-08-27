@@ -39,6 +39,7 @@ export type PipBehaviorState = {
   hasGreeted: boolean;
   resumeExcludingKind: PipActivityKind | null;
   activeMission: PipPriorityMission | null;
+  pendingMissions: readonly PipPriorityMission[];
   seenMissionIds: readonly string[];
 };
 
@@ -84,6 +85,7 @@ export function createPipBehaviorState(
     hasGreeted: false,
     resumeExcludingKind: null,
     activeMission: null,
+    pendingMissions: [],
     seenMissionIds: [],
     ...overrides,
   };
@@ -200,7 +202,7 @@ function selectGreeting(state: PipBehaviorState, input: PipBehaviorFrameInput) {
   };
 }
 
-export function interruptPipBehaviorWithReward(
+function startPriorityMission(
   state: PipBehaviorState,
   mission: PipPriorityMission,
   now: number,
@@ -226,6 +228,22 @@ export function interruptPipBehaviorWithReward(
   };
 }
 
+export function interruptPipBehaviorWithReward(
+  state: PipBehaviorState,
+  mission: PipPriorityMission,
+  now: number,
+): PipBehaviorState {
+  if (state.seenMissionIds.includes(mission.id)) return state;
+  if (state.mode === 'priority') {
+    return {
+      ...state,
+      pendingMissions: [...state.pendingMissions, mission],
+      seenMissionIds: [...state.seenMissionIds, mission.id],
+    };
+  }
+  return startPriorityMission(state, mission, now);
+}
+
 function completedActivityKind(state: PipBehaviorState) {
   return state.mode === 'priority'
     ? state.resumeExcludingKind
@@ -236,6 +254,10 @@ export function completePipBehaviorActivity(
   state: PipBehaviorState,
   input: PipBehaviorFrameInput,
 ) {
+  if (state.mode === 'priority' && state.pendingMissions.length > 0) {
+    const [nextMission, ...remainingMissions] = state.pendingMissions;
+    return startPriorityMission({ ...state, pendingMissions: remainingMissions }, nextMission, input.now);
+  }
   return selectOrdinaryActivity(state, input, completedActivityKind(state));
 }
 
@@ -243,20 +265,19 @@ export function advancePipBehavior(
   state: PipBehaviorState,
   input: PipBehaviorFrameInput,
 ): PipBehaviorState {
-  const candidateMission = [input.choiceMission, input.rewardMission]
-    .find((mission): mission is PipPriorityMission => Boolean(
-      mission && !state.seenMissionIds.includes(mission.id),
-    ));
-  if (candidateMission) return interruptPipBehaviorWithReward(state, candidateMission, input.now);
+  let current = state;
+  for (const mission of [input.rewardMission, input.choiceMission]) {
+    if (mission) current = interruptPipBehaviorWithReward(current, mission, input.now);
+  }
 
-  const wasEmployeeNearby = state.employeeNearby;
-  const employeeNearby = wasEmployeeNearby
-    ? input.employeeDistance <= GREETING_EXIT_DISTANCE
-    : input.employeeDistance < GREETING_DISTANCE;
-  let current = employeeNearby === state.employeeNearby ? state : { ...state, employeeNearby };
-
-  if (current.mode === 'ordinary' && !wasEmployeeNearby && employeeNearby) {
-    current = selectGreeting(current, input);
+  let employeeNearby = current.employeeNearby;
+  if (current.mode === 'ordinary') {
+    const wasEmployeeNearby = current.employeeNearby;
+    employeeNearby = wasEmployeeNearby
+      ? input.employeeDistance <= GREETING_EXIT_DISTANCE
+      : input.employeeDistance < GREETING_DISTANCE;
+    if (employeeNearby !== current.employeeNearby) current = { ...current, employeeNearby };
+    if (!wasEmployeeNearby && employeeNearby) current = selectGreeting(current, input);
   }
 
   if (!current.activity) return selectOrdinaryActivity(current, input);
@@ -278,7 +299,7 @@ export function advancePipBehavior(
         startedAt: input.now,
       };
     }
-    if (hasActivityTimedOut(current.startedAt, input.now, PIP_ACTIVITY_TIMEOUT_SECONDS)) {
+    if (current.mode === 'ordinary' && hasActivityTimedOut(current.startedAt, input.now, PIP_ACTIVITY_TIMEOUT_SECONDS)) {
       return completePipBehaviorActivity(current, input);
     }
     return current;

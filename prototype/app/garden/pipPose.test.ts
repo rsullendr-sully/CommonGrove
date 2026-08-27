@@ -13,6 +13,7 @@ describe('Pip pose', () => {
     const pose = getPipPose({ poseKind: 'walk', speed: 1, distanceTravelled: 0.3, attentive: false, reducedMotion: true });
     expect(pose.bodyLift).toBe(0);
     expect(pose.earSway).toBe(0);
+    expect(pose.bodyLean).toBe(0);
   });
 
   it('lowers Pip by 0.12 meters for rest without moving the feet', () => {

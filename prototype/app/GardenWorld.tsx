@@ -6,7 +6,7 @@ import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import PipCharacter from './garden/PipCharacter';
 import { EMPLOYEE_WALK_SPEED, stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
-import { selectCurrentGardenInterests, type GardenInterest, type GardenObstacle } from './garden/navigation';
+import { createSafeGardenRoute, isSafeGardenSegment, selectCurrentGardenInterests, type GardenInterest, type GardenObstacle, type GardenPoint } from './garden/navigation';
 import { getPipPose, type PipPose } from './garden/pipPose';
 import { type GardenChoice } from './garden/rewardState';
 import { usePipBehavior, type PipPriorityMission } from './garden/usePipBehavior';
@@ -637,6 +637,9 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
     reducedMotion,
   }));
   const target = useMemo(() => new THREE.Vector3(), []);
+  const routeTargetKey = useRef<string | null>(null);
+  const routeWaypoints = useRef<readonly GardenPoint[]>([]);
+  const routeIndex = useRef(0);
   const rewardMission = useMemo<PipPriorityMission | null>(() => {
     if (rewardStage === 1) return {
       id: 'reward-1',
@@ -680,19 +683,54 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
       );
       let locomotionComplete = false;
       if (behavior.target) {
-        target.set(behavior.target.x, 0, behavior.target.z);
-        pipMotion.current = stepLocomotion(
-          pipMotion.current,
+        const targetKey = `${behavior.target.x},${behavior.target.z}`;
+        if (routeTargetKey.current !== targetKey) {
+          routeTargetKey.current = targetKey;
+          routeWaypoints.current = createSafeGardenRoute(
+            { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
+            behavior.target,
+            obstacles,
+          );
+          routeIndex.current = 0;
+        }
+        const routeTarget = routeWaypoints.current[routeIndex.current] ?? behavior.target;
+        target.set(routeTarget.x, 0, routeTarget.z);
+        const previousMotion = pipMotion.current;
+        const steppedMotion = stepLocomotion(
+          previousMotion,
           target,
           delta,
           behavior.mode === 'priority' ? pipRewardMotionConfig : pipMotionConfig,
         );
+        pipMotion.current = isSafeGardenSegment(
+          { x: previousMotion.position.x, z: previousMotion.position.z },
+          { x: steppedMotion.position.x, z: steppedMotion.position.z },
+          obstacles,
+        ) ? steppedMotion : {
+          ...steppedMotion,
+          position: previousMotion.position.clone(),
+          speed: 0,
+          distanceTravelled: previousMotion.distanceTravelled,
+          moving: false,
+        };
         pip.current.position.copy(pipMotion.current.position);
         pip.current.rotation.y = pipMotion.current.facing;
-        locomotionComplete = !pipMotion.current.moving
+        const waypointComplete = !pipMotion.current.moving
           && pipMotion.current.position.distanceTo(target) <= pipMotionConfig.arrivalRadius;
+        if (waypointComplete && routeIndex.current < routeWaypoints.current.length - 1) {
+          routeIndex.current += 1;
+        } else {
+          locomotionComplete = waypointComplete;
+        }
       } else if (pipMotion.current.moving || pipMotion.current.speed > 0) {
         pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
+        routeTargetKey.current = null;
+        routeWaypoints.current = [];
+        routeIndex.current = 0;
+      } else if (routeTargetKey.current !== null) {
+        routeTargetKey.current = null;
+        routeWaypoints.current = [];
+        routeIndex.current = 0;
       }
 
       behavior.advance({

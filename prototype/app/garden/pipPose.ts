@@ -28,7 +28,7 @@ export function getPipPose(input: PipPoseInput): PipPose {
     leftArm: weight ? -stride * 0.2 * weight : 0,
     rightArm: weight ? stride * 0.2 * weight : 0,
     bodyLift: input.poseKind === 'rest' ? -0.12 : input.reducedMotion ? 0 : Math.abs(stride) * 0.025 * weight,
-    bodyLean: input.poseKind === 'walk' ? input.speed * 0.035 : 0,
+    bodyLean: input.poseKind === 'walk' && !input.reducedMotion ? input.speed * 0.035 : 0,
     earSway: input.reducedMotion ? 0 : stride * 0.045 * weight + (input.attentive ? 0.08 : 0),
     headTilt: input.poseKind === 'inspect' ? 0.16 : 0,
     listeningEarLift: input.poseKind === 'greet' ? 0.12 : 0,
