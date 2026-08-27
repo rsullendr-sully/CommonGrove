@@ -6,13 +6,14 @@ import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import PipCharacter from './garden/PipCharacter';
 import { EMPLOYEE_WALK_SPEED, stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
+import { type GardenInterest, type GardenObstacle } from './garden/navigation';
 import { getPipPose, type PipPose } from './garden/pipPose';
 import { type GardenChoice } from './garden/rewardState';
 
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
 
-const obstacles = [
+const obstacles: readonly GardenObstacle[] = [
   { x: 0, z: 0, radius: 6.7 },
   { x: 0, z: -15.2, radius: 6.8 },
   { x: -12.2, z: -12.4, radius: 3.2 },
@@ -593,10 +594,24 @@ function ChoiceDestination({ choice, reducedMotion }: { choice: GardenChoice | n
   );
 }
 
-const pipWaypoints: Array<[number, number]> = [
-  [8.4, 1.5], [8.7, -3.8], [6.8, -7.2], [1.8, -8], [-4.8, -8],
-  [-8.1, -5.2], [-8.2, 2.4], [-6.3, 7.1], [0.4, 8], [6.4, 7],
+const gardenInterestDefinitions: readonly GardenInterest[] = [
+  { id: 'flowers', position: { x: 8.8, z: -5.9 } },
+  { id: 'pond', position: { x: 8.2, z: 6.6 } },
+  { id: 'pavilion', position: { x: -8.65, z: -8.1 } },
+  { id: 'seed', position: { x: -8.5, z: 7.4 } },
+  { id: 'destination', position: { x: -10.6, z: 9.2 } },
+  { id: 'wander-east', position: { x: 8.4, z: 1.5 } },
+  { id: 'wander-south', position: { x: 6.8, z: -7.2 } },
+  { id: 'wander-west', position: { x: -6.3, z: 7.1 } },
 ];
+
+function getCurrentGardenInterests(seedVisible: boolean, destinationVisible: GardenChoice | null) {
+  return gardenInterestDefinitions.filter((interest) => {
+    if (interest.id === 'seed') return seedVisible;
+    if (interest.id === 'destination') return destinationVisible !== null;
+    return true;
+  });
+}
 
 const pipMotionConfig: LocomotionConfig = {
   maxSpeed: 1.2,
@@ -612,7 +627,7 @@ const pipRewardMotionConfig: LocomotionConfig = {
   maxSpeed: 1.65,
 };
 
-function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
+function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean }) {
   const pip = useRef<THREE.Group>(null);
   const pipMotion = useRef<LocomotionState>({
     position: new THREE.Vector3(8.4, 0, 1.5),
@@ -637,6 +652,7 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
   const reactionMessageUntil = useRef(0);
   const observedChoice = useRef<GardenChoice | null>(null);
   const choiceMission = useRef<GardenChoice | null>(null);
+  const wanderInterests = useMemo(() => interests.filter(({ id }) => id.startsWith('wander-')), [interests]);
 
   useEffect(() => {
     if (rewardStage > observedRewardStage.current) {
@@ -719,11 +735,11 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
           hasMovementTarget = true;
         }
       } else if (!isNearby && clock.elapsedTime >= pauseUntil.current) {
-        const [targetX, targetZ] = pipWaypoints[waypointIndex.current];
-        target.set(targetX, 0, targetZ);
+        const currentWanderInterest = wanderInterests[waypointIndex.current % wanderInterests.length];
+        target.set(currentWanderInterest.position.x, 0, currentWanderInterest.position.z);
         const distanceToTarget = pip.current.position.distanceTo(target);
         if (distanceToTarget < 0.16) {
-          waypointIndex.current = (waypointIndex.current + 1) % pipWaypoints.length;
+          waypointIndex.current = (waypointIndex.current + 1) % wanderInterests.length;
           pauseUntil.current = clock.elapsedTime + 2.5 + (waypointIndex.current % 3);
         } else {
           hasMovementTarget = true;
@@ -766,6 +782,10 @@ function Pip({ onMessage, rewardStage, gardenChoice, reducedMotion }: { onMessag
 
 function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const grassTexture = useGrassTexture();
+  const interests = useMemo(
+    () => getCurrentGardenInterests(seedVisible, destinationVisible),
+    [destinationVisible, seedVisible],
+  );
   return (
     <>
       <FrameCadence />
@@ -802,7 +822,7 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
       <CuriousSeed visible={seedVisible} reducedMotion={reducedMotion} />
       <ChoiceDestination choice={destinationVisible} reducedMotion={reducedMotion} />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
-      <Pip onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} reducedMotion={reducedMotion} />
+      <Pip onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} />
 
       <FirstPersonControls movement={movement} />
     </>
