@@ -105,7 +105,7 @@ Before inviting staff, complete one uninterrupted local walkthrough:
 
 ## Current verification record — 2026-08-27
 
-- **Automated:** 179 tests pass across the full suite. Coverage includes prompt input suppression and repeat-key handling, accessible/visible prompt label parity, the direct greet/pet/pick-up reducer and timer sequence, safe greeting routes and duplicate-greeting suppression, Escape placement ordering, canonical safe placement, opening interaction state, and readable text for greet/pet/eat/play outcomes. Lint and the production build pass.
+- **Automated:** 182 tests pass across the full suite. Coverage includes prompt input suppression and repeat-key handling, accessible/visible prompt label parity, the direct greet/pet/pick-up reducer and post-arrival timer sequence, real safe-route arrival at maximum range and around scenery, duplicate-greeting suppression, Escape placement ordering, canonical safe placement, opening interaction state, and readable text for greet/pet/eat/play outcomes. Lint and the production build pass.
 - **Short live smoke:** the three reward controls advanced; each choice path was confirmed in a separately restarted session; privacy copy and a local comfort selection rendered; restart and refresh restored the opening journal and disabled **Now** control. No error-level console entries appeared. The existing `THREE.Clock` deprecation warning remains; deliberate refresh also emitted a WebGL context-lost log.
 - **Owner walkthrough:** not yet complete. The detailed Before/Now, direct interaction, keyboard-only, unsafe-placement, and operating-system reduced-motion checks above still require owner observation before staff invitations resume.
 

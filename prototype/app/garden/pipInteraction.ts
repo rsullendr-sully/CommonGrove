@@ -8,7 +8,7 @@ import {
 } from './navigation';
 import type { InteractableId } from './interaction';
 
-export type PipInteractionPhase = 'none' | 'greet' | 'pet' | 'carried' | 'placed' | 'eating' | 'playing';
+export type PipInteractionPhase = 'none' | 'greet-approach' | 'greet' | 'pet' | 'carried' | 'placed' | 'eating' | 'playing';
 
 export const PIP_EATING_REACTION_SECONDS = 3;
 export const PIP_PLAYING_REACTION_SECONDS = 4;

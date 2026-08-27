@@ -5,6 +5,7 @@ export function pipInteractionStatusText(
   placementMessage: string | null,
   pipMessage: string | null,
 ): string | null {
+  if (phase === 'greet-approach') return null;
   if (phase === 'greet') return PIP_DIRECT_GREET_MESSAGE;
   if (phase === 'pet') return PIP_PET_MESSAGE;
   if (phase === 'eating') return 'Pip takes a few pleased bites, listening ear bobbing.';

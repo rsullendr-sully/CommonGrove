@@ -57,8 +57,8 @@ export type PipBehaviorFrameInput = {
   randomValue: number;
 };
 
-const GREETING_DISTANCE = 1.35;
-const GREETING_EXIT_DISTANCE = 2;
+const GREETING_DISTANCE = 2.4;
+const GREETING_EXIT_DISTANCE = 3.2;
 const PRIORITY_PAUSE_SECONDS = 6;
 
 const poseForActivity = (kind: PipActivityKind): PipPoseKind => {

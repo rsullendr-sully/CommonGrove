@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import type { GardenInterest } from './navigation';
+import { createSafeGardenRoute, GARDEN_OBSTACLES, isSafeGardenSegment } from './navigation';
+import { PIP_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './locomotion';
+import { yawTowardEmployee } from './pipInteraction';
 import {
   advancePipBehavior,
   createPipBehaviorState,
@@ -401,7 +405,7 @@ describe('Pip behavior lifecycle', () => {
       ...ordinaryInput,
       now: 6,
       randomValue: 0,
-      employeeDistance: 3,
+      employeeDistance: 4,
     });
     const employeeReturns = advancePipBehavior(employeeLeaves, {
       ...ordinaryInput,
@@ -415,20 +419,55 @@ describe('Pip behavior lifecycle', () => {
   });
 
   it.each([
-    [{ x: 10, z: 1.5 }, { x: 8.4, z: 1.5 }],
-    [{ x: 8.4, z: 3.1 }, { x: 8.4, z: 1.5 }],
-  ] as const)('autonomous greeting safely approaches an employee at %o', (employeePosition, pipPosition) => {
+    [{ x: 10.7, z: 1.5 }, { x: 8.4, z: 1.5 }, Math.PI / 2],
+    [{ x: 8.4, z: 3.8 }, { x: 8.4, z: 1.5 }, 0],
+  ] as const)('autonomous greeting safely approaches and faces an employee at %o', (employeePosition, pipPosition, expectedYaw) => {
+    const employeeDistance = Math.hypot(
+      employeePosition.x - pipPosition.x,
+      employeePosition.z - pipPosition.z,
+    );
     const greeted = advancePipBehavior(createPipBehaviorState(), {
       ...ordinaryInput,
       now: 1,
       randomValue: 0,
-      employeeDistance: 1,
+      employeeDistance,
       employeePosition,
       pipPosition,
     });
 
     expect(greeted.activity?.kind).toBe('greet');
-    expect(greeted.poseKind).toBe(greeted.target ? 'walk' : 'greet');
+    expect(greeted.target).not.toEqual(pipPosition);
+    expect(Math.hypot(greeted.target!.x - employeePosition.x, greeted.target!.z - employeePosition.z)).toBeCloseTo(1.65, 2);
+
+    const route = createSafeGardenRoute(pipPosition, greeted.target!, GARDEN_OBSTACLES);
+    let progress = {
+      motion: {
+        position: new THREE.Vector3(pipPosition.x, 0, pipPosition.z), facing: 0, speed: 0,
+        distanceTravelled: 0, moving: false,
+      } satisfies LocomotionState,
+      waypointIndex: 0,
+      complete: false,
+    };
+    let previous = pipPosition;
+    for (let frame = 0; frame < 600 && !progress.complete; frame += 1) {
+      progress = stepSafeRouteLocomotion(progress, route, 1 / 60, PIP_MOTION_CONFIG, GARDEN_OBSTACLES);
+      const current = { x: progress.motion.position.x, z: progress.motion.position.z };
+      expect(isSafeGardenSegment(previous, current, GARDEN_OBSTACLES)).toBe(true);
+      previous = current;
+    }
+    expect(progress.complete).toBe(true);
+    const arrived = advancePipBehavior(greeted, {
+      ...ordinaryInput,
+      now: 2,
+      randomValue: 0,
+      employeeDistance: Math.hypot(employeePosition.x - previous.x, employeePosition.z - previous.z),
+      employeePosition,
+      pipPosition: previous,
+      locomotionComplete: true,
+    });
+    expect(arrived).toMatchObject({ phase: 'performing', poseKind: 'greet', target: null });
+    const yaw = yawTowardEmployee(previous, employeePosition);
+    expect(yaw).toBeCloseTo(expectedYaw, 6);
   });
 
   it('records a direct greeting edge so proximity cannot immediately duplicate it', () => {

@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import type { InteractionEvent } from './interaction';
-import { PIP_EATING_REACTION_SECONDS, PIP_PLAYING_REACTION_SECONDS, shouldSuspendPipMotion } from './pipInteraction';
+import { PIP_DIRECT_GREET_REACTION_SECONDS, PIP_EATING_REACTION_SECONDS, PIP_PLAYING_REACTION_SECONDS, shouldSuspendPipMotion, yawTowardEmployee } from './pipInteraction';
 import { createToyPlayApproach, resolveGardenObjectPlacement } from './GardenObjects';
-import { GARDEN_OBSTACLES, isSafeGardenPoint } from './navigation';
+import { createSafeGreetingApproach, GARDEN_OBSTACLES, isSafeGardenPoint, isSafeGardenSegment, type GardenPoint } from './navigation';
 import { PIP_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './locomotion';
 import {
   consumePipResumeSequence,
   createPipInteractionSceneState,
   eligibleInteractionTarget,
   pipInteractionSceneReducer,
+  scheduleDirectGreetingCompletion,
   schedulePipSceneEvent,
   scheduleObjectReactionCompletion,
   type PipInteractionSceneEvent,
@@ -43,7 +44,8 @@ describe('Pip interaction scene lifecycle', () => {
   it('keeps reducer state and visual phase synchronized through greet, pet, and carry activation', () => {
     const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'pip' });
     const greeting = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'greet' } });
-    const readyToPet = pipInteractionSceneReducer(greeting, { type: 'greet-complete' });
+    const arrived = pipInteractionSceneReducer(greeting, { type: 'greet-arrived' });
+    const readyToPet = pipInteractionSceneReducer(arrived, { type: 'greet-complete' });
     const petting = pipInteractionSceneReducer(readyToPet, { type: 'activate', event: { type: 'pet' } });
     const ready = pipInteractionSceneReducer(petting, { type: 'pet-complete' });
     const carrying = pipInteractionSceneReducer(ready, {
@@ -51,7 +53,8 @@ describe('Pip interaction scene lifecycle', () => {
       event: { type: 'pick-up', target: 'pip', safePosition: [8.4, 0, 1.5] },
     });
 
-    expect(greeting).toMatchObject({ phase: 'greet', interaction: { mode: 'reacting', reaction: 'greet' } });
+    expect(greeting).toMatchObject({ phase: 'greet-approach', interaction: { mode: 'reacting', reaction: 'greet' } });
+    expect(arrived).toMatchObject({ phase: 'greet', greetingArrived: true });
     expect(readyToPet).toMatchObject({ phase: 'none', resumeSequence: 1, interaction: { mode: 'idle', pipFocusedAction: 'pet' } });
     expect(petting).toMatchObject({ phase: 'pet', interaction: { mode: 'reacting', focused: 'pip' } });
     expect(shouldSuspendPipMotion(petting.phase)).toBe(true);
@@ -63,7 +66,8 @@ describe('Pip interaction scene lifecycle', () => {
   it('completes pet and placed phases once and requests exactly one fresh resume each', () => {
     const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'pip' });
     const greeting = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'greet' } });
-    const readyToPet = pipInteractionSceneReducer(greeting, { type: 'greet-complete' });
+    const arrived = pipInteractionSceneReducer(greeting, { type: 'greet-arrived' });
+    const readyToPet = pipInteractionSceneReducer(arrived, { type: 'greet-complete' });
     const petting = pipInteractionSceneReducer(readyToPet, { type: 'activate', event: { type: 'pet' } });
     const petComplete = pipInteractionSceneReducer(petting, { type: 'pet-complete' });
     const latePetComplete = pipInteractionSceneReducer(petComplete, { type: 'pet-complete' });
@@ -89,15 +93,83 @@ describe('Pip interaction scene lifecycle', () => {
     expect(placedComplete.resumeSequence).toBe(3);
   });
 
+  it.each([
+    ['maximum direct range with worst initial facing', { x: 8.4, z: 1.5 }, { x: 10.8, z: 1.5 }, false],
+    ['scenery detour', { x: 12.703, z: -8.001 }, { x: 12.703, z: -10.399 }, true],
+  ] as const)('waits for safe greet arrival before starting the exact response timer: %s', (_label, start, employee, expectsDetour) => {
+    vi.useFakeTimers();
+    try {
+      expect(Math.hypot(employee.x - start.x, employee.z - start.z)).toBeLessThanOrEqual(2.400001);
+      const approach = createSafeGreetingApproach(start, employee, GARDEN_OBSTACLES);
+      if (expectsDetour) expect(approach.route.length).toBeGreaterThan(1);
+
+      let state = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'pip' });
+      state = pipInteractionSceneReducer(state, { type: 'activate', event: { type: 'greet' } });
+      const dispatch = (event: PipInteractionSceneEvent) => { state = pipInteractionSceneReducer(state, event); };
+      const scheduleBeforeArrival = vi.fn(setTimeout);
+      scheduleDirectGreetingCompletion(state, dispatch, scheduleBeforeArrival, clearTimeout);
+      vi.advanceTimersByTime(10_000);
+      expect(scheduleBeforeArrival).not.toHaveBeenCalled();
+      expect(state.phase).toBe('greet-approach');
+      expect(pipInteractionSceneReducer(state, { type: 'greet-complete' })).toBe(state);
+
+      let progress = {
+        motion: {
+          position: new THREE.Vector3(start.x, 0, start.z),
+          facing: yawTowardEmployee(start, employee) + Math.PI,
+          speed: 0,
+          distanceTravelled: 0,
+          moving: false,
+        } satisfies LocomotionState,
+        waypointIndex: 0,
+        complete: false,
+      };
+      let previous: GardenPoint = start;
+      for (let frame = 0; frame < 1_200 && !progress.complete; frame += 1) {
+        progress = stepSafeRouteLocomotion(progress, approach.route, 1 / 60, PIP_MOTION_CONFIG, GARDEN_OBSTACLES);
+        const current = { x: progress.motion.position.x, z: progress.motion.position.z };
+        expect(isSafeGardenPoint(current, GARDEN_OBSTACLES)).toBe(true);
+        expect(isSafeGardenSegment(previous, current, GARDEN_OBSTACLES)).toBe(true);
+        previous = current;
+      }
+      expect(progress.complete).toBe(true);
+      expect(previous.x).toBeCloseTo(approach.target.x, 6);
+      expect(previous.z).toBeCloseTo(approach.target.z, 6);
+      const facing = yawTowardEmployee(previous, employee);
+      expect(Math.sin(facing) * (employee.x - previous.x) + Math.cos(facing) * (employee.z - previous.z)).toBeGreaterThan(0);
+
+      dispatch({ type: 'greet-arrived' });
+      const afterDuplicateArrival = pipInteractionSceneReducer(state, { type: 'greet-arrived' });
+      expect(afterDuplicateArrival).toBe(state);
+      const cleanup = scheduleDirectGreetingCompletion(state, dispatch, setTimeout, clearTimeout);
+      vi.advanceTimersByTime(PIP_DIRECT_GREET_REACTION_SECONDS * 1000 - 1);
+      expect(state.phase).toBe('greet');
+      vi.advanceTimersByTime(1);
+      expect(state).toMatchObject({ phase: 'none', greetingArrived: false, interaction: { mode: 'idle', pipFocusedAction: 'pet' } });
+      const completed = state;
+      dispatch({ type: 'greet-complete' });
+      expect(state).toBe(completed);
+      cleanup();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('cleans up the direct greeting timer so no completion can fire after unmount', () => {
     let callback: (() => void) | null = null;
     const dispatch = vi.fn();
     const cancel = vi.fn();
-    const cleanup = schedulePipSceneEvent(
+    const focused = pipInteractionSceneReducer(createPipInteractionSceneState(), { type: 'focus', target: 'pip' });
+    const approaching = pipInteractionSceneReducer(focused, { type: 'activate', event: { type: 'greet' } });
+    const arrived = pipInteractionSceneReducer(approaching, { type: 'greet-arrived' });
+    const cleanup = scheduleDirectGreetingCompletion(
+      arrived,
       dispatch,
-      { type: 'greet-complete' },
-      1400,
-      (scheduled) => { callback = scheduled; return 29; },
+      (scheduled, delay) => {
+        callback = scheduled;
+        expect(delay).toBe(PIP_DIRECT_GREET_REACTION_SECONDS * 1000);
+        return 29;
+      },
       cancel,
     );
 

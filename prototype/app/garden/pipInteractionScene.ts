@@ -10,6 +10,7 @@ import {
   type GardenPoint,
 } from './navigation';
 import {
+  PIP_DIRECT_GREET_REACTION_SECONDS,
   PIP_EATING_REACTION_SECONDS,
   PIP_PLAYING_REACTION_SECONDS,
   type PipInteractionPhase,
@@ -33,12 +34,14 @@ export type PipInteractionSceneState = {
   objectPositions: GardenObjectPositions;
   objectLastSafePositions: GardenObjectPositions;
   reactionStarted: boolean;
+  greetingArrived: boolean;
   toyNudged: boolean;
 };
 
 export type PipInteractionSceneEvent =
   | { type: 'focus'; target: InteractableId | null }
   | { type: 'activate'; event: InteractionActivationEvent }
+  | { type: 'greet-arrived' }
   | { type: 'greet-complete' }
   | { type: 'pet-complete' }
   | { type: 'place-pip'; point: GardenPoint; message: string | null }
@@ -78,6 +81,7 @@ export function createPipInteractionSceneState(): PipInteractionSceneState {
       toy: [toyRecovery.x, GARDEN_TOY_AUTHORED_POSITION[1], toyRecovery.z],
     },
     reactionStarted: false,
+    greetingArrived: false,
     toyNudged: false,
   };
 }
@@ -95,7 +99,7 @@ export function pipInteractionSceneReducer(
       const interaction = interactionReducer(state.interaction, event.event);
       if (interaction === state.interaction) return state;
       const phase = event.event.type === 'greet'
-        ? 'greet'
+        ? 'greet-approach'
         : event.event.type === 'pet'
           ? 'pet'
         : event.event.type === 'pick-up' && event.event.target === 'pip'
@@ -107,6 +111,7 @@ export function pipInteractionSceneReducer(
         phase,
         placedPosition: phase === 'carried' ? null : state.placedPosition,
         placementMessage: null,
+        greetingArrived: false,
         ...(event.event.type === 'pick-up' && event.event.target !== 'pip'
           ? {
               objectLastSafePositions: {
@@ -117,12 +122,21 @@ export function pipInteractionSceneReducer(
           : {}),
       };
     }
+    case 'greet-arrived': {
+      if (state.phase !== 'greet-approach') return state;
+      return {
+        ...state,
+        phase: 'greet',
+        greetingArrived: true,
+      };
+    }
     case 'greet-complete': {
-      if (state.phase !== 'greet') return state;
+      if (state.phase !== 'greet' || !state.greetingArrived) return state;
       return {
         ...state,
         interaction: interactionReducer(state.interaction, { type: 'reaction-complete' }),
         phase: 'none',
+        greetingArrived: false,
         resumeSequence: state.resumeSequence + 1,
       };
     }
@@ -243,6 +257,22 @@ export function scheduleObjectReactionCompletion<Handle>(
     dispatch,
     { type: 'object-reaction-complete' },
     delayMs,
+    schedule,
+    cancel,
+  );
+}
+
+export function scheduleDirectGreetingCompletion<Handle>(
+  state: PipInteractionSceneState,
+  dispatch: (event: PipInteractionSceneEvent) => void,
+  schedule: (callback: () => void, delayMs: number) => Handle,
+  cancel: (handle: Handle) => void,
+): () => void {
+  if (state.phase !== 'greet' || !state.greetingArrived) return () => {};
+  return schedulePipSceneEvent(
+    dispatch,
+    { type: 'greet-complete' },
+    PIP_DIRECT_GREET_REACTION_SECONDS * 1000,
     schedule,
     cancel,
   );

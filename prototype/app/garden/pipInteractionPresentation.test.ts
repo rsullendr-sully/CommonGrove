@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { pipInteractionStatusText, pipLiveRegionLabel } from './pipInteractionPresentation';
 
 describe('Pip interaction presentation', () => {
+  it('does not announce the direct response before the safe approach arrives', () => {
+    expect(pipInteractionStatusText('greet-approach', null, 'ordinary activity')).toBeNull();
+  });
+
   it.each([
     ['greet', 'Pip steps closer, listening ear lifted in hello.'],
     ['pet', 'Pip leans into your hand, listening ear tipped toward you.'],

@@ -20,7 +20,6 @@ import { getFirstPersonMovementVector } from './garden/firstPersonMovement';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import {
-  PIP_DIRECT_GREET_REACTION_SECONDS,
   PIP_PET_REACTION_SECONDS,
   CAMERA_CONTROLS_FRAME_PRIORITY,
   PIP_INTERACTION_FRAME_PRIORITY,
@@ -41,6 +40,7 @@ import {
   createPipInteractionSceneState,
   eligibleInteractionTarget,
   pipInteractionSceneReducer,
+  scheduleDirectGreetingCompletion,
   scheduleObjectReactionCompletion,
   schedulePipSceneEvent,
 } from './garden/pipInteractionScene';
@@ -631,7 +631,7 @@ const gardenInterestDefinitions: readonly GardenInterest[] = [
   { id: 'wander-west', position: { x: -6.3, z: 7.1 } },
 ];
 
-function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardStage, gardenChoice, interests, reducedMotion, interactionPhase, interactionTarget, placedPosition, resumeSequence }: { onPipMount: (pip: THREE.Group | null) => void; onMessage: (message: string | null) => void; onPriorityModeChange: (priority: boolean) => void; onToyNudged: () => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean; interactionPhase: PipInteractionPhase; interactionTarget: GardenPoint | null; placedPosition: GardenPoint | null; resumeSequence: number }) {
+function Pip({ onPipMount, onMessage, onPriorityModeChange, onGreetingArrived, onToyNudged, rewardStage, gardenChoice, interests, reducedMotion, interactionPhase, interactionTarget, placedPosition, resumeSequence }: { onPipMount: (pip: THREE.Group | null) => void; onMessage: (message: string | null) => void; onPriorityModeChange: (priority: boolean) => void; onGreetingArrived: () => void; onToyNudged: () => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean; interactionPhase: PipInteractionPhase; interactionTarget: GardenPoint | null; placedPosition: GardenPoint | null; resumeSequence: number }) {
   const pip = useRef<THREE.Group>(null);
   const setPipRef = useCallback((node: THREE.Group | null) => {
     pip.current = node;
@@ -658,6 +658,7 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
   const interactionStartedAt = useRef<number | null>(null);
   const toyNudgeSent = useRef(false);
   const directGreetingRecorded = useRef(false);
+  const greetingArrivalSent = useRef(false);
   const rewardMission = useMemo<PipPriorityMission | null>(() => {
     if (rewardStage === 1) return {
       id: 'reward-1',
@@ -703,7 +704,7 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
         pip.current.position.x - camera.position.x,
         pip.current.position.z - camera.position.z,
       );
-      if (interactionPhase === 'greet') {
+      if (interactionPhase === 'greet-approach') {
         if (!directGreetingRecorded.current) {
           behavior.recordDirectGreeting(clock.elapsedTime);
           directGreetingRecorded.current = true;
@@ -733,8 +734,12 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
           { x: pip.current.position.x, z: pip.current.position.z },
           { x: camera.position.x, z: camera.position.z },
         );
+        if (routeProgress.complete && !greetingArrivalSent.current) {
+          greetingArrivalSent.current = true;
+          onGreetingArrived();
+        }
         setPose(getPipPose({
-          poseKind: routeProgress.complete ? 'greet' : 'walk',
+          poseKind: 'walk',
           speed: pipMotion.current.speed,
           distanceTravelled: pipMotion.current.distanceTravelled,
           attentive: true,
@@ -743,7 +748,10 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
         return;
       }
 
-      directGreetingRecorded.current = false;
+      if (interactionPhase !== 'greet') {
+        directGreetingRecorded.current = false;
+        greetingArrivalSent.current = false;
+      }
       if (interactionPhase === 'eating' || interactionPhase === 'playing') {
         const startedAt = interactionStartedAt.current ?? clock.elapsedTime;
         interactionStartedAt.current = startedAt;
@@ -826,7 +834,7 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onToyNudged, rewardS
 
         if (interactionPhase === 'carried') {
           updateCarriedPipTransform(camera, pip.current);
-        } else if (interactionPhase === 'pet') {
+        } else if (interactionPhase === 'greet' || interactionPhase === 'pet') {
           pip.current.rotation.y = yawTowardEmployee(
             { x: pip.current.position.x, z: pip.current.position.z },
             { x: camera.position.x, z: camera.position.z },
@@ -956,7 +964,7 @@ function InteractionTargetTracker({ registrations, onTargetChange, republishSequ
   return null;
 }
 
-function GardenWorldScene({ movement, movementSpeed, pip, food, toy, onPipMount, onPipMessage, onPipPriorityModeChange, onToyNudged, onInteractionTargetChange, onCameraMount, interactionPhase, interactionTarget, heldTarget, objectPositions, toyNudged, placedPosition, resumeSequence, focusRepublishSequence, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; movementSpeed: number; pip: MutableRefObject<THREE.Group | null>; food: MutableRefObject<THREE.Group | null>; toy: MutableRefObject<THREE.Group | null>; onPipMount: (pip: THREE.Group | null) => void; onPipMessage: (message: string | null) => void; onPipPriorityModeChange: (priority: boolean) => void; onToyNudged: () => void; onInteractionTargetChange: (target: InteractableId | null) => void; onCameraMount: (camera: THREE.Camera | null) => void; interactionPhase: PipInteractionPhase; interactionTarget: GardenPoint | null; heldTarget: InteractableId | null; objectPositions: Record<GardenObjectId, readonly [number, number, number]>; toyNudged: boolean; placedPosition: GardenPoint | null; resumeSequence: number; focusRepublishSequence: number; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
+function GardenWorldScene({ movement, movementSpeed, pip, food, toy, onPipMount, onPipMessage, onPipPriorityModeChange, onGreetingArrived, onToyNudged, onInteractionTargetChange, onCameraMount, interactionPhase, interactionTarget, heldTarget, objectPositions, toyNudged, placedPosition, resumeSequence, focusRepublishSequence, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; movementSpeed: number; pip: MutableRefObject<THREE.Group | null>; food: MutableRefObject<THREE.Group | null>; toy: MutableRefObject<THREE.Group | null>; onPipMount: (pip: THREE.Group | null) => void; onPipMessage: (message: string | null) => void; onPipPriorityModeChange: (priority: boolean) => void; onGreetingArrived: () => void; onToyNudged: () => void; onInteractionTargetChange: (target: InteractableId | null) => void; onCameraMount: (camera: THREE.Camera | null) => void; interactionPhase: PipInteractionPhase; interactionTarget: GardenPoint | null; heldTarget: InteractableId | null; objectPositions: Record<GardenObjectId, readonly [number, number, number]>; toyNudged: boolean; placedPosition: GardenPoint | null; resumeSequence: number; focusRepublishSequence: number; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const grassTexture = useGrassTexture();
   const interactionTargets = useMemo<readonly InteractionTargetRegistration[]>(
     () => [
@@ -1011,7 +1019,7 @@ function GardenWorldScene({ movement, movementSpeed, pip, food, toy, onPipMount,
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
       <GardenSnack ref={food} position={objectPositions.food} carried={heldTarget === 'food'} />
       <GardenToy ref={toy} position={objectPositions.toy} carried={heldTarget === 'toy'} nudged={toyNudged} />
-      <Pip onPipMount={onPipMount} onMessage={onPipMessage} onPriorityModeChange={onPipPriorityModeChange} onToyNudged={onToyNudged} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} interactionPhase={interactionPhase} interactionTarget={interactionTarget} placedPosition={placedPosition} resumeSequence={resumeSequence} />
+      <Pip onPipMount={onPipMount} onMessage={onPipMessage} onPriorityModeChange={onPipPriorityModeChange} onGreetingArrived={onGreetingArrived} onToyNudged={onToyNudged} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} interactionPhase={interactionPhase} interactionTarget={interactionTarget} placedPosition={placedPosition} resumeSequence={resumeSequence} />
 
       <FirstPersonControls movement={movement} speed={movementSpeed} onCameraMount={onCameraMount} />
       <InteractionTargetTracker registrations={interactionTargets} onTargetChange={onInteractionTargetChange} republishSequence={focusRepublishSequence} />
@@ -1133,14 +1141,13 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
 
   useEffect(() => {
     if (pipInteractionPhase !== 'greet') return;
-    return schedulePipSceneEvent(
+    return scheduleDirectGreetingCompletion(
+      pipInteractionScene,
       dispatchPipInteractionScene,
-      { type: 'greet-complete' },
-      PIP_DIRECT_GREET_REACTION_SECONDS * 1000,
       window.setTimeout,
       window.clearTimeout,
     );
-  }, [pipInteractionPhase]);
+  }, [pipInteractionPhase, pipInteractionScene]);
 
   useEffect(() => {
     if (pipInteractionPhase !== 'pet') return;
@@ -1196,6 +1203,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
           onPipMount={onPipMount}
           onPipMessage={setPipMessage}
           onPipPriorityModeChange={setPipPriorityMissionActive}
+          onGreetingArrived={() => dispatchPipInteractionScene({ type: 'greet-arrived' })}
           onToyNudged={() => dispatchPipInteractionScene({ type: 'toy-nudged' })}
           onInteractionTargetChange={onInteractionTargetChange}
           onCameraMount={onCameraMount}

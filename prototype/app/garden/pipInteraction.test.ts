@@ -46,6 +46,7 @@ describe('direct Pip interactions', () => {
   });
 
   it('suspends ordinary locomotion and activity selection throughout direct greeting, petting, and carrying', () => {
+    expect(shouldSuspendPipMotion('greet-approach')).toBe(true);
     expect(shouldSuspendPipMotion('greet')).toBe(true);
     expect(shouldSuspendPipMotion('pet')).toBe(true);
     expect(shouldSuspendPipMotion('carried')).toBe(true);
