@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import GardenWorld from './GardenWorld';
-
-type GardenChoice = 'orchard' | 'workshop';
+import { deriveGardenVisibility, type GardenChoice, type GardenView } from './garden/rewardState';
 
 export default function Home() {
   const [rewardStage, setRewardStage] = useState<0 | 1 | 2 | 3>(0);
-  const [gardenView, setGardenView] = useState<'before' | 'now'>('before');
+  const [gardenView, setGardenView] = useState<GardenView>('before');
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<GardenChoice | null>(null);
   const [gardenChoice, setGardenChoice] = useState<GardenChoice | null>(null);
@@ -57,9 +56,7 @@ export default function Home() {
   };
 
   const activeReward = rewardStage === 3 ? 'seed' : rewardStage === 2 ? 'pavilion' : 'starflowers';
-  const starflowersVisible = rewardStage > 1 || (rewardStage === 1 && gardenView === 'now');
-  const pavilionImproved = rewardStage > 2 || (rewardStage === 2 && gardenView === 'now');
-  const seedVisible = rewardStage === 3 && gardenView === 'now';
+  const { starflowersVisible, pavilionImproved, seedVisible } = deriveGardenVisibility({ rewardStage, gardenView, gardenChoice });
 
   const confirmChoice = () => {
     if (!pendingChoice) return;
@@ -210,11 +207,11 @@ export default function Home() {
             </div>
 
             <div className="comfort-check">
-              <span>How would this boundary feel?</span>
+              <span>How would this proposed coworker visit feel? This is temporary research feedback only. Your choice will not enable a visit, contact anyone, or leave this prototype session.</span>
               <div>
                 <button type="button" aria-pressed={comfortResponse === 'comfortable'} className={comfortResponse === 'comfortable' ? 'selected' : ''} onClick={() => setComfortResponse('comfortable')}>Comfortable</button>
-                <button type="button" aria-pressed={comfortResponse === 'unsure'} className={comfortResponse === 'unsure' ? 'selected' : ''} onClick={() => setComfortResponse('unsure')}>Not sure</button>
-                <button type="button" aria-pressed={comfortResponse === 'invasive'} className={comfortResponse === 'invasive' ? 'selected' : ''} onClick={() => setComfortResponse('invasive')}>Feels invasive</button>
+                <button type="button" aria-pressed={comfortResponse === 'unsure'} className={comfortResponse === 'unsure' ? 'selected' : ''} onClick={() => setComfortResponse('unsure')}>Unsure</button>
+                <button type="button" aria-pressed={comfortResponse === 'invasive'} className={comfortResponse === 'invasive' ? 'selected' : ''} onClick={() => setComfortResponse('invasive')}>Invasive</button>
               </div>
               <small>{comfortResponse ? 'Response noted only for this local session.' : 'This response is not saved or sent anywhere.'}</small>
             </div>

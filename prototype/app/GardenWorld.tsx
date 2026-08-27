@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import PipCharacter from './garden/PipCharacter';
 import { EMPLOYEE_WALK_SPEED, stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
 import { getPipPose, type PipPose } from './garden/pipPose';
+import { type GardenChoice } from './garden/rewardState';
 
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
@@ -21,7 +22,6 @@ const obstacles = [
 ];
 
 type MovementInput = MutableRefObject<Set<string>>;
-type GardenChoice = 'orchard' | 'workshop';
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -492,7 +492,8 @@ function CuriousSeed({ visible, reducedMotion }: { visible: boolean; reducedMoti
     const next = reducedMotion ? target : THREE.MathUtils.damp(discovery.current.scale.x, target, visible ? 4.4 : 7, delta);
     discovery.current.scale.setScalar(next);
     discovery.current.rotation.y = reducedMotion ? 0 : clock.elapsedTime * 0.32;
-    discovery.current.position.y = reducedMotion ? 0.72 : 0.72 + Math.sin(clock.elapsedTime * 1.6) * 0.08;
+    const targetY = visible ? 0.72 + Math.sin(clock.elapsedTime * 1.6) * 0.08 : 0.08;
+    discovery.current.position.y = reducedMotion ? (visible ? 0.72 : 0.08) : THREE.MathUtils.damp(discovery.current.position.y, targetY, visible ? 4.4 : 7, delta);
   });
 
   return (
