@@ -69,6 +69,8 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 - Integrated spatial pass completed: full-screen garden, rock backdrop, spring sanctuary, raised reading pavilion, trees, flower discoveries, compact journal, and correctly scaled Pip
 - Product owner described the integrated composition as a solid start; environmental finish pass added grass variation, natural boundary planting, stepping-stone wayfinding, atmospheric clouds, localized lighting, rock detail, and Pip idle motion
 - Pip behavior slice added: safe autonomous route, natural pauses, one warm proximity greeting, quiet later reactions, and automatic return to exploration
+- Autonomous activity selection completed: automated runtime tests cover wander, look-around, inspect-flowers, watch-pond, visit-pavilion, inspect-destination, rest, and proximity greeting, with cooldown and repetition safeguards. Named interests, pond/boundary/obstacle-safe routing, nearest-safe recovery, and the eight-second ordinary travel timeout are implemented and tested.
+- Reward and choice interruptions completed: automated lifecycle tests verify priority missions serialize once in reward-before-choice order, override ordinary behavior and greeting while active, avoid the ordinary timeout, and resume fresh ordinary behavior after the reaction pause. The integrated reward-one to reward-two route simulation completes without unsafe steps or deadlock.
 - First complete reward loop added: simulated “Helped someone succeed” event, animated starflower bloom, Pip investigation, Before/Now comparison, and private role-neutral explanation
 - Product owner confirmed the first reward loop works technically on 2026-08-26; emotional value remains a later staff-validation question
 - Second reward loop added: simulated “Moved important work forward” event, animated pavilion shelves/books/lanterns, Pip investigation, sequential Before/Now comparison, and private role-neutral explanation
@@ -82,4 +84,4 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 
 ## Resume here
 
-Begin the autonomous behavior increment in `docs/superpowers/plans/2026-08-27-pip-autonomy-plan.md`. Staff invitations and testing are paused. Do not begin production architecture, integrations, or hosted access.
+Begin first-person interaction expansion in `docs/superpowers/plans/2026-08-27-pip-interactions-plan.md`. The autonomy evidence above is automated/runtime simulation; no five-minute live observation is claimed here. Staff invitations and testing remain paused. Do not begin production architecture, integrations, or hosted access.
