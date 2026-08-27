@@ -11,15 +11,23 @@ const context: BehaviorContext = {
 
 describe('Pip behavior selection', () => {
   it('does not immediately repeat an ordinary activity', () => {
-    expect(chooseNextActivity(context, 0).kind).not.toBe('inspect-flowers');
+    const next = chooseNextActivity(context, 0);
+    expect(next).not.toBeNull();
+    if (!next) throw new Error('expected an eligible activity');
+    expect(next.kind).not.toBe('inspect-flowers');
   });
 
   it('chooses greeting when the employee is nearby', () => {
-    expect(chooseNextActivity({ ...context, employeeNearby: true }, 0.5).kind).toBe('greet');
+    const next = chooseNextActivity({ ...context, employeeNearby: true }, 0.5);
+    expect(next).not.toBeNull();
+    if (!next) throw new Error('expected greeting activity');
+    expect(next.kind).toBe('greet');
   });
 
   it('excludes activities still on cooldown', () => {
     const next = chooseNextActivity({ ...context, cooldownUntil: { 'watch-pond': 40 } }, 0);
+    expect(next).not.toBeNull();
+    if (!next) throw new Error('expected an eligible activity');
     expect(next.kind).not.toBe('watch-pond');
   });
 
@@ -30,6 +38,8 @@ describe('Pip behavior selection', () => {
 
   it('ignores unavailable interest activities', () => {
     const next = chooseNextActivity({ ...context, recentKind: null, availableInterestIds: [] }, 0.99);
+    expect(next).not.toBeNull();
+    if (!next) throw new Error('expected an ordinary activity');
     expect(['inspect-flowers', 'watch-pond', 'visit-pavilion', 'inspect-destination']).not.toContain(next.kind);
   });
 
