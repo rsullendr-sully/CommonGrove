@@ -1,7 +1,7 @@
 # Pip and Exploration Expansion — Design
 
 Date: 2026-08-27  
-Status: Approved in conversation; awaiting written-spec review  
+Status: Approved for implementation planning
 Scope: Local Common Grove prototype
 
 ## Objective
@@ -229,4 +229,3 @@ This is deliberate. Reliable persistence would require product decisions about i
 - Inventory, currencies, or resource economy
 - Accounts, databases, synchronization, hosted access, or production integrations
 - Real coworker visits or multiplayer
-
