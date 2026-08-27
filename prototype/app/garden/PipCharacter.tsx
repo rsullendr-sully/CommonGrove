@@ -37,52 +37,54 @@ export default function PipCharacter({ pose }: { pose: PipPose }): React.JSX.Ele
           <sphereGeometry args={[1, 24, 18]} />
           <meshStandardMaterial color={CLAY} roughness={0.96} />
         </mesh>
-        <mesh position={[0, 0.22, 0]} scale={[0.31, 0.3, 0.27]} castShadow>
-          <sphereGeometry args={[1, 24, 18]} />
-          <meshStandardMaterial color={CLAY} roughness={0.96} />
-        </mesh>
-
-        <group
-          ref={listeningEar}
-          position={[-0.19, 0.43, -0.015]}
-          rotation={[0.08, 0, -0.18 + pose.earSway]}
-        >
-          <mesh position={[0, 0.09, 0]} castShadow>
-            <capsuleGeometry args={[0.065, 0.18, 6, 12]} />
+        <group rotation={[0, 0, pose.headTilt]}>
+          <mesh position={[0, 0.22, 0]} scale={[0.31, 0.3, 0.27]} castShadow>
+            <sphereGeometry args={[1, 24, 18]} />
             <meshStandardMaterial color={CLAY} roughness={0.96} />
           </mesh>
-        </group>
-        <group position={[0.2, 0.4, -0.02]} rotation={[0.12, 0, -0.55]}>
-          <mesh position={[0, 0.065, 0]} castShadow>
-            <capsuleGeometry args={[0.06, 0.12, 6, 12]} />
-            <meshStandardMaterial color={CLAY} roughness={0.96} />
+
+          <group
+            ref={listeningEar}
+            position={[-0.19, 0.43 + pose.listeningEarLift, -0.015]}
+            rotation={[0.08, 0, -0.18 + pose.earSway]}
+          >
+            <mesh position={[0, 0.09, 0]} castShadow>
+              <capsuleGeometry args={[0.065, 0.18, 6, 12]} />
+              <meshStandardMaterial color={CLAY} roughness={0.96} />
+            </mesh>
+          </group>
+          <group position={[0.2, 0.4, -0.02]} rotation={[0.12, 0, -0.55]}>
+            <mesh position={[0, 0.065, 0]} castShadow>
+              <capsuleGeometry args={[0.06, 0.12, 6, 12]} />
+              <meshStandardMaterial color={CLAY} roughness={0.96} />
+            </mesh>
+          </group>
+
+          <mesh position={[-0.105, 0.27, 0.268]} scale={[0.032, 0.045, 0.018]}>
+            <sphereGeometry args={[1, 16, 12]} />
+            <meshStandardMaterial color={FEATURES} roughness={0.88} />
+          </mesh>
+          <mesh position={[0.105, 0.255, 0.271]} scale={[0.03, 0.043, 0.018]}>
+            <sphereGeometry args={[1, 16, 12]} />
+            <meshStandardMaterial color={FEATURES} roughness={0.88} />
+          </mesh>
+
+          {[
+            [0.19, 0.19, 0.25],
+            [0.215, 0.145, 0.238],
+            [0.175, 0.12, 0.252],
+          ].map(([x, y, z], index) => (
+            <mesh key={index} position={[x, y, z]} scale={[0.014, 0.014, 0.008]}>
+              <sphereGeometry args={[1, 10, 8]} />
+              <meshStandardMaterial color={FRECKLES} roughness={1} />
+            </mesh>
+          ))}
+
+          <mesh position={[-0.01, 0.14, 0.278]}>
+            <tubeGeometry args={[smile, 10, 0.012, 6, false]} />
+            <meshStandardMaterial color={FEATURES} roughness={0.9} />
           </mesh>
         </group>
-
-        <mesh position={[-0.105, 0.27, 0.268]} scale={[0.032, 0.045, 0.018]}>
-          <sphereGeometry args={[1, 16, 12]} />
-          <meshStandardMaterial color={FEATURES} roughness={0.88} />
-        </mesh>
-        <mesh position={[0.105, 0.255, 0.271]} scale={[0.03, 0.043, 0.018]}>
-          <sphereGeometry args={[1, 16, 12]} />
-          <meshStandardMaterial color={FEATURES} roughness={0.88} />
-        </mesh>
-
-        {[
-          [0.19, 0.19, 0.25],
-          [0.215, 0.145, 0.238],
-          [0.175, 0.12, 0.252],
-        ].map(([x, y, z], index) => (
-          <mesh key={index} position={[x, y, z]} scale={[0.014, 0.014, 0.008]}>
-            <sphereGeometry args={[1, 10, 8]} />
-            <meshStandardMaterial color={FRECKLES} roughness={1} />
-          </mesh>
-        ))}
-
-        <mesh position={[-0.01, 0.14, 0.278]}>
-          <tubeGeometry args={[smile, 10, 0.012, 6, false]} />
-          <meshStandardMaterial color={FEATURES} roughness={0.9} />
-        </mesh>
       </group>
 
       <group ref={leftArm} position={[-0.31, 0.55 + pose.bodyLift, 0]} rotation={[pose.leftArm, 0, 0.14]}>

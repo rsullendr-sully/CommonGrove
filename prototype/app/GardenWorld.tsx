@@ -9,6 +9,7 @@ import { EMPLOYEE_WALK_SPEED, stepLocomotion, type LocomotionConfig, type Locomo
 import { selectCurrentGardenInterests, type GardenInterest, type GardenObstacle } from './garden/navigation';
 import { getPipPose, type PipPose } from './garden/pipPose';
 import { type GardenChoice } from './garden/rewardState';
+import { usePipBehavior, type PipPriorityMission } from './garden/usePipBehavior';
 
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
@@ -629,133 +630,85 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
     moving: false,
   });
   const [pose, setPose] = useState<PipPose>(() => getPipPose({
+    poseKind: 'idle',
     speed: 0,
     distanceTravelled: 0,
     attentive: false,
     reducedMotion,
   }));
-  const waypointIndex = useRef(0);
-  const pauseUntil = useRef(0);
-  const nearby = useRef(false);
-  const greeted = useRef(false);
   const target = useMemo(() => new THREE.Vector3(), []);
-  const rewardMission = useRef<0 | 1 | 2 | 3>(0);
-  const observedRewardStage = useRef(0);
-  const reactionMessageUntil = useRef(0);
-  const observedChoice = useRef<GardenChoice | null>(null);
-  const choiceMission = useRef<GardenChoice | null>(null);
-  const wanderInterests = useMemo(() => interests.filter(({ id }) => id.startsWith('wander-')), [interests]);
+  const rewardMission = useMemo<PipPriorityMission | null>(() => {
+    if (rewardStage === 1) return {
+      id: 'reward-1',
+      target: { x: 8.2, z: 6.6 },
+      startMessage: 'One ear lifts. Pip noticed something change near the pond.',
+      completionMessage: 'It bloomed! Something kind reached the garden.',
+    };
+    if (rewardStage === 2) return {
+      id: 'reward-2',
+      target: { x: -8.65, z: -8.1 },
+      startMessage: 'A warm chime carries from the reading pavilion. Pip turns toward it.',
+      completionMessage: 'The nook is ready. Pip settles beside the new books for a moment.',
+    };
+    if (rewardStage === 3) return {
+      id: 'reward-3',
+      target: { x: -8.5, z: 7.4 },
+      startMessage: 'A tiny golden light appears by the unopened path. Pip hurries to see.',
+      completionMessage: 'A curious seed! Pip leaves it safely waiting for your choice.',
+    };
+    return null;
+  }, [rewardStage]);
+  const choiceMission = useMemo<PipPriorityMission | null>(() => gardenChoice ? {
+    id: `choice-${gardenChoice}`,
+    target: { x: -10.6, z: 9.2 },
+    startMessage: gardenChoice === 'orchard'
+      ? 'Soft lanterns flicker to life. Pip trots toward the new orchard path.'
+      : 'A cheerful little tap echoes across the lawn. Pip heads for the workshop path.',
+    completionMessage: gardenChoice === 'orchard'
+      ? 'The lantern saplings are taking root. Pip curls up in their warm glow.'
+      : 'The workshop foundation is ready. Pip listens for the next useful idea.',
+  } : null, [gardenChoice]);
+  const behavior = usePipBehavior(interests);
 
-  useEffect(() => {
-    if (rewardStage > observedRewardStage.current) {
-      observedRewardStage.current = rewardStage;
-      rewardMission.current = rewardStage as 1 | 2 | 3;
-      onMessage(rewardStage === 3
-        ? 'A tiny golden light appears by the unopened path. Pip hurries to see.'
-        : rewardStage === 2
-          ? 'A warm chime carries from the reading pavilion. Pip turns toward it.'
-          : 'One ear lifts. Pip noticed something change near the pond.');
-    }
-  }, [rewardStage, onMessage]);
-
-  useEffect(() => {
-    if (gardenChoice && gardenChoice !== observedChoice.current) {
-      observedChoice.current = gardenChoice;
-      choiceMission.current = gardenChoice;
-      onMessage(gardenChoice === 'orchard'
-        ? 'Soft lanterns flicker to life. Pip trots toward the new orchard path.'
-        : 'A cheerful little tap echoes across the lawn. Pip heads for the workshop path.');
-    }
-  }, [gardenChoice, onMessage]);
+  useEffect(() => onMessage(behavior.message), [behavior.message, onMessage]);
 
   useFrame(({ clock, camera }, delta) => {
     if (pip.current) {
-      let hasMovementTarget = false;
       const distanceToVisitor = Math.hypot(
         pip.current.position.x - camera.position.x,
         pip.current.position.z - camera.position.z,
       );
-      const isNearby = distanceToVisitor < 3.15;
-
-      if (isNearby && !nearby.current) {
-        nearby.current = true;
-        if (!greeted.current) {
-          greeted.current = true;
-          onMessage('Oh! You’re here. I saved the quiet spot by the spring for you.');
-        } else {
-          onMessage('Pip pauses, perks up one ear, and listens.');
-        }
-      } else if (distanceToVisitor > 4.1 && nearby.current) {
-        nearby.current = false;
-        onMessage(null);
-        pauseUntil.current = clock.elapsedTime + 1.5;
-      }
-
-      if (reactionMessageUntil.current && clock.elapsedTime > reactionMessageUntil.current && !isNearby) {
-        reactionMessageUntil.current = 0;
-        onMessage(null);
-      }
-
-      if (!isNearby && rewardMission.current) {
-        const activeMission = rewardMission.current;
-        target.set(activeMission === 3 ? -8.5 : activeMission === 2 ? -8.65 : 8.2, 0, activeMission === 3 ? 7.4 : activeMission === 2 ? -8.1 : 6.6);
-        const distanceToReward = pip.current.position.distanceTo(target);
-        if (distanceToReward < 0.22) {
-          rewardMission.current = 0;
-          pauseUntil.current = clock.elapsedTime + 6;
-          reactionMessageUntil.current = clock.elapsedTime + 6;
-          onMessage(activeMission === 3
-            ? 'A curious seed! Pip leaves it safely waiting for your choice.'
-            : activeMission === 2
-              ? 'The nook is ready. Pip settles beside the new books for a moment.'
-              : 'It bloomed! Something kind reached the garden.');
-        } else {
-          hasMovementTarget = true;
-        }
-      } else if (!isNearby && choiceMission.current) {
-        const activeChoice = choiceMission.current;
-        target.set(-10.6, 0, 9.2);
-        const distanceToChoice = pip.current.position.distanceTo(target);
-        if (distanceToChoice < 0.22) {
-          choiceMission.current = null;
-          pauseUntil.current = clock.elapsedTime + 6;
-          reactionMessageUntil.current = clock.elapsedTime + 6;
-          onMessage(activeChoice === 'orchard'
-            ? 'The lantern saplings are taking root. Pip curls up in their warm glow.'
-            : 'The workshop foundation is ready. Pip listens for the next useful idea.');
-        } else {
-          hasMovementTarget = true;
-        }
-      } else if (!isNearby && clock.elapsedTime >= pauseUntil.current) {
-        const currentWanderInterest = wanderInterests[waypointIndex.current % wanderInterests.length];
-        target.set(currentWanderInterest.position.x, 0, currentWanderInterest.position.z);
-        const distanceToTarget = pip.current.position.distanceTo(target);
-        if (distanceToTarget < 0.16) {
-          waypointIndex.current = (waypointIndex.current + 1) % wanderInterests.length;
-          pauseUntil.current = clock.elapsedTime + 2.5 + (waypointIndex.current % 3);
-        } else {
-          hasMovementTarget = true;
-        }
-      }
-
-      if (hasMovementTarget) {
+      let locomotionComplete = false;
+      if (behavior.target) {
+        target.set(behavior.target.x, 0, behavior.target.z);
         pipMotion.current = stepLocomotion(
           pipMotion.current,
           target,
           delta,
-          rewardMission.current ? pipRewardMotionConfig : pipMotionConfig,
+          behavior.mode === 'priority' ? pipRewardMotionConfig : pipMotionConfig,
         );
         pip.current.position.copy(pipMotion.current.position);
         pip.current.rotation.y = pipMotion.current.facing;
+        locomotionComplete = !pipMotion.current.moving
+          && pipMotion.current.position.distanceTo(target) <= pipMotionConfig.arrivalRadius;
       } else if (pipMotion.current.moving || pipMotion.current.speed > 0) {
         pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
       }
 
+      behavior.advance({
+        now: clock.elapsedTime,
+        employeeDistance: distanceToVisitor,
+        locomotionComplete,
+        rewardMission,
+        choiceMission,
+      });
+
       const currentLocomotion = pipMotion.current;
       setPose(getPipPose({
+        poseKind: behavior.poseKind,
         speed: currentLocomotion.moving ? currentLocomotion.speed : 0,
         distanceTravelled: currentLocomotion.distanceTravelled,
-        attentive: isNearby,
+        attentive: distanceToVisitor < 3.15,
         reducedMotion,
       }));
     }
