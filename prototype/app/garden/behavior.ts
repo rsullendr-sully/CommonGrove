@@ -46,20 +46,21 @@ function normalizedRandomValue(randomValue: number) {
   return Math.min(1 - Number.EPSILON, Math.max(0, randomValue));
 }
 
-export function chooseNextActivity(context: BehaviorContext, randomValue: number): PipActivity {
+export function chooseNextActivity(context: BehaviorContext, randomValue: number): PipActivity | null {
   if (context.employeeNearby) return activityDefinitions.find(({ kind }) => kind === 'greet')!;
 
-  let eligible = activityDefinitions.filter((definition) => isAvailable(definition, context, true));
-  if (eligible.length === 0) eligible = activityDefinitions.filter((definition) => isAvailable(definition, context, false));
-  if (eligible.length === 0) eligible = activityDefinitions.filter((definition) => definition.interestId === undefined || context.availableInterestIds.includes(definition.interestId));
-  if (eligible.length === 0) eligible = [activityDefinitions[0]];
+  const ordinaryDefinitions = activityDefinitions.filter(({ kind }) => kind !== 'greet');
+  const notCooled = ordinaryDefinitions.filter((definition) => isAvailable(definition, context, false));
+  if (notCooled.length === 0) return null;
+  const eligible = notCooled.filter((definition) => isAvailable(definition, context, true));
+  const pool = eligible.length > 0 ? eligible : notCooled;
 
-  const totalWeight = eligible.reduce((sum, definition) => sum + definition.weight, 0);
+  const totalWeight = pool.reduce((sum, definition) => sum + definition.weight, 0);
   const target = normalizedRandomValue(randomValue) * totalWeight;
   let cumulative = 0;
-  for (const definition of eligible) {
+  for (const definition of pool) {
     cumulative += definition.weight;
     if (target < cumulative) return definition;
   }
-  return eligible[eligible.length - 1];
+  return pool[pool.length - 1];
 }
