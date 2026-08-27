@@ -1,6 +1,6 @@
 # Common Grove — Current Status
 
-Last updated: 2026-08-26
+Last updated: 2026-08-27
 
 ## Current objective
 
@@ -76,7 +76,10 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 - Meaningful choice implemented: deliberate Lantern Orchard or Tinker Workshop selection, corresponding 3D destination preview, Pip reaction, and no deadline or upkeep
 - Static coworker-visit privacy preview implemented: opt-in concept, explicit visible/private boundaries, local-only comfort response, and no actual social capability
 - Release 0 readiness controls completed: full-session restart, keyboard-contained dialogs with initial focus and Escape dismissal, assistive selected states, and reduced-motion behavior within the 3D scene
+- Procedural 3D Pip locomotion pass completed: original clay character, grounded foot cycle, natural facing, acceleration, arrival braking, and reduced-motion treatment. Live OS-level reduced-motion review remains outstanding.
+- Employee garden movement increased from 2 to 4 meters per second while preserving the approved 40 × 40 meter footprint and collision boundaries.
+- Discovery-seed transition completed and privacy comfort feedback clarified as temporary local research input.
 
 ## Resume here
 
-Open `docs/reviews/prototype-design-review-2026-08-25.md` and address one design issue at a time. Staff invitations and testing are paused. Do not begin production architecture, integrations, or hosted access.
+Begin the autonomous behavior increment in `docs/superpowers/plans/2026-08-27-pip-autonomy-plan.md`. Staff invitations and testing are paused. Do not begin production architecture, integrations, or hosted access.

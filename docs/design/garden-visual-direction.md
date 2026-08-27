@@ -38,14 +38,18 @@ The next slice changes garden composition and apparent scale only. It does not a
 ## Approved spatial shell
 
 - Square garden footprint: 40 × 40 meters
-- Calm walking speed: 2 meters per second
-- Expected uninterrupted edge-to-edge walk: approximately 20 seconds
+- Calm walking speed: 4 meters per second
+- Expected uninterrupted edge-to-edge walk: approximately 10 seconds
 - Eye-level first-person camera
 - Smooth forward, backward, and side movement
 - Bounded perimeter with no jumping or sprinting in the first test
 - Initial shell contains only ground, sky, boundaries, and a center marker so scale can be judged before landmarks are added
 
 Product-owner review on 2026-08-26 confirmed that this footprint feels like a good size. Treat the garden dimensions and walking pace as locked for Release 0 unless later landmark placement reveals a specific problem.
+
+## Procedural 3D Pip
+
+Pip is an original compact pear-shaped clay character built from simple procedural primitives, with uneven listening ears, dot eyes, three freckles, a quiet asymmetrical smile, and articulated limbs and feet. Movement is grounded through a visible foot cycle, natural facing, acceleration, arrival braking, and a restrained shadow; reduced-motion treatment is included. This construction is an approved prototype direction only: a future renderer may replace its implementation while preserving Pip’s original character traits, grounded movement, and the approved behavioral feel.
 
 ## Central pond test
 

@@ -16,7 +16,7 @@ Only these items are active.
 - The three garden changes have a deliberate visual hierarchy.
 - The neutral identity area does not imply health or performance status.
 
-**Progress:** Garden-change hierarchy, the detailed compact Pip design, and the first constrained 3D-space treatment are implemented. Personality behavior, facilitator-control separation, and identity wording remain active.
+**Progress:** Garden-change hierarchy, the detailed compact Pip design, the constrained 3D-space treatment, and the Procedural 3D Pip locomotion increment are complete. The autonomous activity-selection increment is the only active implementation outcome. Staff invitations remain paused.
 
 ## Completed
 
@@ -28,7 +28,8 @@ Only these items are active.
 
 ## Next
 
-- Run voluntary staff validation with 6–10 participants
+- Begin autonomous activity selection in `docs/superpowers/plans/2026-08-27-pip-autonomy-plan.md`
+- Run voluntary staff validation with 6–10 participants only after invitations resume
 - Summarize findings and evaluate the Release 0 gate
 
 ## Later
