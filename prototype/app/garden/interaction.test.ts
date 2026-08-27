@@ -49,6 +49,26 @@ describe('first-person interaction state', () => {
     });
   });
 
+  it.each([null, 'food', 'toy'] as const)(
+    'keeps Pip ready for pick-up when the reticle changes to %s during petting',
+    (target) => {
+      const focused = interactionReducer(idle, { type: 'focus', target: 'pip' });
+      const petting = interactionReducer(focused, { type: 'pet' });
+      const afterFocusChange = interactionReducer(petting, { type: 'focus', target });
+      const readyToCarry = interactionReducer(afterFocusChange, { type: 'reaction-complete' });
+
+      expect(afterFocusChange).toEqual(petting);
+      expect(readyToCarry).toEqual({
+        mode: 'idle',
+        focused: 'pip',
+        held: null,
+        lastSafePosition: null,
+        pipFocusedAction: 'pick-up',
+      });
+      expect(actionLabelFor(readyToCarry)).toBe('Pick up Pip');
+    },
+  );
+
   it('picks up and safely places Pip', () => {
     const held = interactionReducer(
       { ...idle, focused: 'pip' },

@@ -43,9 +43,8 @@ function assertNever(value: never): never {
 export function interactionReducer(state: InteractionState, event: InteractionEvent): InteractionState {
   switch (event.type) {
     case 'focus':
-      if (state.mode === 'carrying') return state;
+      if (state.mode === 'carrying' || state.mode === 'reacting') return state;
       if (state.focused === event.target) return state;
-      if (state.mode === 'reacting') return { ...state, focused: event.target };
       return {
         mode: 'idle',
         focused: event.target,
