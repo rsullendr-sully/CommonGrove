@@ -19,6 +19,11 @@ export type GardenInterest = {
   position: GardenPoint;
 };
 
+export type GardenInterestState = {
+  seedVisible: boolean;
+  destinationVisible: boolean;
+};
+
 function isOutsideCircle(point: GardenPoint, center: GardenPoint, radius: number) {
   return Math.hypot(point.x - center.x, point.z - center.z) >= radius;
 }
@@ -27,6 +32,17 @@ export function isSafeGardenPoint(point: GardenPoint, obstacles: readonly Garden
   if (Math.abs(point.x) > SAFE_GARDEN_HALF_SIZE || Math.abs(point.z) > SAFE_GARDEN_HALF_SIZE) return false;
   if (!isOutsideCircle(point, { x: 0, z: 0 }, SAFE_POND_RADIUS)) return false;
   return obstacles.every((obstacle) => isOutsideCircle(point, obstacle, obstacle.radius + SCENERY_CLEARANCE));
+}
+
+export function selectCurrentGardenInterests(
+  interests: readonly GardenInterest[],
+  state: GardenInterestState,
+) {
+  return interests.filter((interest) => {
+    if (interest.id === 'seed') return state.seedVisible && !state.destinationVisible;
+    if (interest.id === 'destination') return state.destinationVisible;
+    return true;
+  });
 }
 
 function clampedToGarden(point: GardenPoint): GardenPoint {
@@ -60,19 +76,40 @@ function pushOutside(point: GardenPoint, center: GardenPoint, radius: number): G
 }
 
 export function nearestSafePoint(point: GardenPoint, obstacles: readonly GardenObstacle[]): GardenPoint {
-  let recovered = { ...point };
-
-  // Repeating the ordered recovery resolves a scenery push that reaches the hedge boundary.
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    recovered = clampedToGarden(recovered);
-    recovered = pushOutside(recovered, { x: 0, z: 0 }, SAFE_POND_RADIUS);
-    for (const obstacle of obstacles) {
-      recovered = pushOutside(recovered, obstacle, obstacle.radius + SCENERY_CLEARANCE);
+  const candidates: GardenPoint[] = [];
+  const addCandidate = (candidate: GardenPoint) => candidates.push(clampedToGarden(candidate));
+  const addCircularCandidates = (center: GardenPoint, radius: number) => {
+    for (let step = 0; step < 72; step += 1) {
+      const angle = (step / 72) * Math.PI * 2;
+      addCandidate({
+        x: center.x + Math.cos(angle) * (radius + RECOVERY_PADDING),
+        z: center.z + Math.sin(angle) * (radius + RECOVERY_PADDING),
+      });
     }
-    if (isSafeGardenPoint(recovered, obstacles)) return recovered;
+  };
+
+  let recovered = clampedToGarden(point);
+  addCandidate(recovered);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    recovered = pushOutside(recovered, { x: 0, z: 0 }, SAFE_POND_RADIUS);
+    for (const obstacle of obstacles) recovered = pushOutside(recovered, obstacle, obstacle.radius + SCENERY_CLEARANCE);
+    addCandidate(recovered);
+    recovered = clampedToGarden(recovered);
   }
 
-  return clampedToGarden(recovered);
+  addCircularCandidates({ x: 0, z: 0 }, SAFE_POND_RADIUS);
+  for (const obstacle of obstacles) addCircularCandidates(obstacle, obstacle.radius + SCENERY_CLEARANCE);
+
+  const safeCandidates = candidates.filter((candidate) => isSafeGardenPoint(candidate, obstacles));
+  if (safeCandidates.length > 0) {
+    return safeCandidates.reduce((nearest, candidate) => (
+      Math.hypot(candidate.x - point.x, candidate.z - point.z) < Math.hypot(nearest.x - point.x, nearest.z - point.z)
+        ? candidate
+        : nearest
+    ));
+  }
+
+  throw new Error('No safe garden point exists for the declared obstacles.');
 }
 
 export function hasActivityTimedOut(startedAt: number, now: number, timeoutSeconds: number) {

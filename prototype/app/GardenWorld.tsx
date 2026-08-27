@@ -6,7 +6,7 @@ import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import PipCharacter from './garden/PipCharacter';
 import { EMPLOYEE_WALK_SPEED, stepLocomotion, type LocomotionConfig, type LocomotionState } from './garden/locomotion';
-import { type GardenInterest, type GardenObstacle } from './garden/navigation';
+import { selectCurrentGardenInterests, type GardenInterest, type GardenObstacle } from './garden/navigation';
 import { getPipPose, type PipPose } from './garden/pipPose';
 import { type GardenChoice } from './garden/rewardState';
 
@@ -605,14 +605,6 @@ const gardenInterestDefinitions: readonly GardenInterest[] = [
   { id: 'wander-west', position: { x: -6.3, z: 7.1 } },
 ];
 
-function getCurrentGardenInterests(seedVisible: boolean, destinationVisible: GardenChoice | null) {
-  return gardenInterestDefinitions.filter((interest) => {
-    if (interest.id === 'seed') return seedVisible;
-    if (interest.id === 'destination') return destinationVisible !== null;
-    return true;
-  });
-}
-
 const pipMotionConfig: LocomotionConfig = {
   maxSpeed: 1.2,
   acceleration: 3,
@@ -783,7 +775,10 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
 function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const grassTexture = useGrassTexture();
   const interests = useMemo(
-    () => getCurrentGardenInterests(seedVisible, destinationVisible),
+    () => selectCurrentGardenInterests(gardenInterestDefinitions, {
+      seedVisible,
+      destinationVisible: destinationVisible !== null,
+    }),
     [destinationVisible, seedVisible],
   );
   return (
