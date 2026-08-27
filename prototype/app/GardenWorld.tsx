@@ -2,19 +2,29 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import Image from 'next/image';
-import { MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { MutableRefObject, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import * as THREE from 'three';
+import InteractionPrompt from './garden/InteractionPrompt';
 import PipCharacter from './garden/PipCharacter';
+import { actionLabelFor, interactionReducer, type InteractionState, type InteractableId } from './garden/interaction';
 import { EMPLOYEE_WALK_SPEED, PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, GARDEN_OBSTACLES, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import { getPipPose, type PipPose } from './garden/pipPose';
 import { type GardenChoice } from './garden/rewardState';
+import { useInteractionTarget, type InteractionTargetRegistration } from './garden/useInteractionTarget';
 import { usePipBehavior, type PipPriorityMission } from './garden/usePipBehavior';
 
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
 
 type MovementInput = MutableRefObject<Set<string>>;
+
+const INITIAL_INTERACTION_STATE: InteractionState = {
+  mode: 'idle',
+  focused: null,
+  held: null,
+  lastSafePosition: null,
+};
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -597,8 +607,12 @@ const gardenInterestDefinitions: readonly GardenInterest[] = [
   { id: 'wander-west', position: { x: -6.3, z: 7.1 } },
 ];
 
-function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }: { onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean }) {
+function Pip({ onPipMount, onMessage, rewardStage, gardenChoice, interests, reducedMotion }: { onPipMount: (pip: THREE.Group | null) => void; onMessage: (message: string | null) => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean }) {
   const pip = useRef<THREE.Group>(null);
+  const setPipRef = useCallback((node: THREE.Group | null) => {
+    pip.current = node;
+    onPipMount(node);
+  }, [onPipMount]);
   const pipMotion = useRef<LocomotionState>({
     position: new THREE.Vector3(8.4, 0, 1.5),
     facing: Math.PI,
@@ -712,7 +726,7 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
   });
 
   return (
-    <group ref={pip} position={[8.4, 0, 1.5]} rotation={[0, Math.PI, 0]}>
+    <group ref={setPipRef} position={[8.4, 0, 1.5]} rotation={[0, Math.PI, 0]} userData={{ interactableId: 'pip' }}>
       <mesh name="blobShadow" position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.48, 0.31, 1]}>
         <circleGeometry args={[0.9, 24]} />
         <meshBasicMaterial color="#34483b" transparent opacity={0.24} />
@@ -722,8 +736,20 @@ function Pip({ onMessage, rewardStage, gardenChoice, interests, reducedMotion }:
   );
 }
 
-function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; onPipMessage: (message: string | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
+function InteractionTargetTracker({ registrations, onTargetChange }: { registrations: readonly InteractionTargetRegistration[]; onTargetChange: (target: InteractableId | null) => void }) {
+  const interactionTarget = useInteractionTarget(registrations, 2.4);
+  const target = interactionTarget?.target ?? null;
+
+  useEffect(() => onTargetChange(target), [onTargetChange, target]);
+  return null;
+}
+
+function GardenWorldScene({ movement, pip, onPipMount, onPipMessage, onInteractionTargetChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { movement: MovementInput; pip: MutableRefObject<THREE.Group | null>; onPipMount: (pip: THREE.Group | null) => void; onPipMessage: (message: string | null) => void; onInteractionTargetChange: (target: InteractableId | null) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
   const grassTexture = useGrassTexture();
+  const interactionTargets = useMemo<readonly InteractionTargetRegistration[]>(
+    () => [{ target: 'pip', ref: pip }],
+    [pip],
+  );
   const interests = useMemo(
     () => selectCurrentGardenInterests(gardenInterestDefinitions, {
       seedVisible,
@@ -767,17 +793,40 @@ function GardenWorldScene({ movement, onPipMessage, rewardStage, starflowersVisi
       <CuriousSeed visible={seedVisible} reducedMotion={reducedMotion} />
       <ChoiceDestination choice={destinationVisible} reducedMotion={reducedMotion} />
       <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
-      <Pip onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} />
+      <Pip onPipMount={onPipMount} onMessage={onPipMessage} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} />
 
       <FirstPersonControls movement={movement} />
+      <InteractionTargetTracker registrations={interactionTargets} onTargetChange={onInteractionTargetChange} />
     </>
   );
 }
 
 export default function GardenWorld({ rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice }: { rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null }) {
   const movement = useRef(new Set<string>());
+  const pip = useRef<THREE.Group>(null);
   const [pipMessage, setPipMessage] = useState<string | null>(null);
+  const [interaction, dispatchInteraction] = useReducer(interactionReducer, INITIAL_INTERACTION_STATE);
   const reducedMotion = useReducedMotion();
+  const interactionLabel = actionLabelFor(interaction);
+  const onInteractionTargetChange = useCallback((target: InteractableId | null) => {
+    dispatchInteraction({ type: 'focus', target });
+  }, []);
+  const onPipMount = useCallback((node: THREE.Group | null) => {
+    pip.current = node;
+  }, []);
+  const activateInteraction = useCallback(() => {
+    if (interaction.mode !== 'idle' || interaction.focused !== 'pip') return;
+
+    if (interaction.pipFocusedAction === 'pick-up' && pip.current) {
+      dispatchInteraction({
+        type: 'pick-up',
+        target: 'pip',
+        safePosition: [pip.current.position.x, 0, pip.current.position.z],
+      });
+      return;
+    }
+    dispatchInteraction({ type: 'pet' });
+  }, [interaction]);
   const startMoving = (key: string) => movement.current.add(key);
   const stopMoving = (key: string) => movement.current.delete(key);
 
@@ -786,7 +835,10 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
       <Canvas frameloop="demand" shadows={false} camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.7} gl={{ antialias: false, powerPreference: 'high-performance' }}>
         <GardenWorldScene
           movement={movement}
+          pip={pip}
+          onPipMount={onPipMount}
           onPipMessage={setPipMessage}
+          onInteractionTargetChange={onInteractionTargetChange}
           rewardStage={rewardStage}
           starflowersVisible={starflowersVisible}
           pavilionImproved={pavilionImproved}
@@ -797,6 +849,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
         />
       </Canvas>
       <div className="world-reticle" aria-hidden="true" />
+      <InteractionPrompt label={interactionLabel} onActivate={activateInteraction} />
       <div className={`pip-presence ${pipMessage ? 'visible' : ''}`} role="status" aria-live="polite">
         <Image src="/pip-detailed-v2.png" width={43} height={43} alt="" aria-hidden="true" />
         <span><strong>Pip</strong>{pipMessage}</span>
