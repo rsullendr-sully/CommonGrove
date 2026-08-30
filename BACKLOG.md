@@ -16,7 +16,16 @@ Only these items are active.
 - The three garden changes have a deliberate visual hierarchy.
 - The neutral identity area does not imply health or performance status.
 
-**Progress:** The Pip exploration expansion is implementation-complete: grounded procedural 3D locomotion, autonomous activity selection, first-person pet/carry/place interactions, and temporary snack/toy reactions are implemented with automated coverage. The full owner walkthrough and explicit owner approval remain outstanding. Staff invitations remain paused.
+**Progress:** The Pip exploration expansion and Soft Storybook Grove implementation are complete. Grounded procedural 3D locomotion, autonomous activity selection, first-person pet/carry/place interactions, temporary snack/toy reactions, deterministic layered foliage, an organic luminous pond, warm lighting, localized magical accents, and refined paths are implemented with automated coverage. The technical gate and scoped browser environment review pass with the documented manual limitations below. The full owner walkthrough and explicit owner approval remain outstanding. Staff invitations and prototype distribution remain paused.
+
+Delivered environment work:
+
+- [x] Deterministic procedural terrain dressing, layered foliage, warm materials, storybook lighting, fog, clouds, and pooled motes
+- [x] Organic layered pond presentation contained by the existing gameplay exclusion
+- [x] Local reward-stage transformations and equal-scale Lantern Orchard and Tinker Workshop destination accents
+- [x] Pure layout, boundary, corridor, static reduced-motion, reward, and destination-mapping regression coverage
+- [x] Browser review of the starting composition, main landmark routes, reward sequence, both destination outcomes, responsive layouts, prompts, and console at `http://localhost:3001/`
+- [ ] Owner visual approval and the remaining manual direct-Pip, offering, unsafe-placement, and operating-system reduced-motion checks
 
 ## Completed
 
@@ -28,7 +37,7 @@ Only these items are active.
 
 ## Next
 
-- Complete the Release 0 owner walkthrough, including direct interactions, both choice paths, keyboard-only use, unsafe placement recovery, reduced motion, refresh, and console review
+- Complete the Release 0 owner walkthrough, including direct Pip interactions and snack/toy offerings, unsafe-placement recovery, operating-system reduced motion, and explicit owner visual approval
 - Run voluntary staff validation with 6–10 participants only after invitations resume
 - Summarize findings and evaluate the Release 0 gate
 
@@ -43,6 +52,12 @@ Only these items are active.
 - Shared team greenhouse
 - Administrative tools
 - Pilot analytics
+- Custom GLTF environment assets
+- Advanced water or vegetation shaders
+- Post-processing and bloom
+- Terrain height-following and physics
+- Audio ambience
+- Hosted prototype distribution and staff invitations
 
 ## Parking lot
 

@@ -1,7 +1,7 @@
 # Garden Visual Direction
 
-Status: Approved inspiration  
-Date: 2026-08-26
+Status: Approved direction; owner visual approval of the environment polish remains pending
+Date: 2026-08-29
 
 ## Reference
 
@@ -77,6 +77,26 @@ The first complete spatial composition uses the approved reference as a structur
 The 40 × 40 meter footprint and walking speed remain unchanged.
 
 Product-owner review on 2026-08-26 described the integrated composition as a solid start. The follow-up finish pass preserves the composition while adding procedural grass variation, natural boundary shrubs, stepping-stone wayfinding, fountain and pavilion lighting, small rock variation, distant clouds, and a restrained idle motion for Pip.
+
+## Soft Storybook Grove environment polish
+
+The implemented environment pass preserves the established composition while making the garden read as a layered, overtly magical grove:
+
+- Deterministic foreground, midground, and perimeter foliage frame the view with varied trees, shrubs, grasses, flowers, roots, and warm stone accents.
+- The central pond uses an irregular stone rim, layered blue-green water, reeds, broad leaves, luminous ripples, and a restrained central glow.
+- Warm morning key and fill lighting, localized pond, sanctuary, pavilion, and plant accents, layered clouds, fog, and pooled motes add depth without changing product state.
+- Reward stages add local starflower, pavilion, and discovery-seed presentation. Lantern Orchard and Tinker Workshop use different accent palettes while retaining the same destination footprint and scale.
+- The presentation is composed through a dedicated deterministic environment layer rather than adding product behavior to `GardenWorld.tsx`.
+
+The navigation contract is unchanged: the garden remains a bounded 40 × 40 meter square, employee movement remains 4 meters per second on the `y = 0` ground plane, and the existing pond exclusion, boundary, canonical obstacles, Pip interests, interactions, reward locations, snack, toy, and destination coordinates remain authoritative. Decorative relief stays outside declared travel corridors and does not add terrain height-following, jumping, physics, or general collision.
+
+## Environment verification record
+
+On 2026-08-29, the integrated garden was reviewed in the isolated local prototype at `http://localhost:3001/`. The starting view read as a layered magical garden, and browser traversal covered both directions around the pond plus the pavilion, sanctuary, three canonical trees, starflower area, seed and destination area, snack, and toy. The pond remained legible near and far, main routes stayed visually open, snack and toy prompts were readable, toy pickup/place completed, all three reward transformations remained distinct, and both destination outcomes rendered at equal scale and prominence. Mobile `390 × 844` and tablet `768 × 800` views retained usable controls, journal content, garden presentation, and Pip status without observed clipping. No application console errors appeared; the existing `THREE.Clock` deprecation warning appeared once per fresh session.
+
+The complete automated gate passed 201 tests in 16 files, lint, and the production build. Pure layout and motion tests cover deterministic placement, boundaries and corridors, reward and destination mappings, and static reduced-motion presentation. The in-app browser did not expose reduced-motion emulation or exact frame-time/FPS telemetry, so no manual reduced-motion or measured-performance claim is recorded. Direct browser completion of Pip pet/carry/place and offering snack or toy was also not obtained because autonomous Pip repeatedly moved outside the fine reticle range; the passing interaction regressions remain automated evidence, not a substitute for the pending owner walkthrough.
+
+This record does not complete the environment slice. Owner visual approval is still required before the prototype is described as ready for staff sessions or distribution.
 
 ## Pip behavior slice
 
