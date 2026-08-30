@@ -57,6 +57,22 @@ describe('storybook environment layout', () => {
       expect.stringContaining('escaped-stone'),
     ]));
   });
+
+  it('reports a duplicated canonical tree root that leaves another root uncovered', () => {
+    const layout = createStorybookEnvironmentLayout();
+    const invalid = {
+      ...layout,
+      trees: [
+        layout.trees[0],
+        layout.trees[1],
+        { ...layout.trees[2], position: [11.8, 0, -9.2] as const },
+      ],
+    };
+
+    expect(validateEnvironmentLayout(invalid)).toEqual(expect.arrayContaining([
+      'Tree roots must equal the three canonical tree obstacle centers.',
+    ]));
+  });
 });
 
 describe('storybook environment presentation', () => {

@@ -194,8 +194,8 @@ export function validateEnvironmentLayout(layout: StorybookEnvironmentLayout): s
     }
   }
 
-  if (layout.trees.length !== canonicalTreeRoots.length || layout.trees.some((tree) => (
-    !canonicalTreeRoots.some((root) => root.x === tree.position[0] && root.z === tree.position[2])
+  if (layout.trees.length !== canonicalTreeRoots.length || canonicalTreeRoots.some((root) => (
+    !layout.trees.some((tree) => root.x === tree.position[0] && root.z === tree.position[2])
   ))) {
     errors.push('Tree roots must equal the three canonical tree obstacle centers.');
   }
