@@ -12,6 +12,12 @@ export type EnvironmentInstance = Readonly<{
 export type EnvironmentDisc = Readonly<{ id: string; center: GardenPoint; radius: number }>;
 export type GardenCorridor = Readonly<{ id: string; start: GardenPoint; end: GardenPoint; halfWidth: number }>;
 
+export const STORYBOOK_FOLIAGE_RADII = {
+  shrubs: 0.72,
+  grassTufts: 0.28,
+  flowers: 0.17,
+} as const;
+
 type PlantingCluster = Readonly<{
   id: string;
   center: GardenPoint;
@@ -249,18 +255,24 @@ export function validateEnvironmentLayout(layout: StorybookEnvironmentLayout): s
     }
   }
 
-  for (const instance of [...layout.shrubs, ...layout.grassTufts, ...layout.flowers]) {
-    const horizontalAllowance = Math.max(instance.scale[0], instance.scale[2]) / 2;
-    if (Math.hypot(instance.position[0], instance.position[2]) - horizontalAllowance < SAFE_POND_RADIUS) {
-      errors.push(`Foliage "${instance.id}" enters the pond exclusion.`);
-    }
-    for (const corridor of layout.corridors) {
-      if (pointToSegmentDistance(
-        { x: instance.position[0], z: instance.position[2] },
-        corridor.start,
-        corridor.end,
-      ) < horizontalAllowance + corridor.halfWidth) {
-        errors.push(`Foliage "${instance.id}" narrows corridor "${corridor.id}".`);
+  for (const family of [
+    { instances: layout.shrubs, radius: STORYBOOK_FOLIAGE_RADII.shrubs },
+    { instances: layout.grassTufts, radius: STORYBOOK_FOLIAGE_RADII.grassTufts },
+    { instances: layout.flowers, radius: STORYBOOK_FOLIAGE_RADII.flowers },
+  ]) {
+    for (const instance of family.instances) {
+      const horizontalAllowance = Math.max(instance.scale[0], instance.scale[2]) * family.radius;
+      if (Math.hypot(instance.position[0], instance.position[2]) - horizontalAllowance < SAFE_POND_RADIUS) {
+        errors.push(`Foliage "${instance.id}" enters the pond exclusion.`);
+      }
+      for (const corridor of layout.corridors) {
+        if (pointToSegmentDistance(
+          { x: instance.position[0], z: instance.position[2] },
+          corridor.start,
+          corridor.end,
+        ) < horizontalAllowance + corridor.halfWidth) {
+          errors.push(`Foliage "${instance.id}" narrows corridor "${corridor.id}".`);
+        }
       }
     }
   }

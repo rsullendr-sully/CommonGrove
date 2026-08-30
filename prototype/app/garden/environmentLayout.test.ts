@@ -63,6 +63,21 @@ describe('storybook environment layout', () => {
     );
   });
 
+  it('uses the rendered shrub radius when checking corridor clearance', () => {
+    const layout = createStorybookEnvironmentLayout();
+    const invalid = {
+      ...layout,
+      shrubs: [
+        ...layout.shrubs,
+        { id: 'edge-shrub', position: [1.95, 0, 14] as const, scale: [1, 1, 1] as const, rotationY: 0, variant: 0 },
+      ],
+    };
+
+    expect(validateEnvironmentLayout(invalid)).toContain(
+      'Foliage "edge-shrub" narrows corridor "spawn-to-pond".',
+    );
+  });
+
   it('keeps the approved layout inside its safety contract', () => {
     expect(validateEnvironmentLayout(createStorybookEnvironmentLayout())).toEqual([]);
   });

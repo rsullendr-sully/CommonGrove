@@ -2,7 +2,11 @@
 
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import type { EnvironmentInstance, StorybookEnvironmentLayout } from './environmentLayout';
+import {
+  STORYBOOK_FOLIAGE_RADII,
+  type EnvironmentInstance,
+  type StorybookEnvironmentLayout,
+} from './environmentLayout';
 
 export type StorybookFoliageProps = Readonly<{
   layout: StorybookEnvironmentLayout;
@@ -24,10 +28,10 @@ type CanopyCluster = Readonly<{
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-const SHRUB_GEOMETRY = new THREE.DodecahedronGeometry(0.72, 1).translate(0, 0.72, 0);
-const GRASS_GEOMETRY = new THREE.ConeGeometry(0.28, 0.92, 5).translate(0, 0.46, 0);
+const SHRUB_GEOMETRY = new THREE.DodecahedronGeometry(STORYBOOK_FOLIAGE_RADII.shrubs, 1).translate(0, 0.72, 0);
+const GRASS_GEOMETRY = new THREE.ConeGeometry(STORYBOOK_FOLIAGE_RADII.grassTufts, 0.92, 5).translate(0, 0.46, 0);
 const FLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.025, 0.035, 0.58, 6).translate(0, 0.29, 0);
-const FLOWER_HEAD_GEOMETRY = new THREE.IcosahedronGeometry(0.17, 1).translate(0, 0.66, 0);
+const FLOWER_HEAD_GEOMETRY = new THREE.IcosahedronGeometry(STORYBOOK_FOLIAGE_RADII.flowers, 1).translate(0, 0.66, 0);
 const TREE_TRUNK_GEOMETRY = new THREE.CylinderGeometry(0.25, 0.43, 4.15, 9).translate(0, 2.075, 0);
 const TREE_CANOPY_GEOMETRY = new THREE.DodecahedronGeometry(1, 1);
 const TREE_TIP_GEOMETRY = new THREE.IcosahedronGeometry(0.26, 1);
