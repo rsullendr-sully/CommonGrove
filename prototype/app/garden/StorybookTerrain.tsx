@@ -17,7 +17,7 @@ type BoundaryHedge = Readonly<{
   variant: number;
 }>;
 
-type SteppingStone = Readonly<{
+export type SteppingStone = Readonly<{
   id: string;
   position: readonly [number, number, number];
   scale: readonly [number, number, number];
@@ -26,10 +26,11 @@ type SteppingStone = Readonly<{
 }>;
 
 const UP = new THREE.Vector3(0, 1, 0);
+export const STEPPING_STONE_HEIGHT = 0.06;
 const PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
 const BERM_GEOMETRY = new THREE.CylinderGeometry(1, 1.08, 0.64, 10);
 const BED_GEOMETRY = new THREE.CylinderGeometry(1, 1, 0.08, 18);
-const STONE_GEOMETRY = new THREE.CylinderGeometry(1, 1.08, 0.18, 10);
+const STONE_GEOMETRY = new THREE.CylinderGeometry(1, 1.08, STEPPING_STONE_HEIGHT, 10);
 const HEDGE_GEOMETRY = new THREE.DodecahedronGeometry(1, 1).translate(0, 1, 0);
 
 const OUTER_GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#789963', roughness: 1 });
@@ -180,7 +181,7 @@ function createBoundaryHedges(): BoundaryHedge[] {
   return hedges;
 }
 
-function createSteppingStones(corridors: readonly GardenCorridor[]): SteppingStone[] {
+export function createSteppingStones(corridors: readonly GardenCorridor[]): SteppingStone[] {
   return corridors.flatMap((corridor, corridorIndex) => {
     const count = corridor.id === 'spawn-to-pond' ? 5 : 4;
     const dx = corridor.end.x - corridor.start.x;
@@ -194,7 +195,7 @@ function createSteppingStones(corridors: readonly GardenCorridor[]): SteppingSto
         id: `${corridor.id}-stone-${index + 1}`,
         position: [
           corridor.start.x + dx * progress + perpendicular.x * offset,
-          0.055 + (index % 2) * 0.006,
+          -0.005,
           corridor.start.z + dz * progress + perpendicular.z * offset,
         ] as const,
         scale: [0.76 + (index % 3) * 0.08, 0.72, 0.52 + ((index + 1) % 2) * 0.08] as const,
