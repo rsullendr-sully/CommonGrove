@@ -756,7 +756,7 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
 
   return (
     <div className="world-wrap">
-      <Canvas frameloop="demand" shadows={false} camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.7} gl={{ antialias: false, powerPreference: 'high-performance' }}>
+      <Canvas frameloop="demand" shadows="percentage" camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.7} gl={{ antialias: false, powerPreference: 'high-performance' }}>
         <GardenWorldScene
           movement={movement}
           movementSpeed={movementSpeed}

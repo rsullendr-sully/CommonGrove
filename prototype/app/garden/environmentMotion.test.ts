@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getPondMotionFrame } from './environmentMotion';
+import { getAtmosphereMotionFrame, getPondMotionFrame } from './environmentMotion';
 
 describe('enchanted pond motion', () => {
   it('returns bounded calm motion', () => {
@@ -18,5 +18,35 @@ describe('enchanted pond motion', () => {
       highlightOffset: 0,
       glowPulse: 1,
     });
+  });
+});
+
+describe('magical atmosphere motion', () => {
+  it('keeps cloud and mote offsets small and repeatable', () => {
+    expect(getAtmosphereMotionFrame(8, true)).toEqual(getAtmosphereMotionFrame(8, true));
+    const frame = getAtmosphereMotionFrame(8, true);
+    expect(Math.abs(frame.moteDriftX)).toBeLessThanOrEqual(0.18);
+    expect(Math.abs(frame.moteDriftY)).toBeLessThanOrEqual(0.12);
+    expect(Math.abs(frame.cloudDriftX)).toBeLessThanOrEqual(1.2);
+  });
+
+  it('freezes ambient movement while retaining full static opacity', () => {
+    expect(getAtmosphereMotionFrame(8, false)).toEqual({
+      moteDriftX: 0,
+      moteDriftY: 0,
+      cloudDriftX: 0,
+      moteOpacity: 1,
+    });
+  });
+
+  it('reuses caller-owned frame storage for the shared render loop', () => {
+    const target = {
+      moteDriftX: 99,
+      moteDriftY: 99,
+      cloudDriftX: 99,
+      moteOpacity: 99,
+    };
+
+    expect(getAtmosphereMotionFrame(8, true, target)).toBe(target);
   });
 });

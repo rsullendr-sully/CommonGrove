@@ -9,6 +9,7 @@ import {
   getEnvironmentPresentation,
 } from './environmentLayout';
 import EnchantedPond from './EnchantedPond';
+import MagicalAtmosphere from './MagicalAtmosphere';
 import type { GardenChoice } from './rewardState';
 import StorybookFoliage from './StorybookFoliage';
 import StorybookTerrain from './StorybookTerrain';
@@ -22,28 +23,6 @@ export type StorybookGardenEnvironmentProps = Readonly<{
   destinationVisible: GardenChoice | null;
   reducedMotion: boolean;
 }>;
-
-function SkyClouds() {
-  const cloudGroups = [
-    { position: [-16, 12, -34] as [number, number, number], scale: 1.3 },
-    { position: [21, 15, -42] as [number, number, number], scale: 1.8 },
-    { position: [-30, 17, 5] as [number, number, number], scale: 1.5 },
-  ];
-  return (
-    <group>
-      {cloudGroups.map((cloud, index) => (
-        <group key={index} position={cloud.position} scale={cloud.scale}>
-          {[[-1.5, 0, 0], [0, 0.35, 0], [1.5, 0, 0], [0.7, -0.15, 0]].map((position, puff) => (
-            <mesh key={puff} position={position as [number, number, number]} scale={[1.9, 0.75, 0.7]}>
-              <sphereGeometry args={[1, 12, 8]} />
-              <meshBasicMaterial color="#f6f3dc" transparent opacity={0.62} fog={false} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-    </group>
-  );
-}
 
 const rockData: Array<{ position: [number, number, number]; scale: [number, number, number]; rotation: [number, number, number]; color: string }> = [
   { position: [-5.2, 2.7, -16.3], scale: [5.3, 4.2, 3.1], rotation: [0.2, 0.15, -0.08], color: '#777966' },
@@ -78,7 +57,13 @@ function RockBackdrop() {
   );
 }
 
-function SpringSanctuary({ reducedMotion }: { reducedMotion: boolean }) {
+function SpringSanctuary({
+  glow,
+  reducedMotion,
+}: {
+  glow: number;
+  reducedMotion: boolean;
+}) {
   const water = useRef<THREE.MeshPhysicalMaterial>(null);
   useFrame(({ clock }) => {
     if (water.current) water.current.opacity = reducedMotion ? 0.7 : 0.64 + Math.sin(clock.elapsedTime * 1.8) * 0.08;
@@ -101,7 +86,17 @@ function SpringSanctuary({ reducedMotion }: { reducedMotion: boolean }) {
       ))}
       <mesh position={[0, 2.1, 0.72]}>
         <planeGeometry args={[2.55, 2.9]} />
-        <meshPhysicalMaterial ref={water} color="#89cbd0" transparent opacity={0.7} roughness={0.08} side={THREE.DoubleSide} depthWrite={false} />
+        <meshPhysicalMaterial
+          ref={water}
+          color="#89cbd0"
+          emissive="#77d6d0"
+          emissiveIntensity={glow}
+          transparent
+          opacity={0.7}
+          roughness={0.08}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
       </mesh>
       <mesh position={[0, 0.42, 1.1]} castShadow>
         <cylinderGeometry args={[1.55, 1.8, 0.65, 32]} />
@@ -111,12 +106,26 @@ function SpringSanctuary({ reducedMotion }: { reducedMotion: boolean }) {
         <circleGeometry args={[1.36, 32]} />
         <meshPhysicalMaterial color="#6db2b7" roughness={0.1} clearcoat={0.7} />
       </mesh>
-      <pointLight position={[0, 2.4, 1.2]} color="#b7eff0" intensity={3} distance={7} decay={2} />
+      <pointLight
+        position={[0, 2.4, 1.2]}
+        color="#b7eff0"
+        intensity={glow * 0.55}
+        distance={7}
+        decay={2}
+      />
     </group>
   );
 }
 
-function Pavilion({ improved, reducedMotion }: { improved: boolean; reducedMotion: boolean }) {
+function Pavilion({
+  glow,
+  improved,
+  reducedMotion,
+}: {
+  glow: number;
+  improved: boolean;
+  reducedMotion: boolean;
+}) {
   const additions = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (!additions.current) return;
@@ -148,7 +157,7 @@ function Pavilion({ improved, reducedMotion }: { improved: boolean; reducedMotio
       <group ref={additions} scale={improved ? 1 : 0.03}>
         <mesh position={[0, 3.6, 0]}>
           <sphereGeometry args={[0.28, 16, 12]} />
-          <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={1.2} />
+          <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={glow} />
         </mesh>
         <mesh position={[0, 2.25, -1.35]} castShadow>
           <boxGeometry args={[2.9, 2.05, 0.42]} />
@@ -164,7 +173,7 @@ function Pavilion({ improved, reducedMotion }: { improved: boolean; reducedMotio
           <group key={x} position={[x, 3.45, 0.25]}>
             <mesh castShadow>
               <cylinderGeometry args={[0.18, 0.24, 0.5, 8]} />
-              <meshStandardMaterial color="#e6b763" emissive="#d99745" emissiveIntensity={1.1} />
+              <meshStandardMaterial color="#e6b763" emissive="#d99745" emissiveIntensity={glow} />
             </mesh>
             <mesh position={[0, 0.48, 0]}>
               <cylinderGeometry args={[0.025, 0.025, 0.5, 6]} />
@@ -173,7 +182,13 @@ function Pavilion({ improved, reducedMotion }: { improved: boolean; reducedMotio
           </group>
         ))}
       </group>
-      <pointLight position={[0, 3.6, 0]} color="#ffd88a" intensity={improved ? 4 : 0} distance={8} decay={2} />
+      <pointLight
+        position={[0, 3.6, 0]}
+        color="#ffd88a"
+        intensity={improved ? glow * 0.75 : 0}
+        distance={8}
+        decay={2}
+      />
       {[0, 1, 2, 3].map((step) => (
         <mesh key={step} position={[0, 0.18 + step * 0.18, 4.2 - step * 0.52]} castShadow receiveShadow>
           <boxGeometry args={[2.5, 0.35, 0.9]} />
@@ -184,7 +199,15 @@ function Pavilion({ improved, reducedMotion }: { improved: boolean; reducedMotio
   );
 }
 
-function FlowerPatch({ position, color }: { position: [number, number, number]; color: string }) {
+function FlowerPatch({
+  position,
+  color,
+  glow,
+}: {
+  position: [number, number, number];
+  color: string;
+  glow: number;
+}) {
   return (
     <group position={position}>
       {[[-0.7, 0], [-0.2, 0.35], [0.35, -0.2], [0.75, 0.2], [0.1, -0.65]].map(([x, z], index) => (
@@ -195,7 +218,12 @@ function FlowerPatch({ position, color }: { position: [number, number, number]; 
           </mesh>
           <mesh position={[0, 0.52, 0]}>
             <sphereGeometry args={[0.13, 8, 6]} />
-            <meshStandardMaterial color={color} roughness={0.8} emissive={color} emissiveIntensity={0.08} />
+            <meshStandardMaterial
+              color={color}
+              roughness={0.8}
+              emissive={color}
+              emissiveIntensity={glow}
+            />
           </mesh>
         </group>
       ))}
@@ -203,7 +231,15 @@ function FlowerPatch({ position, color }: { position: [number, number, number]; 
   );
 }
 
-function StarflowerPatch({ visible, reducedMotion }: { visible: boolean; reducedMotion: boolean }) {
+function StarflowerPatch({
+  glow,
+  visible,
+  reducedMotion,
+}: {
+  glow: number;
+  visible: boolean;
+  reducedMotion: boolean;
+}) {
   const flowers = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (!flowers.current) return;
@@ -219,15 +255,22 @@ function StarflowerPatch({ visible, reducedMotion }: { visible: boolean; reduced
         <meshStandardMaterial color="#596f45" roughness={1} />
       </mesh>
       <group ref={flowers} scale={visible ? 1 : 0.04}>
-        <FlowerPatch position={[0, 0, 0]} color="#e6c5ef" />
-        <FlowerPatch position={[0.7, 0, 0.55]} color="#f3d58e" />
+        <FlowerPatch position={[0, 0, 0]} color="#e6c5ef" glow={glow} />
+        <FlowerPatch position={[0.7, 0, 0.55]} color="#f3d58e" glow={glow} />
       </group>
-      <pointLight position={[0, 1, 0]} color="#eed9ff" intensity={visible ? 1.8 : 0} distance={4.5} decay={2} />
     </group>
   );
 }
 
-function CuriousSeed({ visible, reducedMotion }: { visible: boolean; reducedMotion: boolean }) {
+function CuriousSeed({
+  glow,
+  visible,
+  reducedMotion,
+}: {
+  glow: number;
+  visible: boolean;
+  reducedMotion: boolean;
+}) {
   const discovery = useRef<THREE.Group>(null);
   useFrame(({ clock }, delta) => {
     if (!discovery.current) return;
@@ -248,7 +291,13 @@ function CuriousSeed({ visible, reducedMotion }: { visible: boolean; reducedMoti
       <group ref={discovery} position={[0, 0.72, 0]} scale={visible ? 1 : 0.03}>
         <mesh castShadow>
           <dodecahedronGeometry args={[0.42, 1]} />
-          <meshStandardMaterial color="#d2ad59" roughness={0.48} emissive="#9d7938" emissiveIntensity={0.18} flatShading />
+          <meshStandardMaterial
+            color="#d2ad59"
+            roughness={0.48}
+            emissive="#9d7938"
+            emissiveIntensity={glow}
+            flatShading
+          />
         </mesh>
         <mesh position={[-0.28, 0.38, 0]} rotation={[0.1, 0, -0.72]} scale={[0.34, 0.12, 0.18]}>
           <sphereGeometry args={[1, 12, 8]} />
@@ -259,12 +308,19 @@ function CuriousSeed({ visible, reducedMotion }: { visible: boolean; reducedMoti
           <meshStandardMaterial color="#789664" roughness={0.88} />
         </mesh>
       </group>
-      <pointLight position={[0, 1.1, 0]} color="#f0cf77" intensity={visible ? 2.2 : 0} distance={5} decay={2} />
     </group>
   );
 }
 
-function ChoiceDestination({ choice, reducedMotion }: { choice: GardenChoice | null; reducedMotion: boolean }) {
+function ChoiceDestination({
+  choice,
+  glow,
+  reducedMotion,
+}: {
+  choice: GardenChoice | null;
+  glow: number;
+  reducedMotion: boolean;
+}) {
   const destination = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
     if (!destination.current) return;
@@ -297,11 +353,14 @@ function ChoiceDestination({ choice, reducedMotion }: { choice: GardenChoice | n
                   </mesh>
                   <mesh position={[0.35, 2.25, 0.55]}>
                     <sphereGeometry args={[0.16, 12, 8]} />
-                    <meshStandardMaterial color="#f2c76e" emissive="#dc9842" emissiveIntensity={1.25} />
+                    <meshStandardMaterial
+                      color="#d7b85a"
+                      emissive="#7fa65b"
+                      emissiveIntensity={glow}
+                    />
                   </mesh>
                 </group>
               ))}
-              <pointLight position={[0, 2.4, 0]} color="#ffd47e" intensity={3.2} distance={8} decay={2} />
             </group>
           ) : (
             <group>
@@ -319,7 +378,12 @@ function ChoiceDestination({ choice, reducedMotion }: { choice: GardenChoice | n
               </mesh>
               <mesh position={[0, 1.05, 1.2]} castShadow>
                 <boxGeometry args={[2.1, 0.22, 0.7]} />
-                <meshStandardMaterial color="#d19b5e" roughness={0.82} />
+                <meshStandardMaterial
+                  color="#8ca5cf"
+                  emissive="#c58b65"
+                  emissiveIntensity={glow}
+                  roughness={0.82}
+                />
               </mesh>
               {[-0.55, 0, 0.55].map((x, index) => (
                 <mesh key={x} position={[x, 1.55 + index * 0.08, 1.18]} rotation={[0, 0, index * 0.3 - 0.3]}>
@@ -327,9 +391,15 @@ function ChoiceDestination({ choice, reducedMotion }: { choice: GardenChoice | n
                   <meshStandardMaterial color={index === 1 ? '#6a8065' : '#d0b064'} roughness={0.8} />
                 </mesh>
               ))}
-              <pointLight position={[0, 1.8, 1.4]} color="#f6b860" intensity={2.4} distance={6} decay={2} />
             </group>
           )}
+          <pointLight
+            position={[0, 2.1, 0.7]}
+            color={choice === 'orchard' ? '#d7b85a' : '#8ca5cf'}
+            intensity={glow * 0.6}
+            distance={7.5}
+            decay={2}
+          />
         </group>
       )}
     </group>
@@ -367,32 +437,35 @@ export default function StorybookGardenEnvironment({
 
   return (
     <>
-      <color attach="background" args={['#addde5']} />
-      <fog attach="fog" args={['#c9ddd0', 36, 78]} />
-      <hemisphereLight args={['#d9f4ff', '#526d47', 1.65]} />
-      <directionalLight position={[13, 24, 10]} intensity={2.45} color="#ffedb8" />
-      <SkyClouds />
+      <MagicalAtmosphere layout={layout} presentation={presentation} />
 
       <StorybookTerrain grassTexture={grassTexture} layout={layout} />
 
       <EnchantedPond layout={layout} presentation={presentation} />
       <RockBackdrop />
-      <SpringSanctuary reducedMotion={!presentation.moteMotion} />
+      <SpringSanctuary
+        glow={presentation.sanctuaryGlow}
+        reducedMotion={!presentation.moteMotion}
+      />
       <Pavilion
+        glow={presentation.pavilionGlow}
         improved={presentation.pavilionGlow > 0.55}
         reducedMotion={!presentation.cloudMotion}
       />
       <StorybookFoliage layout={layout} />
       <StarflowerPatch
+        glow={presentation.starflowerGlow}
         visible={presentation.starflowerGlow > 0.2}
         reducedMotion={!presentation.moteMotion}
       />
       <CuriousSeed
+        glow={presentation.seedGlow}
         visible={presentation.seedGlow > 0.15}
         reducedMotion={!presentation.moteMotion}
       />
       <ChoiceDestination
         choice={presentation.destinationAccent}
+        glow={presentation.destinationGlow}
         reducedMotion={!presentation.moteMotion}
       />
     </>
