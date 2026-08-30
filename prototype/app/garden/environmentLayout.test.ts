@@ -82,6 +82,13 @@ describe('storybook environment layout', () => {
     expect(validateEnvironmentLayout(createStorybookEnvironmentLayout())).toEqual([]);
   });
 
+  it('keeps all pond dressing inside the canonical safety exclusion', () => {
+    const layout = createStorybookEnvironmentLayout();
+    expect(layout.pondStones.length).toBeGreaterThanOrEqual(24);
+    expect(layout.reeds.length).toBeGreaterThanOrEqual(18);
+    expect(validateEnvironmentLayout(layout)).toEqual([]);
+  });
+
   it('reports duplicate ids, blocked corridors, and an escaped pond stone', () => {
     const layout = createStorybookEnvironmentLayout();
     const invalid = {

@@ -8,6 +8,7 @@ import {
   createStorybookEnvironmentLayout,
   getEnvironmentPresentation,
 } from './environmentLayout';
+import EnchantedPond from './EnchantedPond';
 import type { GardenChoice } from './rewardState';
 import StorybookFoliage from './StorybookFoliage';
 import StorybookTerrain from './StorybookTerrain';
@@ -40,38 +41,6 @@ function SkyClouds() {
           ))}
         </group>
       ))}
-    </group>
-  );
-}
-
-function CentralPond({ reducedMotion }: { reducedMotion: boolean }) {
-  const ripples = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    if (ripples.current && !reducedMotion) ripples.current.rotation.z = clock.elapsedTime * 0.025;
-  });
-
-  return (
-    <group>
-      <mesh position={[0, -0.14, 0]} receiveShadow>
-        <cylinderGeometry args={[6.45, 6.45, 0.36, 64]} />
-        <meshStandardMaterial color="#827e69" roughness={0.96} />
-      </mesh>
-      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[5.82, 64]} />
-        <meshPhysicalMaterial color="#4f9da7" roughness={0.12} metalness={0.04} clearcoat={0.82} clearcoatRoughness={0.16} />
-      </mesh>
-      <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[5.82, 6.55, 64]} />
-        <meshStandardMaterial color="#d8cfad" roughness={0.9} />
-      </mesh>
-      <group ref={ripples} position={[0, 0.095, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        {[2.1, 3.55, 4.7].map((radius, index) => (
-          <mesh key={radius}>
-            <ringGeometry args={[radius, radius + 0.055, 64]} />
-            <meshBasicMaterial color="#c7eeea" transparent opacity={0.46 - index * 0.1} />
-          </mesh>
-        ))}
-      </group>
     </group>
   );
 }
@@ -406,7 +375,7 @@ export default function StorybookGardenEnvironment({
 
       <StorybookTerrain grassTexture={grassTexture} layout={layout} />
 
-      <CentralPond reducedMotion={!presentation.rippleMotion} />
+      <EnchantedPond layout={layout} presentation={presentation} />
       <RockBackdrop />
       <SpringSanctuary reducedMotion={!presentation.moteMotion} />
       <Pavilion
