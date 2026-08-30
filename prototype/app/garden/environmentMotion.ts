@@ -11,6 +11,10 @@ export type AtmosphereMotionFrame = Readonly<{
   moteOpacity: number;
 }>;
 
+type WritablePondMotionFrame = {
+  -readonly [Key in keyof PondMotionFrame]: PondMotionFrame[Key];
+};
+
 type WritableAtmosphereMotionFrame = {
   -readonly [Key in keyof AtmosphereMotionFrame]: AtmosphereMotionFrame[Key];
 };
@@ -49,11 +53,33 @@ export function getAtmosphereMotionFrame(
   return frame;
 }
 
-export function getPondMotionFrame(elapsedSeconds: number, motionEnabled: boolean): PondMotionFrame {
-  if (!motionEnabled) return { rippleRotation: 0, highlightOffset: 0, glowPulse: 1 };
-  return {
-    rippleRotation: (elapsedSeconds * 0.045) % (Math.PI * 2),
-    highlightOffset: Math.sin(elapsedSeconds * 0.38) * 0.08,
-    glowPulse: 1 + Math.sin(elapsedSeconds * 0.8) * 0.08,
+export function getPondMotionFrame(
+  elapsedSeconds: number,
+  motionEnabled: boolean,
+): PondMotionFrame;
+export function getPondMotionFrame(
+  elapsedSeconds: number,
+  motionEnabled: boolean,
+  target: WritablePondMotionFrame,
+): PondMotionFrame;
+export function getPondMotionFrame(
+  elapsedSeconds: number,
+  motionEnabled: boolean,
+  target?: WritablePondMotionFrame,
+): PondMotionFrame {
+  const frame = target ?? {
+    rippleRotation: 0,
+    highlightOffset: 0,
+    glowPulse: 1,
   };
+  if (!motionEnabled) {
+    frame.rippleRotation = 0;
+    frame.highlightOffset = 0;
+    frame.glowPulse = 1;
+    return frame;
+  }
+  frame.rippleRotation = (elapsedSeconds * 0.045) % (Math.PI * 2);
+  frame.highlightOffset = Math.sin(elapsedSeconds * 0.38) * 0.08;
+  frame.glowPulse = 1 + Math.sin(elapsedSeconds * 0.8) * 0.08;
+  return frame;
 }

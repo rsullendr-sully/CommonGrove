@@ -32,6 +32,22 @@ const rockData: Array<{ position: [number, number, number]; scale: [number, numb
   { position: [2.5, 7.4, -17.7], scale: [3.8, 3.1, 2.5], rotation: [-0.15, 0.1, 0.18], color: '#696f5d' },
 ];
 
+const STARFLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.025, 0.035, 0.46, 7);
+const STARFLOWER_HEAD_GEOMETRY = new THREE.SphereGeometry(0.13, 8, 6);
+const STARFLOWER_STEM_MATERIAL = new THREE.MeshStandardMaterial({ color: '#4d774b' });
+const LAVENDER_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#e6c5ef',
+  roughness: 0.8,
+  emissive: '#e6c5ef',
+  emissiveIntensity: 0.2,
+});
+const GOLD_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#f3d58e',
+  roughness: 0.8,
+  emissive: '#f3d58e',
+  emissiveIntensity: 0.2,
+});
+
 function RockBackdrop() {
   return (
     <group>
@@ -201,30 +217,28 @@ function Pavilion({
 
 function FlowerPatch({
   position,
-  color,
+  headMaterial,
   glow,
 }: {
   position: [number, number, number];
-  color: string;
+  headMaterial: THREE.MeshStandardMaterial;
   glow: number;
 }) {
   return (
-    <group position={position}>
+    <group position={position} dispose={null}>
       {[[-0.7, 0], [-0.2, 0.35], [0.35, -0.2], [0.75, 0.2], [0.1, -0.65]].map(([x, z], index) => (
         <group key={index} position={[x, 0, z]}>
-          <mesh position={[0, 0.24, 0]}>
-            <cylinderGeometry args={[0.025, 0.035, 0.46, 7]} />
-            <meshStandardMaterial color="#4d774b" />
-          </mesh>
-          <mesh position={[0, 0.52, 0]}>
-            <sphereGeometry args={[0.13, 8, 6]} />
-            <meshStandardMaterial
-              color={color}
-              roughness={0.8}
-              emissive={color}
-              emissiveIntensity={glow}
-            />
-          </mesh>
+          <mesh
+            geometry={STARFLOWER_STEM_GEOMETRY}
+            material={STARFLOWER_STEM_MATERIAL}
+            position={[0, 0.24, 0]}
+          />
+          <mesh
+            geometry={STARFLOWER_HEAD_GEOMETRY}
+            material={headMaterial}
+            material-emissiveIntensity={glow}
+            position={[0, 0.52, 0]}
+          />
         </group>
       ))}
     </group>
@@ -255,8 +269,8 @@ function StarflowerPatch({
         <meshStandardMaterial color="#596f45" roughness={1} />
       </mesh>
       <group ref={flowers} scale={visible ? 1 : 0.04}>
-        <FlowerPatch position={[0, 0, 0]} color="#e6c5ef" glow={glow} />
-        <FlowerPatch position={[0.7, 0, 0.55]} color="#f3d58e" glow={glow} />
+        <FlowerPatch position={[0, 0, 0]} headMaterial={LAVENDER_STARFLOWER_MATERIAL} glow={glow} />
+        <FlowerPatch position={[0.7, 0, 0.55]} headMaterial={GOLD_STARFLOWER_MATERIAL} glow={glow} />
       </group>
     </group>
   );

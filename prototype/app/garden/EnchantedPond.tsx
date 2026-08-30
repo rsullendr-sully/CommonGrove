@@ -52,9 +52,18 @@ export default function EnchantedPond({ layout, presentation }: EnchantedPondPro
   const firstHighlight = useRef<THREE.Group>(null);
   const secondHighlight = useRef<THREE.Group>(null);
   const glow = useRef<THREE.MeshBasicMaterial>(null);
+  const motionFrame = useRef({
+    rippleRotation: 0,
+    highlightOffset: 0,
+    glowPulse: 1,
+  });
 
   useFrame(({ clock }) => {
-    const frame = getPondMotionFrame(clock.elapsedTime, presentation.rippleMotion);
+    const frame = getPondMotionFrame(
+      clock.elapsedTime,
+      presentation.rippleMotion,
+      motionFrame.current,
+    );
     if (ripples.current) ripples.current.rotation.z = frame.rippleRotation;
     if (firstHighlight.current) firstHighlight.current.position.x = -1.55 + frame.highlightOffset;
     if (secondHighlight.current) secondHighlight.current.position.z = 1.2 - frame.highlightOffset;

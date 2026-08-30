@@ -19,6 +19,23 @@ describe('enchanted pond motion', () => {
       glowPulse: 1,
     });
   });
+
+  it('mutates and returns caller-owned storage for moving frames', () => {
+    const target = {
+      rippleRotation: 99,
+      highlightOffset: 99,
+      glowPulse: 99,
+    };
+
+    const frame = getPondMotionFrame(0, true, target);
+
+    expect(frame).toBe(target);
+    expect(target).toEqual({
+      rippleRotation: 0,
+      highlightOffset: 0,
+      glowPulse: 1,
+    });
+  });
 });
 
 describe('magical atmosphere motion', () => {
