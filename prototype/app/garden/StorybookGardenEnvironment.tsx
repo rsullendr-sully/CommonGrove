@@ -9,6 +9,8 @@ import {
   getEnvironmentPresentation,
 } from './environmentLayout';
 import type { GardenChoice } from './rewardState';
+import StorybookFoliage from './StorybookFoliage';
+import StorybookTerrain from './StorybookTerrain';
 
 export type StorybookGardenEnvironmentProps = Readonly<{
   grassTexture: Texture;
@@ -19,58 +21,6 @@ export type StorybookGardenEnvironmentProps = Readonly<{
   destinationVisible: GardenChoice | null;
   reducedMotion: boolean;
 }>;
-
-function HedgeBoundary({ position, size }: { position: [number, number, number]; size: [number, number, number] }) {
-  return (
-    <mesh position={position} receiveShadow>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color="#4f744e" roughness={1} />
-    </mesh>
-  );
-}
-
-function BoundaryPlanting() {
-  const shrubs = useMemo(() => {
-    const items: Array<{ position: [number, number, number]; scale: [number, number, number]; color: string }> = [];
-    for (let value = -18; value <= 18; value += 3) {
-      const variation = 0.82 + ((value + 18) % 5) * 0.055;
-      items.push({ position: [value, 1.35, -19.1], scale: [1.65, variation, 1.25], color: value % 2 ? '#527650' : '#5f8257' });
-      items.push({ position: [value, 1.2, 19.1], scale: [1.55, variation * 0.9, 1.15], color: value % 2 ? '#5a7d52' : '#4e714c' });
-      items.push({ position: [-19.1, 1.25, value], scale: [1.2, variation, 1.55], color: value % 2 ? '#527650' : '#62845a' });
-      items.push({ position: [19.1, 1.25, value], scale: [1.2, variation * 0.95, 1.55], color: value % 2 ? '#4e714c' : '#597c52' });
-    }
-    return items;
-  }, []);
-
-  return (
-    <group>
-      {shrubs.map((shrub, index) => (
-        <mesh key={index} position={shrub.position} scale={shrub.scale} receiveShadow>
-          <dodecahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial color={shrub.color} roughness={1} flatShading />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function GardenPaths() {
-  const steppingStones: Array<[number, number, number, number]> = [
-    [0, 0.035, 14.5, -0.04], [-0.2, 0.04, 12.4, 0.08], [0.25, 0.045, 10.4, -0.1],
-    [-0.3, 0.04, 8.45, 0.06], [-7.1, 0.04, -5.7, -0.35], [-8.4, 0.045, -7, -0.55],
-    [-9.5, 0.05, -8.3, -0.68], [-10.5, 0.055, -9.7, -0.75],
-  ];
-  return (
-    <group>
-      {steppingStones.map(([x, y, z, rotation], index) => (
-        <mesh key={index} position={[x, y, z]} rotation={[0, rotation, 0]} scale={[1.3, 0.11, 0.78]} receiveShadow>
-          <cylinderGeometry args={[0.82, 0.9, 0.28, 10]} />
-          <meshStandardMaterial color={index % 2 ? '#c9bea0' : '#d8cdac'} roughness={0.98} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
 
 function SkyClouds() {
   const cloudGroups = [
@@ -259,23 +209,6 @@ function Pavilion({ improved, reducedMotion }: { improved: boolean; reducedMotio
         <mesh key={step} position={[0, 0.18 + step * 0.18, 4.2 - step * 0.52]} castShadow receiveShadow>
           <boxGeometry args={[2.5, 0.35, 0.9]} />
           <meshStandardMaterial color="#c6bda1" roughness={0.94} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function GardenTree({ position, scale = 1, color = '#557c52' }: { position: [number, number, number]; scale?: number; color?: string }) {
-  return (
-    <group position={position} scale={scale}>
-      <mesh position={[0, 2.1, 0]} castShadow>
-        <cylinderGeometry args={[0.27, 0.42, 4.2, 10]} />
-        <meshStandardMaterial color="#806149" roughness={1} />
-      </mesh>
-      {[[0, 4.7, 0], [-0.8, 4.3, 0.1], [0.78, 4.35, -0.1], [0.05, 4.1, 0.7]].map((leaf, index) => (
-        <mesh key={index} position={leaf as [number, number, number]} scale={[1.25, 1.05, 1.1]} castShadow>
-          <dodecahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial color={index % 2 ? '#64885a' : color} roughness={1} flatShading />
         </mesh>
       ))}
     </group>
@@ -471,21 +404,7 @@ export default function StorybookGardenEnvironment({
       <directionalLight position={[13, 24, 10]} intensity={2.45} color="#ffedb8" />
       <SkyClouds />
 
-      <mesh position={[0, -0.26, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[120, 120]} />
-        <meshStandardMaterial color="#789963" roughness={1} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial map={grassTexture} color="#ffffff" roughness={1} />
-      </mesh>
-
-      <HedgeBoundary position={[0, 1, -20]} size={[40, 2, 1.15]} />
-      <HedgeBoundary position={[0, 1, 20]} size={[40, 2, 1.15]} />
-      <HedgeBoundary position={[-20, 1, 0]} size={[1.15, 2, 40]} />
-      <HedgeBoundary position={[20, 1, 0]} size={[1.15, 2, 40]} />
-      <BoundaryPlanting />
-      <GardenPaths />
+      <StorybookTerrain grassTexture={grassTexture} layout={layout} />
 
       <CentralPond reducedMotion={!presentation.rippleMotion} />
       <RockBackdrop />
@@ -494,14 +413,7 @@ export default function StorybookGardenEnvironment({
         improved={presentation.pavilionGlow > 0.55}
         reducedMotion={!presentation.cloudMotion}
       />
-      {layout.trees.map((tree) => (
-        <GardenTree
-          key={tree.id}
-          position={[...tree.position]}
-          scale={tree.scale[0]}
-          color={['#557c52', '#49744c', '#5f8558'][tree.variant]}
-        />
-      ))}
+      <StorybookFoliage layout={layout} />
       <StarflowerPatch
         visible={presentation.starflowerGlow > 0.2}
         reducedMotion={!presentation.moteMotion}
@@ -514,7 +426,6 @@ export default function StorybookGardenEnvironment({
         choice={presentation.destinationAccent}
         reducedMotion={!presentation.moteMotion}
       />
-      <FlowerPatch position={[8.8, 0, -5.9]} color="#d3dff7" />
     </>
   );
 }

@@ -32,6 +32,37 @@ describe('storybook environment layout', () => {
     ]));
   });
 
+  it('provides layered deterministic planting without turning it into collision geometry', () => {
+    const layout = createStorybookEnvironmentLayout();
+    expect(layout.trees).toHaveLength(3);
+    expect(layout.shrubs.length).toBeGreaterThanOrEqual(28);
+    expect(layout.grassTufts.length).toBeGreaterThanOrEqual(72);
+    expect(layout.flowers.length).toBeGreaterThanOrEqual(36);
+    expect(layout.berms.length).toBeGreaterThanOrEqual(6);
+    expect(layout.plantingBeds.length).toBeGreaterThanOrEqual(8);
+    expect(new Set([
+      ...layout.shrubs,
+      ...layout.grassTufts,
+      ...layout.flowers,
+    ].map(({ id }) => id)).size).toBe(layout.shrubs.length + layout.grassTufts.length + layout.flowers.length);
+    expect(validateEnvironmentLayout(layout)).toEqual([]);
+  });
+
+  it('reports ordinary foliage that visually narrows an authored corridor', () => {
+    const layout = createStorybookEnvironmentLayout();
+    const invalid = {
+      ...layout,
+      shrubs: [
+        ...layout.shrubs,
+        { id: 'blocked-shrub', position: [0, 0, 14] as const, scale: [1, 1, 1] as const, rotationY: 0, variant: 0 },
+      ],
+    };
+
+    expect(validateEnvironmentLayout(invalid)).toContain(
+      'Foliage "blocked-shrub" narrows corridor "spawn-to-pond".',
+    );
+  });
+
   it('keeps the approved layout inside its safety contract', () => {
     expect(validateEnvironmentLayout(createStorybookEnvironmentLayout())).toEqual([]);
   });

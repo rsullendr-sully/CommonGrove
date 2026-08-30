@@ -12,6 +12,17 @@ export type EnvironmentInstance = Readonly<{
 export type EnvironmentDisc = Readonly<{ id: string; center: GardenPoint; radius: number }>;
 export type GardenCorridor = Readonly<{ id: string; start: GardenPoint; end: GardenPoint; halfWidth: number }>;
 
+type PlantingCluster = Readonly<{
+  id: string;
+  center: GardenPoint;
+  spread: number;
+  scale: number;
+  rotationY: number;
+  variant: number;
+}>;
+
+type PlantingOffset = readonly [x: number, z: number, scale: number, rotationY: number];
+
 export type StorybookEnvironmentLayout = Readonly<{
   berms: readonly EnvironmentDisc[];
   plantingBeds: readonly EnvironmentDisc[];
@@ -65,9 +76,13 @@ const trees: readonly EnvironmentInstance[] = [
 
 const berms: readonly EnvironmentDisc[] = [
   { id: 'berm-north', center: { x: 0, z: -19.1 }, radius: 3.8 },
-  { id: 'berm-east', center: { x: 19.1, z: -1.8 }, radius: 3.5 },
+  { id: 'berm-north-east', center: { x: 12.2, z: -19 }, radius: 3.2 },
+  { id: 'berm-east', center: { x: 19.1, z: -2.8 }, radius: 3.5 },
+  { id: 'berm-south-east', center: { x: 19, z: 12.4 }, radius: 3.1 },
   { id: 'berm-south', center: { x: 1.5, z: 19.1 }, radius: 3.6 },
+  { id: 'berm-south-west', center: { x: -12.4, z: 19 }, radius: 3.15 },
   { id: 'berm-west', center: { x: -19.1, z: -1.1 }, radius: 3.5 },
+  { id: 'berm-north-west', center: { x: -11.8, z: -19 }, radius: 3.25 },
 ];
 
 const plantingBeds: readonly EnvironmentDisc[] = [
@@ -75,30 +90,70 @@ const plantingBeds: readonly EnvironmentDisc[] = [
   { id: 'bed-east-shade', center: { x: 10.5, z: -4.5 }, radius: 1.1 },
   { id: 'bed-south-east', center: { x: 8.3, z: -12.1 }, radius: 1.15 },
   { id: 'bed-west-gate', center: { x: -12.5, z: -1.2 }, radius: 1.2 },
+  { id: 'bed-pavilion-west', center: { x: -16.2, z: -9.6 }, radius: 1.15 },
+  { id: 'bed-sanctuary-west', center: { x: -8.1, z: -15.8 }, radius: 1.1 },
+  { id: 'bed-sanctuary-east', center: { x: 8.2, z: -15.7 }, radius: 1.15 },
+  { id: 'bed-foreground-west', center: { x: -11.2, z: 13.3 }, radius: 1.2 },
+  { id: 'bed-foreground-east', center: { x: 14.8, z: 12.1 }, radius: 1.05 },
 ];
 
-const shrubs: readonly EnvironmentInstance[] = [
-  { id: 'shrub-north-east-a', position: [8.4, 0, 11.7], scale: [0.78, 0.78, 0.78], rotationY: 0.16, variant: 0 },
-  { id: 'shrub-north-east-b', position: [9.4, 0, 12.3], scale: [0.64, 0.64, 0.64], rotationY: -0.3, variant: 1 },
-  { id: 'shrub-east-shade', position: [10.5, 0, -4.5], scale: [0.84, 0.84, 0.84], rotationY: 0.48, variant: 2 },
-  { id: 'shrub-south-east', position: [8.3, 0, -12.1], scale: [0.72, 0.72, 0.72], rotationY: -0.22, variant: 0 },
-  { id: 'shrub-west-gate-a', position: [-12.5, 0, -1.2], scale: [0.82, 0.82, 0.82], rotationY: 0.38, variant: 1 },
-  { id: 'shrub-west-gate-b', position: [-13.1, 0, -0.3], scale: [0.58, 0.58, 0.58], rotationY: -0.54, variant: 2 },
+const shrubOffsets: readonly PlantingOffset[] = [
+  [-0.58, -0.34, 1, -0.18],
+  [0.48, -0.3, 0.82, 0.34],
+  [-0.32, 0.48, 0.9, 0.62],
+  [0.55, 0.38, 0.74, -0.52],
 ];
 
-const grassTufts: readonly EnvironmentInstance[] = [
-  { id: 'grass-north-east', position: [7.5, 0, 13.2], scale: [0.55, 0.55, 0.55], rotationY: 0.1, variant: 0 },
-  { id: 'grass-east-loop', position: [15.6, 0, 7.3], scale: [0.62, 0.62, 0.62], rotationY: -0.2, variant: 1 },
-  { id: 'grass-south-east', position: [7.2, 0, -13.4], scale: [0.5, 0.5, 0.5], rotationY: 0.35, variant: 2 },
-  { id: 'grass-west-loop', position: [-15.6, 0, 7.2], scale: [0.6, 0.6, 0.6], rotationY: -0.44, variant: 0 },
-  { id: 'grass-west-gate', position: [-13.8, 0, -2.1], scale: [0.57, 0.57, 0.57], rotationY: 0.26, variant: 1 },
+const shrubClusters: readonly PlantingCluster[] = [
+  { id: 'pavilion-west', center: { x: -16.2, z: -10.1 }, spread: 0.95, scale: 0.82, rotationY: 0.2, variant: 0 },
+  { id: 'pavilion-back', center: { x: -12.4, z: -16.5 }, spread: 0.88, scale: 0.72, rotationY: -0.4, variant: 1 },
+  { id: 'pond-east', center: { x: 8.8, z: -1.8 }, spread: 0.86, scale: 0.68, rotationY: 0.5, variant: 2 },
+  { id: 'pond-west', center: { x: -9.1, z: -0.8 }, spread: 0.82, scale: 0.7, rotationY: -0.2, variant: 0 },
+  { id: 'foreground-east', center: { x: 11.5, z: 13.8 }, spread: 1.05, scale: 0.76, rotationY: 0.7, variant: 1 },
+  { id: 'foreground-west', center: { x: -11.3, z: 14.2 }, spread: 1, scale: 0.78, rotationY: -0.6, variant: 2 },
+  { id: 'sanctuary-east', center: { x: 8.4, z: -14.2 }, spread: 0.9, scale: 0.74, rotationY: 0.1, variant: 0 },
 ];
 
-const flowers: readonly EnvironmentInstance[] = [
-  { id: 'flowers-north-east', position: [9.1, 0, 11.5], scale: [0.45, 0.45, 0.45], rotationY: 0, variant: 0 },
-  { id: 'flowers-east-shade', position: [11.1, 0, -4.1], scale: [0.42, 0.42, 0.42], rotationY: 0.32, variant: 1 },
-  { id: 'flowers-south-east', position: [8.9, 0, -12.5], scale: [0.48, 0.48, 0.48], rotationY: -0.18, variant: 2 },
-  { id: 'flowers-west-gate', position: [-12, 0, -1.8], scale: [0.46, 0.46, 0.46], rotationY: 0.52, variant: 0 },
+const grassOffsets: readonly PlantingOffset[] = [
+  [-0.72, -0.45, 0.82, -0.28],
+  [-0.18, -0.62, 1, 0.15],
+  [0.5, -0.5, 0.9, 0.48],
+  [0.72, 0.02, 0.76, -0.62],
+  [0.45, 0.52, 1.04, 0.72],
+  [-0.08, 0.66, 0.88, -0.12],
+  [-0.62, 0.4, 0.94, 0.36],
+  [-0.72, 0.02, 0.72, -0.75],
+];
+
+const grassClusters: readonly PlantingCluster[] = [
+  { id: 'pond-east', center: { x: 8.5, z: -2.7 }, spread: 0.78, scale: 0.58, rotationY: 0.1, variant: 0 },
+  { id: 'pond-west', center: { x: -8.7, z: -1.1 }, spread: 0.78, scale: 0.55, rotationY: -0.35, variant: 1 },
+  { id: 'pavilion-west', center: { x: -16.5, z: -7.8 }, spread: 0.9, scale: 0.6, rotationY: 0.52, variant: 2 },
+  { id: 'foreground-east', center: { x: 14.4, z: 15.2 }, spread: 1, scale: 0.62, rotationY: -0.18, variant: 0 },
+  { id: 'foreground-west', center: { x: -14.3, z: 15 }, spread: 1, scale: 0.6, rotationY: 0.3, variant: 1 },
+  { id: 'sanctuary-east', center: { x: 8.2, z: -17.2 }, spread: 0.88, scale: 0.58, rotationY: -0.44, variant: 2 },
+  { id: 'sanctuary-west', center: { x: -7.8, z: -17.1 }, spread: 0.9, scale: 0.57, rotationY: 0.62, variant: 0 },
+  { id: 'boundary-east', center: { x: 17.4, z: -4.6 }, spread: 0.82, scale: 0.61, rotationY: -0.14, variant: 1 },
+  { id: 'boundary-west', center: { x: -17.3, z: -2.5 }, spread: 0.84, scale: 0.59, rotationY: 0.4, variant: 2 },
+];
+
+const flowerOffsets: readonly PlantingOffset[] = [
+  [-0.52, -0.3, 0.86, -0.2],
+  [0.4, -0.38, 1, 0.28],
+  [-0.28, 0.48, 0.92, 0.58],
+  [0.52, 0.34, 0.78, -0.48],
+];
+
+const flowerClusters: readonly PlantingCluster[] = [
+  { id: 'north-east', center: { x: 8.8, z: 12 }, spread: 0.76, scale: 0.48, rotationY: 0.1, variant: 0 },
+  { id: 'east-shade', center: { x: 10.5, z: -4.5 }, spread: 0.7, scale: 0.46, rotationY: -0.3, variant: 1 },
+  { id: 'south-east', center: { x: 8.3, z: -12.1 }, spread: 0.72, scale: 0.5, rotationY: 0.48, variant: 2 },
+  { id: 'west-gate', center: { x: -12.5, z: -1.2 }, spread: 0.75, scale: 0.48, rotationY: -0.52, variant: 0 },
+  { id: 'pavilion-west', center: { x: -16.2, z: -9.6 }, spread: 0.72, scale: 0.47, rotationY: 0.36, variant: 1 },
+  { id: 'sanctuary-west', center: { x: -8.1, z: -15.8 }, spread: 0.7, scale: 0.45, rotationY: -0.18, variant: 2 },
+  { id: 'sanctuary-east', center: { x: 8.2, z: -15.7 }, spread: 0.72, scale: 0.49, rotationY: 0.62, variant: 0 },
+  { id: 'foreground-west', center: { x: -11.2, z: 13.3 }, spread: 0.76, scale: 0.5, rotationY: -0.4, variant: 1 },
+  { id: 'foreground-east', center: { x: 14.8, z: 12.1 }, spread: 0.68, scale: 0.46, rotationY: 0.24, variant: 2 },
 ];
 
 const pondStones: readonly EnvironmentInstance[] = [
@@ -147,9 +202,9 @@ export function createStorybookEnvironmentLayout(): StorybookEnvironmentLayout {
     plantingBeds: plantingBeds.map(cloneDisc),
     corridors: corridors.map(cloneCorridor),
     trees: trees.map(cloneInstance),
-    shrubs: shrubs.map(cloneInstance),
-    grassTufts: grassTufts.map(cloneInstance),
-    flowers: flowers.map(cloneInstance),
+    shrubs: createAuthoredPlanting('shrub', shrubClusters, shrubOffsets),
+    grassTufts: createAuthoredPlanting('grass', grassClusters, grassOffsets),
+    flowers: createAuthoredPlanting('flower', flowerClusters, flowerOffsets),
     pondStones: pondStones.map(cloneInstance),
     reeds: reeds.map(cloneInstance),
     motes: motes.map(cloneInstance),
@@ -190,6 +245,22 @@ export function validateEnvironmentLayout(layout: StorybookEnvironmentLayout): s
     for (const corridor of layout.corridors) {
       if (pointToSegmentDistance(bed.center, corridor.start, corridor.end) < bed.radius + corridor.halfWidth) {
         errors.push(`Planting bed "${bed.id}" blocks corridor "${corridor.id}".`);
+      }
+    }
+  }
+
+  for (const instance of [...layout.shrubs, ...layout.grassTufts, ...layout.flowers]) {
+    const horizontalAllowance = Math.max(instance.scale[0], instance.scale[2]) / 2;
+    if (Math.hypot(instance.position[0], instance.position[2]) - horizontalAllowance < SAFE_POND_RADIUS) {
+      errors.push(`Foliage "${instance.id}" enters the pond exclusion.`);
+    }
+    for (const corridor of layout.corridors) {
+      if (pointToSegmentDistance(
+        { x: instance.position[0], z: instance.position[2] },
+        corridor.start,
+        corridor.end,
+      ) < horizontalAllowance + corridor.halfWidth) {
+        errors.push(`Foliage "${instance.id}" narrows corridor "${corridor.id}".`);
       }
     }
   }
@@ -237,6 +308,27 @@ function cloneInstance(instance: EnvironmentInstance): EnvironmentInstance {
     rotationY: instance.rotationY,
     variant: instance.variant,
   };
+}
+
+function createAuthoredPlanting(
+  family: string,
+  clusters: readonly PlantingCluster[],
+  offsets: readonly PlantingOffset[],
+): EnvironmentInstance[] {
+  return clusters.flatMap((cluster) => offsets.map(([x, z, scale, rotationY], index) => {
+    const instanceScale = cluster.scale * scale;
+    return {
+      id: `${family}-${cluster.id}-${index + 1}`,
+      position: [
+        cluster.center.x + x * cluster.spread,
+        0,
+        cluster.center.z + z * cluster.spread,
+      ] as const,
+      scale: [instanceScale, instanceScale, instanceScale] as const,
+      rotationY: cluster.rotationY + rotationY,
+      variant: (cluster.variant + index) % 3,
+    };
+  }));
 }
 
 function isInsideVisibleBoundary(point: GardenPoint): boolean {
