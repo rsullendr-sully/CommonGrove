@@ -14,6 +14,7 @@ import {
   type GardenInterest,
   type GardenObstacle,
 } from './navigation';
+import { PAVILION_OBSTACLES, PAVILION_READING_POINT } from './pavilionLayout';
 
 const scenery: readonly GardenObstacle[] = [
   { x: 13, z: 8, radius: 1.2 },
@@ -130,7 +131,7 @@ describe('Pip garden navigation', () => {
 
   it('routes reward one to reward two without crossing the pond or scenery', () => {
     const rewardOne = { x: 8.2, z: 6.6 };
-    const rewardTwo = { x: -8.65, z: -8.1 };
+    const rewardTwo = PAVILION_READING_POINT;
 
     expect(isSafeGardenSegment(rewardOne, rewardTwo, GARDEN_OBSTACLES)).toBe(false);
     const route = createSafeGardenRoute(rewardOne, rewardTwo, GARDEN_OBSTACLES);
@@ -145,7 +146,7 @@ describe('Pip garden navigation', () => {
     const ordinaryTargets = [
       { x: 8.8, z: -5.9 },
       { x: 8.2, z: 6.6 },
-      { x: -8.65, z: -8.1 },
+      PAVILION_READING_POINT,
       { x: -8.5, z: 7.4 },
       { x: -10.6, z: 9.2 },
       { x: 8.4, z: 1.5 },
@@ -158,6 +159,22 @@ describe('Pip garden navigation', () => {
       expect(route.at(-1)).toEqual(target);
       expectSafeRoute(start, route, GARDEN_OBSTACLES);
     }
+  });
+
+  it('keeps the pavilion approach and reading point open while blocking its structures', () => {
+    const frontApproach = { x: -12.2, z: -8.2 };
+    expect(isSafeGardenPoint(frontApproach, GARDEN_OBSTACLES)).toBe(true);
+    expect(isSafeGardenPoint(PAVILION_READING_POINT, GARDEN_OBSTACLES)).toBe(true);
+    for (const obstacle of PAVILION_OBSTACLES) {
+      expect(isSafeGardenPoint(obstacle, GARDEN_OBSTACLES)).toBe(false);
+    }
+  });
+
+  it('routes Pip through the pavilion entrance to the reading point', () => {
+    const start = { x: -8.1, z: -7.5 };
+    const route = createSafeGardenRoute(start, PAVILION_READING_POINT, GARDEN_OBSTACLES);
+    expect(route.at(-1)).toEqual(PAVILION_READING_POINT);
+    expectSafeRoute(start, route, GARDEN_OBSTACLES);
   });
 
   it('routes around declared scenery and rejects endpoints outside the boundary', () => {

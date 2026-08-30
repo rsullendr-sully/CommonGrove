@@ -11,6 +11,12 @@ import {
 import EnchantedPond from './EnchantedPond';
 import MagicalAtmosphere from './MagicalAtmosphere';
 import type { GardenChoice } from './rewardState';
+import {
+  PAVILION_CENTER,
+  PAVILION_LOCAL_BENCHES,
+  PAVILION_LOCAL_POSTS,
+  PAVILION_SURFACE,
+} from './pavilionLayout';
 import StorybookFoliage from './StorybookFoliage';
 import StorybookTerrain from './StorybookTerrain';
 
@@ -151,42 +157,49 @@ function Pavilion({
   });
 
   return (
-    <group position={[-12.2, 0, -12.4]}>
-      <mesh position={[0, 0.9, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[3.1, 3.4, 1.8, 8]} />
+    <group position={[PAVILION_CENTER.x, 0, PAVILION_CENTER.z]}>
+      <mesh position={[0, PAVILION_SURFACE.deck.centerY, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[
+          PAVILION_SURFACE.deck.radiusTop,
+          PAVILION_SURFACE.deck.radiusBottom,
+          PAVILION_SURFACE.deck.height,
+          12,
+        ]} />
         <meshStandardMaterial color="#b7ad91" roughness={0.94} />
       </mesh>
-      {[[-2, -2], [2, -2], [-2, 2], [2, 2]].map(([x, z]) => (
-        <mesh key={`${x}-${z}`} position={[x, 3.4, z]} castShadow>
+      {PAVILION_LOCAL_POSTS.map(({ x, z }) => (
+        <mesh key={`${x}-${z}`} position={[x, 2.66, z]} castShadow>
           <cylinderGeometry args={[0.19, 0.25, 5, 10]} />
           <meshStandardMaterial color="#88705e" roughness={0.88} />
         </mesh>
       ))}
-      <mesh position={[0, 6.05, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+      <mesh position={[0, 5.31, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <coneGeometry args={[4.3, 1.5, 4]} />
         <meshStandardMaterial color="#796577" roughness={0.85} />
       </mesh>
-      <mesh position={[0, 1.75, 0.5]} castShadow>
-        <boxGeometry args={[3, 0.45, 1]} />
-        <meshStandardMaterial color="#9a7859" roughness={0.9} />
-      </mesh>
+      {PAVILION_LOCAL_BENCHES.map(({ x, z }) => (
+        <mesh key={`${x}-${z}`} position={[x, 0.385, z]} castShadow>
+          <boxGeometry args={[0.65, 0.45, 2.1]} />
+          <meshStandardMaterial color="#9a7859" roughness={0.9} />
+        </mesh>
+      ))}
       <group ref={additions} scale={improved ? 1 : 0.03}>
-        <mesh position={[0, 3.6, 0]}>
+        <mesh position={[0, 2.86, 0]}>
           <sphereGeometry args={[0.28, 16, 12]} />
           <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={glow} />
         </mesh>
-        <mesh position={[0, 2.25, -1.35]} castShadow>
+        <mesh position={[0, 1.185, -1.35]} castShadow>
           <boxGeometry args={[2.9, 2.05, 0.42]} />
           <meshStandardMaterial color="#8f6d52" roughness={0.92} />
         </mesh>
         {[-0.9, -0.45, 0, 0.45, 0.9].map((x, index) => (
-          <mesh key={x} position={[x, 2.35 + (index % 2) * 0.08, -1.11]} rotation={[0, 0, (index - 2) * 0.035]} castShadow>
+          <mesh key={x} position={[x, 1.32, -1.11]} rotation={[0, 0, (index - 2) * 0.035]} castShadow>
             <boxGeometry args={[0.25, 1.2 - (index % 3) * 0.08, 0.28]} />
             <meshStandardMaterial color={['#ad7658', '#6e8266', '#c59a58', '#7f6d91', '#b98263'][index]} roughness={0.86} />
           </mesh>
         ))}
         {[-1.7, 1.7].map((x) => (
-          <group key={x} position={[x, 3.45, 0.25]}>
+          <group key={x} position={[x, 2.71, 0.25]}>
             <mesh castShadow>
               <cylinderGeometry args={[0.18, 0.24, 0.5, 8]} />
               <meshStandardMaterial color="#e6b763" emissive="#d99745" emissiveIntensity={glow} />
@@ -199,15 +212,15 @@ function Pavilion({
         ))}
       </group>
       <pointLight
-        position={[0, 3.6, 0]}
+        position={[0, 2.86, 0]}
         color="#ffd88a"
         intensity={improved ? glow * 0.75 : 0}
         distance={8}
         decay={2}
       />
-      {[0, 1, 2, 3].map((step) => (
-        <mesh key={step} position={[0, 0.18 + step * 0.18, 4.2 - step * 0.52]} castShadow receiveShadow>
-          <boxGeometry args={[2.5, 0.35, 0.9]} />
+      {PAVILION_SURFACE.approachSteps.map(({ z, centerY, height, width, depth }) => (
+        <mesh key={z} position={[0, centerY, z]} castShadow receiveShadow>
+          <boxGeometry args={[width, height, depth]} />
           <meshStandardMaterial color="#c6bda1" roughness={0.94} />
         </mesh>
       ))}

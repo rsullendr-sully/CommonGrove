@@ -20,6 +20,7 @@ import { actionEventForLiveTarget, actionLabelForLiveTarget, type InteractableId
 import { getFirstPersonMovementVector } from './garden/firstPersonMovement';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
+import { PAVILION_READING_POINT } from './garden/pavilionLayout';
 import {
   PIP_PET_REACTION_SECONDS,
   CAMERA_CONTROLS_FRAME_PRIORITY,
@@ -210,7 +211,7 @@ function FirstPersonControls({ movement, speed, onCameraMount }: { movement: Mov
 const gardenInterestDefinitions: readonly GardenInterest[] = [
   { id: 'flowers', position: { x: 8.8, z: -5.9 } },
   { id: 'pond', position: { x: 8.2, z: 6.6 } },
-  { id: 'pavilion', position: { x: -8.65, z: -8.1 } },
+  { id: 'pavilion', position: { ...PAVILION_READING_POINT } },
   { id: 'seed', position: { x: -8.5, z: 7.4 } },
   { id: 'destination', position: { x: -10.6, z: 9.2 } },
   { id: 'wander-east', position: { x: 8.4, z: 1.5 } },
@@ -255,7 +256,7 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onGreetingArrived, o
     };
     if (rewardStage === 2) return {
       id: 'reward-2',
-      target: { x: -8.65, z: -8.1 },
+      target: { ...PAVILION_READING_POINT },
       startMessage: 'A warm chime carries from the reading pavilion. Pip turns toward it.',
       completionMessage: 'The nook is ready. Pip settles beside the new books for a moment.',
     };
