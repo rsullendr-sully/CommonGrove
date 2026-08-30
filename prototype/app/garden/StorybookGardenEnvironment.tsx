@@ -15,6 +15,7 @@ import {
   PAVILION_CENTER,
   PAVILION_LOCAL_BENCHES,
   PAVILION_LOCAL_POSTS,
+  PAVILION_PERMANENT_FURNITURE,
   PAVILION_SURFACE,
 } from './pavilionLayout';
 import StorybookFoliage from './StorybookFoliage';
@@ -177,20 +178,22 @@ function Pavilion({
         <coneGeometry args={[4.3, 1.5, 4]} />
         <meshStandardMaterial color="#796577" roughness={0.85} />
       </mesh>
-      {PAVILION_LOCAL_BENCHES.map(({ x, z }) => (
-        <mesh key={`${x}-${z}`} position={[x, 0.385, z]} castShadow>
-          <boxGeometry args={[0.65, 0.45, 2.1]} />
+      {PAVILION_LOCAL_BENCHES.map(({ x, z, centerY, width, height, depth }) => (
+        <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
+          <boxGeometry args={[width, height, depth]} />
           <meshStandardMaterial color="#9a7859" roughness={0.9} />
+        </mesh>
+      ))}
+      {PAVILION_PERMANENT_FURNITURE.map(({ x, z, centerY, width, height, depth }) => (
+        <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
+          <boxGeometry args={[width, height, depth]} />
+          <meshStandardMaterial color="#8f6d52" roughness={0.92} />
         </mesh>
       ))}
       <group ref={additions} scale={improved ? 1 : 0.03}>
         <mesh position={[0, 2.86, 0]}>
           <sphereGeometry args={[0.28, 16, 12]} />
           <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={glow} />
-        </mesh>
-        <mesh position={[0, 1.185, -1.35]} castShadow>
-          <boxGeometry args={[2.9, 2.05, 0.42]} />
-          <meshStandardMaterial color="#8f6d52" roughness={0.92} />
         </mesh>
         {[-0.9, -0.45, 0, 0.45, 0.9].map((x, index) => (
           <mesh key={x} position={[x, 1.32, -1.11]} rotation={[0, 0, (index - 2) * 0.035]} castShadow>
