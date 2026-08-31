@@ -1,7 +1,7 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import {
   STORYBOOK_POND_DRESSING_RADII,
@@ -10,6 +10,7 @@ import {
   type StorybookEnvironmentLayout,
 } from './environmentLayout';
 import { getPondMotionFrame } from './environmentMotion';
+import { createPondOutline, type PondOutlinePoint } from './pondShape';
 
 export type EnchantedPondProps = Readonly<{
   layout: StorybookEnvironmentLayout;
@@ -47,6 +48,16 @@ const BANK_FLOWER_HEAD_MATERIALS = ['#f0d8a0', '#d9c8ee', '#e8b9cf'].map((color)
   })
 ));
 
+function createOutlineGeometry(points: readonly PondOutlinePoint[]) {
+  const shape = new THREE.Shape();
+  shape.moveTo(points[0].x, points[0].z);
+  for (let index = 1; index < points.length; index += 1) {
+    shape.lineTo(points[index].x, points[index].z);
+  }
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape, 8);
+}
+
 export default function EnchantedPond({ layout, presentation }: EnchantedPondProps) {
   const ripples = useRef<THREE.Group>(null);
   const firstHighlight = useRef<THREE.Group>(null);
@@ -57,6 +68,17 @@ export default function EnchantedPond({ layout, presentation }: EnchantedPondPro
     highlightOffset: 0,
     glowPulse: 1,
   });
+  const pondGeometry = useMemo(() => ({
+    bank: createOutlineGeometry(createPondOutline(6.35, 0.2, 64, 1.2)),
+    depth: createOutlineGeometry(createPondOutline(6.04, 0.16, 64, 0.35)),
+    water: createOutlineGeometry(createPondOutline(5.78, 0.12, 64, 0.82)),
+  }), []);
+
+  useEffect(() => () => {
+    pondGeometry.bank.dispose();
+    pondGeometry.depth.dispose();
+    pondGeometry.water.dispose();
+  }, [pondGeometry]);
 
   useFrame(({ clock }) => {
     const frame = getPondMotionFrame(
@@ -73,26 +95,28 @@ export default function EnchantedPond({ layout, presentation }: EnchantedPondPro
   return (
     <group dispose={null}>
       <mesh position={[0, -0.16, 0]} receiveShadow>
-        <cylinderGeometry args={[6.35, 6.35, 0.28, 64]} />
-        <meshStandardMaterial color="#314b49" roughness={0.98} />
+        <cylinderGeometry args={[6.18, 6.22, 0.28, 64]} />
+        <meshStandardMaterial color="#566957" roughness={0.98} />
       </mesh>
 
-      <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[5.9, 64]} />
+      <mesh geometry={pondGeometry.bank} position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <meshStandardMaterial color="#87956f" roughness={0.98} />
+      </mesh>
+
+      <mesh geometry={pondGeometry.depth} position={[0, 0.026, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <meshPhysicalMaterial
-          color="#3f858c"
+          color="#365e5d"
           transparent
-          opacity={0.88}
-          roughness={0.28}
+          opacity={0.96}
+          roughness={0.34}
           metalness={0.03}
           depthWrite={false}
         />
       </mesh>
 
-      <mesh position={[0, 0.055, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[5.78, 64]} />
+      <mesh geometry={pondGeometry.water} position={[0, 0.056, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <meshPhysicalMaterial
-          color="#78c6c3"
+          color="#71bbb5"
           transparent
           opacity={0.72}
           roughness={0.15}
