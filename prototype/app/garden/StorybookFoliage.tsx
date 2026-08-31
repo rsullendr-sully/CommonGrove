@@ -18,6 +18,7 @@ type InstancedPlantingProps = Readonly<{
   material: THREE.Material;
   colors: readonly THREE.Color[];
   castShadow?: boolean;
+  useInstanceColors?: boolean;
 }>;
 
 type CanopyCluster = Readonly<{
@@ -37,21 +38,16 @@ const TREE_CANOPY_GEOMETRY = new THREE.DodecahedronGeometry(1, 2);
 const TREE_TIP_GEOMETRY = new THREE.IcosahedronGeometry(0.26, 1);
 const ROOT_STONE_GEOMETRY = new THREE.DodecahedronGeometry(0.34, 0);
 
-const SHRUB_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#ffffff',
-  emissive: '#607858',
-  emissiveIntensity: 0.04,
-  roughness: 1,
-  vertexColors: true,
+const SHRUB_MATERIAL = new THREE.MeshBasicMaterial({
+  color: '#7d9b6e',
 });
-const GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, flatShading: true, vertexColors: true });
-const FLOWER_STEM_MATERIAL = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95, vertexColors: true });
+const GRASS_MATERIAL = new THREE.MeshBasicMaterial({ color: '#8da973' });
+const FLOWER_STEM_MATERIAL = new THREE.MeshBasicMaterial({ color: '#5f8358' });
 const FLOWER_HEAD_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#ffffff',
-  emissive: '#6f685e',
-  emissiveIntensity: 0.08,
+  color: '#e3cedf',
+  emissive: '#cfaed0',
+  emissiveIntensity: 0.1,
   roughness: 0.8,
-  vertexColors: true,
 });
 const TREE_TRUNK_MATERIAL = new THREE.MeshStandardMaterial({ color: '#8f6d50', roughness: 1, flatShading: true });
 const TREE_LEAF_MATERIALS = ['#5f8258', '#719265', '#86a474'].map((color) => (
@@ -112,25 +108,28 @@ export default function StorybookFoliage({ layout }: StorybookFoliageProps) {
         geometry={SHRUB_GEOMETRY}
         material={SHRUB_MATERIAL}
         colors={SHRUB_COLORS}
-        castShadow
+        useInstanceColors={false}
       />
       <InstancedPlanting
         instances={layout.grassTufts}
         geometry={GRASS_GEOMETRY}
         material={GRASS_MATERIAL}
         colors={GRASS_COLORS}
+        useInstanceColors={false}
       />
       <InstancedPlanting
         instances={layout.flowers}
         geometry={FLOWER_STEM_GEOMETRY}
         material={FLOWER_STEM_MATERIAL}
         colors={STEM_COLORS}
+        useInstanceColors={false}
       />
       <InstancedPlanting
         instances={layout.flowers}
         geometry={FLOWER_HEAD_GEOMETRY}
         material={FLOWER_HEAD_MATERIAL}
         colors={FLOWER_COLORS}
+        useInstanceColors={false}
       />
       {layout.trees.map((tree) => <StorybookTree key={tree.id} tree={tree} />)}
     </group>
@@ -143,6 +142,7 @@ function InstancedPlanting({
   material,
   colors,
   castShadow = false,
+  useInstanceColors = true,
 }: InstancedPlantingProps) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const matrix = useMemo(() => new THREE.Matrix4(), []);
@@ -157,13 +157,13 @@ function InstancedPlanting({
       scale.set(...item.scale);
       matrix.compose(position, quaternion, scale);
       mesh.current?.setMatrixAt(index, matrix);
-      mesh.current?.setColorAt(index, colors[item.variant % colors.length]);
+      if (useInstanceColors) mesh.current?.setColorAt(index, colors[item.variant % colors.length]);
     });
     if (mesh.current) {
       mesh.current.instanceMatrix.needsUpdate = true;
-      if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
+      if (useInstanceColors && mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
     }
-  }, [colors, instances, matrix, position, quaternion, scale]);
+  }, [colors, instances, matrix, position, quaternion, scale, useInstanceColors]);
 
   return (
     <instancedMesh

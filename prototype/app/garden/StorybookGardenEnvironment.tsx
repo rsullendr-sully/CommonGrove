@@ -70,16 +70,6 @@ function RockBackdrop() {
           <meshStandardMaterial color="#718965" roughness={1} />
         </mesh>
       ))}
-      {[
-        { position: [-5.1, 6.2, -16.05] as [number, number, number], scale: [2.05, 0.3, 1.4] as [number, number, number] },
-        { position: [0.15, 9.5, -16.85] as [number, number, number], scale: [2.2, 0.34, 1.45] as [number, number, number] },
-        { position: [5.05, 6.4, -15.9] as [number, number, number], scale: [1.9, 0.28, 1.35] as [number, number, number] },
-      ].map((cap, index) => (
-        <mesh key={`moss-cap-${index}`} position={cap.position} scale={cap.scale} rotation={[0.08, index * 0.7, 0.04]}>
-          <dodecahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial color={index === 1 ? '#84976d' : '#789066'} roughness={1} />
-        </mesh>
-      ))}
       {[[-7.8, 0.55, -13.6], [-6.7, 0.38, -15], [7.2, 0.52, -14.4], [8.1, 0.32, -16]].map((position, index) => (
         <mesh key={`base-${index}`} position={position as [number, number, number]} scale={[1.5 - index * 0.1, 1.05, 1.15]} rotation={[0.2, index * 0.8, 0.1]} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 0]} />

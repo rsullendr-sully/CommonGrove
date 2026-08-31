@@ -21,8 +21,8 @@ describe('storybook stepping stones', () => {
   it('keeps the inset stones subordinate to the walking path', () => {
     const stones = createSteppingStones(createStorybookEnvironmentLayout().corridors);
 
-    expect(Math.max(...stones.map((stone) => stone.scale[0]))).toBeLessThanOrEqual(0.68);
-    expect(Math.max(...stones.map((stone) => stone.scale[2]))).toBeLessThanOrEqual(0.48);
+    expect(Math.max(...stones.map((stone) => stone.scale[0]))).toBeLessThanOrEqual(0.5);
+    expect(Math.max(...stones.map((stone) => stone.scale[2]))).toBeLessThanOrEqual(0.36);
     for (const stone of stones) {
       const top = stone.position[1] + (STEPPING_STONE_HEIGHT * stone.scale[1]) / 2;
       expect(top).toBeLessThan(0.03);

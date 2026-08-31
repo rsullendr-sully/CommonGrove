@@ -51,20 +51,14 @@ const BED_MATERIALS = ['#526d43', '#5d7748', '#637d4c'].map((color) => (
   new THREE.MeshStandardMaterial({ color, roughness: 1 })
 ));
 const PATH_MATERIALS = ['#aeb487', '#b7b68b', '#a5af7e'].map((color) => (
-  new THREE.MeshStandardMaterial({ color, roughness: 1, transparent: true, opacity: 0.34, depthWrite: false })
+  new THREE.MeshStandardMaterial({ color, roughness: 1, transparent: true, opacity: 0.22, depthWrite: false })
 ));
 const STONE_MATERIALS = ['#ddd3b4', '#d1c5a7', '#d8c39d', '#cbb796'].map((color) => (
   new THREE.MeshStandardMaterial({ color, roughness: 0.98, flatShading: true })
 ));
-const HEDGE_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#ffffff',
-  emissive: '#587052',
-  emissiveIntensity: 0.05,
-  roughness: 1,
-  vertexColors: true,
+const HEDGE_MATERIAL = new THREE.MeshBasicMaterial({
+  color: '#759465',
 });
-const HEDGE_COLORS = ['#668d5f', '#759968', '#80a06d', '#8ba871'].map((color) => new THREE.Color(color));
-
 const boundaryHedges = createBoundaryHedges();
 
 export default function StorybookTerrain({ grassTexture, layout }: StorybookTerrainProps) {
@@ -172,11 +166,9 @@ function BoundaryHedges() {
       scale.set(...hedge.scale);
       matrix.compose(position, quaternion, scale);
       mesh.current?.setMatrixAt(index, matrix);
-      mesh.current?.setColorAt(index, HEDGE_COLORS[hedge.variant]);
     });
     if (mesh.current) {
       mesh.current.instanceMatrix.needsUpdate = true;
-      if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
     }
   }, [matrix, position, quaternion, scale]);
 
@@ -184,7 +176,6 @@ function BoundaryHedges() {
     <instancedMesh
       ref={mesh}
       args={[HEDGE_GEOMETRY, HEDGE_MATERIAL, boundaryHedges.length]}
-      receiveShadow
       dispose={null}
     />
   );
@@ -223,7 +214,7 @@ export function createSteppingStones(corridors: readonly GardenCorridor[]): Step
           -0.005,
           corridor.start.z + dz * progress + perpendicular.z * offset,
         ] as const,
-        scale: [0.54 + (index % 3) * 0.06, 0.72, 0.4 + ((index + 1) % 2) * 0.06] as const,
+        scale: [0.38 + (index % 3) * 0.05, 0.72, 0.28 + ((index + 1) % 2) * 0.05] as const,
         rotationY: Math.atan2(-dz, dx) + (index % 2 ? 0.08 : -0.06),
         variant: (index + corridorIndex) % STONE_MATERIALS.length,
       };
