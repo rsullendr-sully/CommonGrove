@@ -118,18 +118,19 @@ describe('direct Pip interactions', () => {
     expect(projectPipPlacement({ x: 2, y: 1.7, z: 3 }, { x: 0, y: -1, z: 0 })).toEqual({ x: 2, z: 1.6 });
   });
 
-  it('makes direct greeting, petting, and pickup unavailable during a priority mission or autonomous greet', () => {
+  it('makes direct greeting, petting, and pickup unavailable only during a priority mission', () => {
     expect(canDirectlyInteractWithPip('ordinary')).toBe(true);
-    expect(canDirectlyInteractWithPip('ordinary', 'greet')).toBe(false);
     expect(canDirectlyInteractWithPip('priority')).toBe(false);
   });
 
-  it('holds Pip attentively only while an ordinary interaction target is available', () => {
-    expect(shouldHoldPipForInteraction(true, 'ordinary', null, 'none')).toBe(true);
-    expect(shouldHoldPipForInteraction(false, 'ordinary', null, 'none')).toBe(false);
-    expect(shouldHoldPipForInteraction(true, 'priority', null, 'none')).toBe(false);
-    expect(shouldHoldPipForInteraction(true, 'ordinary', 'greet', 'none')).toBe(false);
-    expect(shouldHoldPipForInteraction(true, 'ordinary', null, 'pet')).toBe(false);
+  it('holds Pip attentively when targeted or approached between ordinary activities', () => {
+    expect(shouldHoldPipForInteraction(true, 8, 'wander', 'ordinary', 'none')).toBe(true);
+    expect(shouldHoldPipForInteraction(false, 3.4, 'wander', 'ordinary', 'none')).toBe(true);
+    expect(shouldHoldPipForInteraction(false, 3.4, null, 'ordinary', 'none')).toBe(true);
+    expect(shouldHoldPipForInteraction(false, 4.1, 'wander', 'ordinary', 'none')).toBe(false);
+    expect(shouldHoldPipForInteraction(false, 3.4, 'greet', 'ordinary', 'none')).toBe(false);
+    expect(shouldHoldPipForInteraction(true, 3.4, 'wander', 'priority', 'none')).toBe(false);
+    expect(shouldHoldPipForInteraction(true, 3.4, 'wander', 'ordinary', 'pet')).toBe(false);
   });
 
   it('places held Pip on Escape before unrelated dismissal handlers can run', () => {

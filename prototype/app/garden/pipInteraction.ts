@@ -7,6 +7,7 @@ import {
   type GardenPoint,
 } from './navigation';
 import type { InteractableId } from './interaction';
+import type { PipActivityKind } from './behavior';
 
 export type PipInteractionPhase = 'none' | 'greet-approach' | 'greet' | 'pet' | 'carried' | 'placed' | 'eating' | 'playing';
 
@@ -21,6 +22,7 @@ export const PIP_PLACEMENT_FALLBACK_MESSAGE = "There wasn't a safe spot there, s
 export const PIP_CARRY_ANCHOR = [0.48, -0.42, -1.35] as const;
 export const PIP_PLACEMENT_DISTANCE = 1.4;
 export const PIP_CARRY_WALK_SPEED = 3;
+export const PIP_INTERACTION_INVITATION_DISTANCE = 3.8;
 export const CAMERA_CONTROLS_FRAME_PRIORITY = -1;
 export const PIP_INTERACTION_FRAME_PRIORITY = 0;
 
@@ -40,18 +42,21 @@ export function employeeWalkSpeedWhileHolding(held: InteractableId | null): numb
 
 export function canDirectlyInteractWithPip(
   mode: 'ordinary' | 'priority',
-  activityKind: string | null = null,
 ): boolean {
-  return mode === 'ordinary' && activityKind !== 'greet';
+  return mode === 'ordinary';
 }
 
 export function shouldHoldPipForInteraction(
   interactionEngaged: boolean,
+  visitorDistance: number,
+  activityKind: PipActivityKind | null,
   mode: 'ordinary' | 'priority',
-  activityKind: string | null,
   phase: PipInteractionPhase,
 ): boolean {
-  return interactionEngaged && phase === 'none' && canDirectlyInteractWithPip(mode, activityKind);
+  if (phase !== 'none' || !canDirectlyInteractWithPip(mode)) return false;
+
+  return interactionEngaged
+    || (visitorDistance <= PIP_INTERACTION_INVITATION_DISTANCE && activityKind !== 'greet');
 }
 
 export function handleHeldPipEscape(

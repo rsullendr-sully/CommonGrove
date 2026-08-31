@@ -260,8 +260,8 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onGreetingArrived, o
 
   useEffect(() => onMessage(behavior.message), [behavior.message, onMessage]);
   useEffect(
-    () => onPriorityModeChange(!canDirectlyInteractWithPip(behavior.mode, behavior.activity?.kind ?? null)),
-    [behavior.activity?.kind, behavior.mode, onPriorityModeChange],
+    () => onPriorityModeChange(!canDirectlyInteractWithPip(behavior.mode)),
+    [behavior.mode, onPriorityModeChange],
   );
 
   useFrame(({ clock, camera }, delta) => {
@@ -450,8 +450,9 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onGreetingArrived, o
 
       if (shouldHoldPipForInteraction(
         interactionEngaged,
-        behavior.mode,
+        distanceToVisitor,
         behavior.activity?.kind ?? null,
+        behavior.mode,
         interactionPhase,
       )) {
         pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
