@@ -28,21 +28,20 @@ type CanopyCluster = Readonly<{
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-const SHRUB_GEOMETRY = new THREE.DodecahedronGeometry(STORYBOOK_FOLIAGE_RADII.shrubs, 1).translate(0, 0.72, 0);
+const SHRUB_GEOMETRY = new THREE.DodecahedronGeometry(STORYBOOK_FOLIAGE_RADII.shrubs, 2).translate(0, 0.72, 0);
 const GRASS_GEOMETRY = new THREE.ConeGeometry(STORYBOOK_FOLIAGE_RADII.grassTufts, 0.92, 5).translate(0, 0.46, 0);
 const FLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.025, 0.035, 0.58, 6).translate(0, 0.29, 0);
 const FLOWER_HEAD_GEOMETRY = new THREE.IcosahedronGeometry(STORYBOOK_FOLIAGE_RADII.flowers, 1).translate(0, 0.66, 0);
 const TREE_TRUNK_GEOMETRY = new THREE.CylinderGeometry(0.25, 0.43, 4.15, 9).translate(0, 2.075, 0);
-const TREE_CANOPY_GEOMETRY = new THREE.DodecahedronGeometry(1, 1);
+const TREE_CANOPY_GEOMETRY = new THREE.DodecahedronGeometry(1, 2);
 const TREE_TIP_GEOMETRY = new THREE.IcosahedronGeometry(0.26, 1);
 const ROOT_STONE_GEOMETRY = new THREE.DodecahedronGeometry(0.34, 0);
 
 const SHRUB_MATERIAL = new THREE.MeshStandardMaterial({
   color: '#ffffff',
-  emissive: '#35543a',
-  emissiveIntensity: 0.16,
+  emissive: '#607858',
+  emissiveIntensity: 0.04,
   roughness: 1,
-  flatShading: true,
   vertexColors: true,
 });
 const GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, flatShading: true, vertexColors: true });
@@ -54,14 +53,14 @@ const FLOWER_HEAD_MATERIAL = new THREE.MeshStandardMaterial({
   roughness: 0.8,
   vertexColors: true,
 });
-const TREE_TRUNK_MATERIAL = new THREE.MeshStandardMaterial({ color: '#806149', roughness: 1, flatShading: true });
-const TREE_LEAF_MATERIALS = ['#426b4c', '#587d50', '#72905c'].map((color) => (
-  new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true })
+const TREE_TRUNK_MATERIAL = new THREE.MeshStandardMaterial({ color: '#8f6d50', roughness: 1, flatShading: true });
+const TREE_LEAF_MATERIALS = ['#5f8258', '#719265', '#86a474'].map((color) => (
+  new THREE.MeshStandardMaterial({ color, roughness: 1 })
 ));
 const TREE_TIP_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#72905c',
-  emissive: '#72905c',
-  emissiveIntensity: 0.2,
+  color: '#91ab78',
+  emissive: '#91ab78',
+  emissiveIntensity: 0.1,
   roughness: 0.82,
   flatShading: true,
 });
@@ -69,8 +68,8 @@ const ROOT_STONE_MATERIALS = ['#827e69', '#918a72', '#747664'].map((color) => (
   new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true })
 ));
 
-const SHRUB_COLORS = ['#5f8758', '#71945f', '#829e6b'].map((color) => new THREE.Color(color));
-const GRASS_COLORS = ['#73945f', '#89a56c', '#9ab576'].map((color) => new THREE.Color(color));
+const SHRUB_COLORS = ['#6f9365', '#7fa071', '#90ac7c'].map((color) => new THREE.Color(color));
+const GRASS_COLORS = ['#7d9c68', '#91aa76', '#a2ba84'].map((color) => new THREE.Color(color));
 const STEM_COLORS = ['#4d774b', '#5a8050', '#668957'].map((color) => new THREE.Color(color));
 const FLOWER_COLORS = ['#d3dff7', '#edc6dc', '#f0d48b'].map((color) => new THREE.Color(color));
 
