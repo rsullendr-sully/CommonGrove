@@ -56,13 +56,13 @@ const GOLD_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
   emissiveIntensity: 0.2,
 });
 
-function RockBackdrop({ limestoneTexture }: { limestoneTexture: Texture }) {
+function RockBackdrop() {
   return (
     <group>
       {rockData.map((rock, index) => (
         <mesh key={index} position={rock.position} scale={rock.scale} rotation={rock.rotation} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial map={limestoneTexture} color={rock.color} roughness={0.98} flatShading />
+          <meshStandardMaterial color={rock.color} roughness={0.98} flatShading />
         </mesh>
       ))}
       {[-4.1, -1.2, 2.1, 4.4].map((x, index) => (
@@ -107,7 +107,7 @@ function SpringSanctuary({
       {[-1.75, 1.75].map((x) => (
         <mesh key={x} position={[x, 2, 0.65]} castShadow>
           <cylinderGeometry args={[0.34, 0.42, 3.8, 12]} />
-          <meshStandardMaterial map={limestoneTexture} color="#e4d6b7" roughness={0.9} />
+          <meshStandardMaterial color="#e4d6b7" roughness={0.9} />
         </mesh>
       ))}
       <mesh position={[0, 2.1, 0.72]}>
@@ -187,28 +187,28 @@ function Pavilion({
       ))}
       <mesh position={[0, 5.31, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <coneGeometry args={[4.3, 1.5, 4]} />
-        <meshStandardMaterial map={woodTexture} color="#8d6555" roughness={0.85} />
+        <meshStandardMaterial color="#8d6555" roughness={0.85} />
       </mesh>
       <mesh position={[0, 4.61, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <coneGeometry args={[4.38, 0.14, 4]} />
-        <meshStandardMaterial map={woodTexture} color="#c28e67" roughness={0.88} />
+        <meshStandardMaterial color="#c28e67" roughness={0.88} />
       </mesh>
       {PAVILION_LOCAL_POSTS.map(({ x, z }) => (
         <mesh key={`cap-${x}-${z}`} position={[x, 5.18, z]} castShadow>
           <cylinderGeometry args={[0.31, 0.27, 0.14, 10]} />
-          <meshStandardMaterial map={woodTexture} color="#c28e67" roughness={0.88} />
+          <meshStandardMaterial color="#c28e67" roughness={0.88} />
         </mesh>
       ))}
       {PAVILION_LOCAL_BENCHES.map(({ x, z, centerY, width, height, depth }) => (
         <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial map={woodTexture} color="#bb8761" roughness={0.9} />
+          <meshStandardMaterial color="#bb8761" roughness={0.9} />
         </mesh>
       ))}
       {PAVILION_PERMANENT_FURNITURE.map(({ x, z, centerY, width, height, depth }) => (
         <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial map={woodTexture} color="#ad7b58" roughness={0.92} />
+          <meshStandardMaterial color="#ad7b58" roughness={0.92} />
         </mesh>
       ))}
       <group ref={additions} scale={improved ? 1 : 0.03}>
@@ -512,17 +512,14 @@ export default function StorybookGardenEnvironment({
       <StorybookTerrain
         grassTexture={grassTexture}
         earthTexture={finishTextures.earth}
-        limestoneTexture={finishTextures.limestone}
         layout={layout}
       />
 
       <EnchantedPond
         layout={layout}
         presentation={presentation}
-        earthTexture={finishTextures.earth}
-        limestoneTexture={finishTextures.limestone}
       />
-      <RockBackdrop limestoneTexture={finishTextures.limestone} />
+      <RockBackdrop />
       <SpringSanctuary
         glow={presentation.sanctuaryGlow}
         reducedMotion={!presentation.moteMotion}

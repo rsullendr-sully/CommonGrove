@@ -3,6 +3,13 @@ import * as THREE from 'three';
 export const GARDEN_SURFACE_SIZE = 96;
 export const GARDEN_SURFACE_REPEAT = 10;
 
+export const GARDEN_RENDER_QUALITY = {
+  minimumDpr: 0.7,
+  maximumDpr: 1,
+  antialias: false,
+  shadowMapSize: 1024,
+} as const;
+
 export type GardenTextureSurface = 'grass' | 'earth' | 'limestone' | 'wood';
 
 export const GARDEN_TEXTURE_PATHS = {

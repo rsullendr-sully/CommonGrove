@@ -1,14 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
+  GARDEN_RENDER_QUALITY,
   GARDEN_SURFACE_REPEAT,
   GARDEN_SURFACE_SIZE,
+  GARDEN_TEXTURE_PATHS,
   createGardenSurfaceTexture,
   generateGardenSurfacePixels,
 } from './gardenSurface';
 import * as gardenSurface from './gardenSurface';
 
 describe('garden surface', () => {
+  it('caps the default renderer cost for touch and integrated GPUs', () => {
+    expect(GARDEN_RENDER_QUALITY.maximumDpr).toBeLessThanOrEqual(1);
+    expect(GARDEN_RENDER_QUALITY.antialias).toBe(false);
+    expect(GARDEN_RENDER_QUALITY.shadowMapSize).toBeLessThanOrEqual(1024);
+  });
+
+  it('ships decodable PNG texture assets for every configured surface', () => {
+    const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+
+    for (const assetPath of Object.values(GARDEN_TEXTURE_PATHS)) {
+      const asset = readFileSync(new URL(`../../public${assetPath}`, import.meta.url));
+      expect([...asset.subarray(0, 8)]).toEqual(pngSignature);
+      expect(asset.readUInt32BE(16)).toBeGreaterThanOrEqual(1024);
+      expect(asset.readUInt32BE(20)).toBeGreaterThanOrEqual(1024);
+    }
+  });
   it('generates deterministic opaque pixels with restrained spring colors', () => {
     const first = generateGardenSurfacePixels(731);
     const second = generateGardenSurfacePixels(731);

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { createStorybookEnvironmentLayout, type GardenCorridor } from './environmentLayout';
-import { createGardenPathBeds, createSteppingStones, STEPPING_STONE_HEIGHT } from './StorybookTerrain';
+import {
+  createGardenPathBeds,
+  createSoilMaterials,
+  createSteppingStones,
+  STEPPING_STONE_HEIGHT,
+} from './StorybookTerrain';
 
 describe('storybook stepping stones', () => {
   it('keeps every path stone top within three centimeters of walkable ground', () => {
@@ -36,5 +42,17 @@ describe('storybook stepping stones', () => {
     expect(beds).toHaveLength(corridors.length);
     expect(createGardenPathBeds(corridors)).toEqual(beds);
     expect(beds.every((bed) => bed.width >= 0.78 && bed.width <= 1.08)).toBe(true);
+  });
+
+  it('uses the earth finish on the actual planting-bed soil', () => {
+    const earthTexture = new THREE.Texture();
+    const materials = createSoilMaterials(earthTexture);
+
+    expect(materials).toHaveLength(3);
+    expect(materials.every((material) => material.map === earthTexture)).toBe(true);
+    expect(materials.every((material) => material.roughness === 1)).toBe(true);
+
+    materials.forEach((material) => material.dispose());
+    earthTexture.dispose();
   });
 });

@@ -18,7 +18,11 @@ import PipCharacter from './garden/PipCharacter';
 import StorybookGardenEnvironment from './garden/StorybookGardenEnvironment';
 import { actionEventForLiveTarget, actionLabelForLiveTarget, type InteractableId } from './garden/interaction';
 import { getFirstPersonMovementVector, resolveFirstPersonGardenMove } from './garden/firstPersonMovement';
-import { GARDEN_TEXTURE_PATHS, prepareGardenTexture } from './garden/gardenSurface';
+import {
+  GARDEN_RENDER_QUALITY,
+  GARDEN_TEXTURE_PATHS,
+  prepareGardenTexture,
+} from './garden/gardenSurface';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import { PAVILION_READING_POINT } from './garden/pavilionLayout';
@@ -771,8 +775,8 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
         frameloop="demand"
         shadows="percentage"
         camera={{ fov: 68, near: 0.1, far: 120 }}
-        dpr={[0.8, 1.25]}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        dpr={[GARDEN_RENDER_QUALITY.minimumDpr, GARDEN_RENDER_QUALITY.maximumDpr]}
+        gl={{ antialias: GARDEN_RENDER_QUALITY.antialias, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 0.98;

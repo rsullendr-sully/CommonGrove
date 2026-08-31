@@ -8,7 +8,6 @@ import type { GardenCorridor, StorybookEnvironmentLayout } from './environmentLa
 export type StorybookTerrainProps = Readonly<{
   grassTexture: Texture;
   earthTexture: Texture;
-  limestoneTexture: Texture;
   layout: StorybookEnvironmentLayout;
 }>;
 
@@ -49,11 +48,14 @@ const OUTER_GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#789963', 
 const BERM_MATERIALS = ['#6f8e58', '#78955d', '#688651'].map((color) => (
   new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true })
 ));
-const BED_MATERIALS = ['#526d43', '#5d7748', '#637d4c'].map((color) => (
-  new THREE.MeshStandardMaterial({ color, roughness: 1 })
-));
+const BED_COLORS = ['#697a54', '#71815a', '#78885f'] as const;
 const PATH_COLORS = ['#bdb18e', '#b5aa88', '#c3b694'] as const;
 const STONE_COLORS = ['#f0e3c5', '#dfd0b0', '#ead5aa', '#d9c29d'] as const;
+const STONE_MATERIALS = STONE_COLORS.map((color) => new THREE.MeshStandardMaterial({
+  color,
+  roughness: 0.96,
+  flatShading: true,
+}));
 const HEDGE_MATERIAL = new THREE.MeshBasicMaterial({
   color: '#759465',
 });
@@ -62,7 +64,6 @@ const boundaryHedges = createBoundaryHedges();
 export default function StorybookTerrain({
   grassTexture,
   earthTexture,
-  limestoneTexture,
   layout,
 }: StorybookTerrainProps) {
   const grassMaterial = useMemo(() => new THREE.MeshStandardMaterial({
@@ -80,22 +81,15 @@ export default function StorybookTerrain({
       depthWrite: false,
     })
   )), [earthTexture]);
-  const stoneMaterials = useMemo(() => STONE_COLORS.map((color) => (
-    new THREE.MeshStandardMaterial({
-      map: limestoneTexture,
-      color,
-      roughness: 0.96,
-      flatShading: true,
-    })
-  )), [limestoneTexture]);
+  const soilMaterials = useMemo(() => createSoilMaterials(earthTexture), [earthTexture]);
   const steppingStones = useMemo(() => createSteppingStones(layout.corridors), [layout.corridors]);
   const pathBeds = useMemo(() => createGardenPathBeds(layout.corridors), [layout.corridors]);
 
   useEffect(() => () => {
     grassMaterial.dispose();
     pathMaterials.forEach((material) => material.dispose());
-    stoneMaterials.forEach((material) => material.dispose());
-  }, [grassMaterial, pathMaterials, stoneMaterials]);
+    soilMaterials.forEach((material) => material.dispose());
+  }, [grassMaterial, pathMaterials, soilMaterials]);
 
   return (
     <group dispose={null}>
@@ -131,7 +125,7 @@ export default function StorybookTerrain({
         <mesh
           key={`${bed.id}-base`}
           geometry={BED_GEOMETRY}
-          material={BED_MATERIALS[index % BED_MATERIALS.length]}
+          material={soilMaterials[index % soilMaterials.length]}
           position={[bed.center.x, 0.012, bed.center.z]}
           rotation={[0, index * 0.47, 0]}
           scale={[bed.radius, 0.7, bed.radius * 0.68]}
@@ -140,7 +134,7 @@ export default function StorybookTerrain({
         <mesh
           key={`${bed.id}-overlap`}
           geometry={BED_GEOMETRY}
-          material={BED_MATERIALS[(index + 1) % BED_MATERIALS.length]}
+          material={soilMaterials[(index + 1) % soilMaterials.length]}
           position={[bed.center.x + bed.radius * 0.18, 0.018, bed.center.z - bed.radius * 0.12]}
           rotation={[0, index * 0.47 + 0.82, 0]}
           scale={[bed.radius * 0.78, 0.72, bed.radius * 0.56]}
@@ -164,7 +158,7 @@ export default function StorybookTerrain({
         <mesh
           key={stone.id}
           geometry={STONE_GEOMETRY}
-          material={stoneMaterials[stone.variant]}
+          material={STONE_MATERIALS[stone.variant]}
           position={[...stone.position]}
           rotation={[0, stone.rotationY, 0]}
           scale={[...stone.scale]}
@@ -175,6 +169,14 @@ export default function StorybookTerrain({
       <BoundaryHedges />
     </group>
   );
+}
+
+export function createSoilMaterials(earthTexture: Texture) {
+  return BED_COLORS.map((color) => new THREE.MeshStandardMaterial({
+    map: earthTexture,
+    color,
+    roughness: 1,
+  }));
 }
 
 function BoundaryHedges() {

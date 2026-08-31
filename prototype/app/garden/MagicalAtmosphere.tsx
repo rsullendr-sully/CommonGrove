@@ -8,6 +8,7 @@ import type {
   StorybookEnvironmentLayout,
 } from './environmentLayout';
 import { getAtmosphereMotionFrame } from './environmentMotion';
+import { GARDEN_RENDER_QUALITY } from './gardenSurface';
 
 export type MagicalAtmosphereProps = Readonly<{
   layout: StorybookEnvironmentLayout;
@@ -96,8 +97,8 @@ export default function MagicalAtmosphere({
         color="#ffe7bd"
         intensity={2.3}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={GARDEN_RENDER_QUALITY.shadowMapSize}
+        shadow-mapSize-height={GARDEN_RENDER_QUALITY.shadowMapSize}
         shadow-camera-left={-24}
         shadow-camera-right={24}
         shadow-camera-top={24}
