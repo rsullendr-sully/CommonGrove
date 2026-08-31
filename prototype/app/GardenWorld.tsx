@@ -514,8 +514,9 @@ function Pip({ onPipMount, onMessage, onPriorityModeChange, onGreetingArrived, o
     <group ref={setPipRef} position={[8.4, 0, 1.5]} rotation={[0, Math.PI, 0]} userData={{ interactableId: 'pip' }}>
       <mesh visible={interactionPhase !== 'carried'} name="blobShadow" position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.48, 0.31, 1]}>
         <circleGeometry args={[0.9, 24]} />
-        <meshBasicMaterial color="#34483b" transparent opacity={0.24} />
+        <meshBasicMaterial color="#405445" transparent opacity={0.2} />
       </mesh>
+      <pointLight position={[0, 1.05, 0.35]} color="#ffe7b2" intensity={0.34} distance={2.8} decay={2} />
       <PipCharacter pose={pose} />
     </group>
   );

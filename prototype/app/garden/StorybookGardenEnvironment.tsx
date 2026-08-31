@@ -32,11 +32,11 @@ export type StorybookGardenEnvironmentProps = Readonly<{
 }>;
 
 const rockData: Array<{ position: [number, number, number]; scale: [number, number, number]; rotation: [number, number, number]; color: string }> = [
-  { position: [-5.2, 2.7, -16.3], scale: [5.3, 4.2, 3.1], rotation: [0.2, 0.15, -0.08], color: '#777966' },
-  { position: [0, 4.5, -17.1], scale: [5.8, 6.1, 3.3], rotation: [0.05, 0.35, 0.08], color: '#6f7461' },
-  { position: [5.2, 2.8, -16.1], scale: [5.1, 4.4, 3.2], rotation: [-0.1, -0.2, 0.12], color: '#7e806c' },
-  { position: [-2.7, 7.1, -17.5], scale: [3.4, 3.3, 2.4], rotation: [0.1, 0.4, -0.15], color: '#737764' },
-  { position: [2.5, 7.4, -17.7], scale: [3.8, 3.1, 2.5], rotation: [-0.15, 0.1, 0.18], color: '#696f5d' },
+  { position: [-5.2, 2.7, -16.3], scale: [5.15, 4.05, 3.1], rotation: [0.2, 0.15, -0.08], color: '#758064' },
+  { position: [0, 4.3, -17.1], scale: [5.45, 5.65, 3.3], rotation: [0.05, 0.35, 0.08], color: '#68765d' },
+  { position: [5.2, 2.8, -16.1], scale: [4.95, 4.2, 3.2], rotation: [-0.1, -0.2, 0.12], color: '#81886d' },
+  { position: [-2.7, 6.8, -17.5], scale: [3, 2.9, 2.35], rotation: [0.1, 0.4, -0.15], color: '#748063' },
+  { position: [2.5, 7, -17.7], scale: [3.3, 2.75, 2.4], rotation: [-0.15, 0.1, 0.18], color: '#6c795f' },
 ];
 
 const STARFLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.025, 0.035, 0.46, 7);
@@ -67,13 +67,23 @@ function RockBackdrop() {
       {[-4.1, -1.2, 2.1, 4.4].map((x, index) => (
         <mesh key={x} position={[x, 7.3 + (index % 2) * 1.2, -15.9]} scale={[1.4, 0.32, 1]} rotation={[-0.15, index * 0.5, 0.1]}>
           <dodecahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color="#55724e" roughness={1} flatShading />
+          <meshStandardMaterial color="#718965" roughness={1} />
+        </mesh>
+      ))}
+      {[
+        { position: [-5.1, 6.2, -16.05] as [number, number, number], scale: [2.05, 0.3, 1.4] as [number, number, number] },
+        { position: [0.15, 9.5, -16.85] as [number, number, number], scale: [2.2, 0.34, 1.45] as [number, number, number] },
+        { position: [5.05, 6.4, -15.9] as [number, number, number], scale: [1.9, 0.28, 1.35] as [number, number, number] },
+      ].map((cap, index) => (
+        <mesh key={`moss-cap-${index}`} position={cap.position} scale={cap.scale} rotation={[0.08, index * 0.7, 0.04]}>
+          <dodecahedronGeometry args={[1, 1]} />
+          <meshStandardMaterial color={index === 1 ? '#84976d' : '#789066'} roughness={1} />
         </mesh>
       ))}
       {[[-7.8, 0.55, -13.6], [-6.7, 0.38, -15], [7.2, 0.52, -14.4], [8.1, 0.32, -16]].map((position, index) => (
         <mesh key={`base-${index}`} position={position as [number, number, number]} scale={[1.5 - index * 0.1, 1.05, 1.15]} rotation={[0.2, index * 0.8, 0.1]} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color={index % 2 ? '#85836c' : '#747663'} roughness={1} flatShading />
+          <meshStandardMaterial color={index % 2 ? '#98927a' : '#888a71'} roughness={1} flatShading />
         </mesh>
       ))}
     </group>
@@ -95,16 +105,16 @@ function SpringSanctuary({
     <group position={[0, 0, -8.4]}>
       <mesh position={[0, 1.9, 0.1]} castShadow receiveShadow>
         <boxGeometry args={[4.8, 3.8, 0.8]} />
-        <meshStandardMaterial color="#a8a38c" roughness={0.9} />
+        <meshStandardMaterial color="#c2b99d" roughness={0.9} />
       </mesh>
       <mesh position={[0, 3.95, 0.05]} castShadow>
         <boxGeometry args={[5.5, 0.45, 1.15]} />
-        <meshStandardMaterial color="#d0c8aa" roughness={0.82} />
+        <meshStandardMaterial color="#dfd4ad" roughness={0.82} />
       </mesh>
       {[-1.75, 1.75].map((x) => (
         <mesh key={x} position={[x, 2, 0.65]} castShadow>
           <cylinderGeometry args={[0.34, 0.42, 3.8, 12]} />
-          <meshStandardMaterial color="#c5bea4" roughness={0.9} />
+          <meshStandardMaterial color="#d2c7a8" roughness={0.9} />
         </mesh>
       ))}
       <mesh position={[0, 2.1, 0.72]}>
@@ -121,9 +131,13 @@ function SpringSanctuary({
           depthWrite={false}
         />
       </mesh>
+      <mesh position={[0, 2.1, 0.75]}>
+        <planeGeometry args={[2.08, 2.42]} />
+        <meshBasicMaterial color="#d9f4e8" transparent opacity={0.16 + glow * 0.1} depthWrite={false} />
+      </mesh>
       <mesh position={[0, 0.42, 1.1]} castShadow>
         <cylinderGeometry args={[1.55, 1.8, 0.65, 32]} />
-        <meshStandardMaterial color="#bcb59c" roughness={0.88} />
+        <meshStandardMaterial color="#c9bea1" roughness={0.88} />
       </mesh>
       <mesh position={[0, 0.79, 1.1]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[1.36, 32]} />
@@ -166,28 +180,38 @@ function Pavilion({
           PAVILION_SURFACE.deck.height,
           12,
         ]} />
-        <meshStandardMaterial color="#b7ad91" roughness={0.94} />
+        <meshStandardMaterial color="#c8b991" roughness={0.94} />
       </mesh>
       {PAVILION_LOCAL_POSTS.map(({ x, z }) => (
         <mesh key={`${x}-${z}`} position={[x, 2.66, z]} castShadow>
           <cylinderGeometry args={[0.19, 0.25, 5, 10]} />
-          <meshStandardMaterial color="#88705e" roughness={0.88} />
+          <meshStandardMaterial color="#956f55" roughness={0.88} />
         </mesh>
       ))}
       <mesh position={[0, 5.31, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <coneGeometry args={[4.3, 1.5, 4]} />
-        <meshStandardMaterial color="#796577" roughness={0.85} />
+        <meshStandardMaterial color="#8b665c" roughness={0.85} />
       </mesh>
+      <mesh position={[0, 4.61, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+        <coneGeometry args={[4.38, 0.14, 4]} />
+        <meshStandardMaterial color="#b28a67" roughness={0.88} />
+      </mesh>
+      {PAVILION_LOCAL_POSTS.map(({ x, z }) => (
+        <mesh key={`cap-${x}-${z}`} position={[x, 5.18, z]} castShadow>
+          <cylinderGeometry args={[0.31, 0.27, 0.14, 10]} />
+          <meshStandardMaterial color="#b28a67" roughness={0.88} />
+        </mesh>
+      ))}
       {PAVILION_LOCAL_BENCHES.map(({ x, z, centerY, width, height, depth }) => (
         <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial color="#9a7859" roughness={0.9} />
+          <meshStandardMaterial color="#aa815e" roughness={0.9} />
         </mesh>
       ))}
       {PAVILION_PERMANENT_FURNITURE.map(({ x, z, centerY, width, height, depth }) => (
         <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial color="#8f6d52" roughness={0.92} />
+          <meshStandardMaterial color="#9b7456" roughness={0.92} />
         </mesh>
       ))}
       <group ref={additions} scale={improved ? 1 : 0.03}>
@@ -224,7 +248,7 @@ function Pavilion({
       {PAVILION_SURFACE.approachSteps.map(({ z, centerY, height, width, depth }) => (
         <mesh key={z} position={[0, centerY, z]} castShadow receiveShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial color="#c6bda1" roughness={0.94} />
+          <meshStandardMaterial color="#cdbf9d" roughness={0.94} />
         </mesh>
       ))}
     </group>

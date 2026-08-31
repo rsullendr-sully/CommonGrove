@@ -88,13 +88,13 @@ export default function MagicalAtmosphere({
 
   return (
     <>
-      <color attach="background" args={['#b9e2df']} />
-      <fog attach="fog" args={['#c6ddd1', 34, 72]} />
-      <hemisphereLight args={['#e5f6ef', '#4d6646', 1.45]} />
+      <color attach="background" args={['#b9dedb']} />
+      <fog attach="fog" args={['#c9ded0', 36, 76]} />
+      <hemisphereLight args={['#eef7e7', '#637858', 1.65]} />
       <directionalLight
         position={[13, 24, 10]}
-        color="#ffe4a8"
-        intensity={2.3}
+        color="#ffe1a3"
+        intensity={2.05}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
