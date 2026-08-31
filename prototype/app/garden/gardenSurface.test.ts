@@ -6,6 +6,7 @@ import {
   GARDEN_SURFACE_REPEAT,
   GARDEN_SURFACE_SIZE,
   GARDEN_TEXTURE_PATHS,
+  createGardenTextureVariant,
   createGardenSurfaceTexture,
   generateGardenSurfacePixels,
 } from './gardenSurface';
@@ -93,5 +94,21 @@ describe('garden surface', () => {
       expect(texture.repeat.toArray()).toEqual(repeat);
       expect(texture.version).toBe(1);
     }
+  });
+
+  it('creates independent UV-calibrated variants for incompatible object scales', () => {
+    const source = new THREE.Texture();
+    const smallStone = createGardenTextureVariant(source, 'limestone', [1, 1]);
+    const rockFace = createGardenTextureVariant(source, 'limestone', [6, 4]);
+
+    expect(smallStone).not.toBe(source);
+    expect(rockFace).not.toBe(source);
+    expect(smallStone).not.toBe(rockFace);
+    expect(smallStone.repeat.toArray()).toEqual([1, 1]);
+    expect(rockFace.repeat.toArray()).toEqual([6, 4]);
+
+    smallStone.dispose();
+    rockFace.dispose();
+    source.dispose();
   });
 });

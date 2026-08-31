@@ -8,6 +8,7 @@ import type { GardenCorridor, StorybookEnvironmentLayout } from './environmentLa
 export type StorybookTerrainProps = Readonly<{
   grassTexture: Texture;
   earthTexture: Texture;
+  limestoneTexture: Texture;
   layout: StorybookEnvironmentLayout;
 }>;
 
@@ -51,11 +52,6 @@ const BERM_MATERIALS = ['#6f8e58', '#78955d', '#688651'].map((color) => (
 const BED_COLORS = ['#697a54', '#71815a', '#78885f'] as const;
 const PATH_COLORS = ['#bdb18e', '#b5aa88', '#c3b694'] as const;
 const STONE_COLORS = ['#f0e3c5', '#dfd0b0', '#ead5aa', '#d9c29d'] as const;
-const STONE_MATERIALS = STONE_COLORS.map((color) => new THREE.MeshStandardMaterial({
-  color,
-  roughness: 0.96,
-  flatShading: true,
-}));
 const HEDGE_MATERIAL = new THREE.MeshBasicMaterial({
   color: '#759465',
 });
@@ -64,6 +60,7 @@ const boundaryHedges = createBoundaryHedges();
 export default function StorybookTerrain({
   grassTexture,
   earthTexture,
+  limestoneTexture,
   layout,
 }: StorybookTerrainProps) {
   const grassMaterial = useMemo(() => new THREE.MeshStandardMaterial({
@@ -82,6 +79,12 @@ export default function StorybookTerrain({
     })
   )), [earthTexture]);
   const soilMaterials = useMemo(() => createSoilMaterials(earthTexture), [earthTexture]);
+  const stoneMaterials = useMemo(() => STONE_COLORS.map((color) => new THREE.MeshStandardMaterial({
+    map: limestoneTexture,
+    color,
+    roughness: 0.96,
+    flatShading: true,
+  })), [limestoneTexture]);
   const steppingStones = useMemo(() => createSteppingStones(layout.corridors), [layout.corridors]);
   const pathBeds = useMemo(() => createGardenPathBeds(layout.corridors), [layout.corridors]);
 
@@ -89,7 +92,8 @@ export default function StorybookTerrain({
     grassMaterial.dispose();
     pathMaterials.forEach((material) => material.dispose());
     soilMaterials.forEach((material) => material.dispose());
-  }, [grassMaterial, pathMaterials, soilMaterials]);
+    stoneMaterials.forEach((material) => material.dispose());
+  }, [grassMaterial, pathMaterials, soilMaterials, stoneMaterials]);
 
   return (
     <group dispose={null}>
@@ -158,7 +162,7 @@ export default function StorybookTerrain({
         <mesh
           key={stone.id}
           geometry={STONE_GEOMETRY}
-          material={STONE_MATERIALS[stone.variant]}
+          material={stoneMaterials[stone.variant]}
           position={[...stone.position]}
           rotation={[0, stone.rotationY, 0]}
           scale={[...stone.scale]}

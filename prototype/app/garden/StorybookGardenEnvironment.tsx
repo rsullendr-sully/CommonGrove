@@ -20,7 +20,7 @@ import {
 } from './pavilionLayout';
 import StorybookFoliage from './StorybookFoliage';
 import StorybookTerrain from './StorybookTerrain';
-import { GARDEN_TEXTURE_PATHS, prepareGardenTexture } from './gardenSurface';
+import { createGardenTextureVariant, GARDEN_TEXTURE_PATHS } from './gardenSurface';
 
 export type StorybookGardenEnvironmentProps = Readonly<{
   grassTexture: Texture;
@@ -56,13 +56,13 @@ const GOLD_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
   emissiveIntensity: 0.2,
 });
 
-function RockBackdrop() {
+function RockBackdrop({ limestoneTexture }: { limestoneTexture: Texture }) {
   return (
     <group>
       {rockData.map((rock, index) => (
         <mesh key={index} position={rock.position} scale={rock.scale} rotation={rock.rotation} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial color={rock.color} roughness={0.98} flatShading />
+          <meshStandardMaterial map={limestoneTexture} color={rock.color} roughness={0.98} flatShading />
         </mesh>
       ))}
       {[-4.1, -1.2, 2.1, 4.4].map((x, index) => (
@@ -107,7 +107,7 @@ function SpringSanctuary({
       {[-1.75, 1.75].map((x) => (
         <mesh key={x} position={[x, 2, 0.65]} castShadow>
           <cylinderGeometry args={[0.34, 0.42, 3.8, 12]} />
-          <meshStandardMaterial color="#e4d6b7" roughness={0.9} />
+          <meshStandardMaterial map={limestoneTexture} color="#e4d6b7" roughness={0.9} />
         </mesh>
       ))}
       <mesh position={[0, 2.1, 0.72]}>
@@ -475,9 +475,12 @@ export default function StorybookGardenEnvironment({
     ],
   );
   const finishTextures = useMemo(() => ({
-    earth: prepareGardenTexture(earthSource.clone(), 'earth'),
-    limestone: prepareGardenTexture(limestoneSource.clone(), 'limestone'),
-    wood: prepareGardenTexture(woodSource.clone(), 'wood'),
+    earthTerrain: createGardenTextureVariant(earthSource, 'earth', [5, 8]),
+    earthPond: createGardenTextureVariant(earthSource, 'earth', [12, 12]),
+    limestoneArchitecture: createGardenTextureVariant(limestoneSource, 'limestone', [4, 3]),
+    limestoneSmall: createGardenTextureVariant(limestoneSource, 'limestone', [1, 1]),
+    limestoneRock: createGardenTextureVariant(limestoneSource, 'limestone', [6, 4]),
+    woodPosts: createGardenTextureVariant(woodSource, 'wood', [2, 5]),
   }), [earthSource, limestoneSource, woodSource]);
   const layout = useMemo(() => createStorybookEnvironmentLayout(), []);
   const presentation = useMemo(
@@ -500,9 +503,7 @@ export default function StorybookGardenEnvironment({
   );
 
   useEffect(() => () => {
-    finishTextures.earth.dispose();
-    finishTextures.limestone.dispose();
-    finishTextures.wood.dispose();
+    Object.values(finishTextures).forEach((texture) => texture.dispose());
   }, [finishTextures]);
 
   return (
@@ -511,26 +512,29 @@ export default function StorybookGardenEnvironment({
 
       <StorybookTerrain
         grassTexture={grassTexture}
-        earthTexture={finishTextures.earth}
+        earthTexture={finishTextures.earthTerrain}
+        limestoneTexture={finishTextures.limestoneSmall}
         layout={layout}
       />
 
       <EnchantedPond
         layout={layout}
         presentation={presentation}
+        earthTexture={finishTextures.earthPond}
+        limestoneTexture={finishTextures.limestoneSmall}
       />
-      <RockBackdrop />
+      <RockBackdrop limestoneTexture={finishTextures.limestoneRock} />
       <SpringSanctuary
         glow={presentation.sanctuaryGlow}
         reducedMotion={!presentation.moteMotion}
-        limestoneTexture={finishTextures.limestone}
+        limestoneTexture={finishTextures.limestoneArchitecture}
       />
       <Pavilion
         glow={presentation.pavilionGlow}
         improved={presentation.pavilionGlow > 0.55}
         reducedMotion={!presentation.cloudMotion}
-        limestoneTexture={finishTextures.limestone}
-        woodTexture={finishTextures.wood}
+        limestoneTexture={finishTextures.limestoneArchitecture}
+        woodTexture={finishTextures.woodPosts}
       />
       <StorybookFoliage layout={layout} />
       <StarflowerPatch

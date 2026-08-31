@@ -109,3 +109,14 @@ export function prepareGardenTexture(
   texture.needsUpdate = true;
   return texture;
 }
+
+export function createGardenTextureVariant(
+  source: THREE.Texture,
+  surface: GardenTextureSurface,
+  repeat: readonly [number, number],
+) {
+  const texture = prepareGardenTexture(source.clone(), surface);
+  texture.repeat.set(...repeat);
+  texture.needsUpdate = true;
+  return texture;
+}
