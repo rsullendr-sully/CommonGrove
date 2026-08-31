@@ -18,6 +18,7 @@ import PipCharacter from './garden/PipCharacter';
 import StorybookGardenEnvironment from './garden/StorybookGardenEnvironment';
 import { actionEventForLiveTarget, actionLabelForLiveTarget, type InteractableId } from './garden/interaction';
 import { getFirstPersonMovementVector, resolveFirstPersonGardenMove } from './garden/firstPersonMovement';
+import { createGardenSurfaceTexture } from './garden/gardenSurface';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import { PAVILION_READING_POINT } from './garden/pavilionLayout';
@@ -90,27 +91,7 @@ function FrameCadence() {
 }
 
 function useGrassTexture() {
-  const texture = useMemo(() => {
-    const size = 64;
-    const data = new Uint8Array(size * size * 4);
-    let seed = 731;
-    for (let index = 0; index < size * size; index += 1) {
-      seed = (seed * 16807) % 2147483647;
-      const variation = (seed % 34) - 17;
-      data[index * 4] = 105 + variation;
-      data[index * 4 + 1] = 151 + variation;
-      data[index * 4 + 2] = 84 + Math.round(variation * 0.55);
-      data[index * 4 + 3] = 255;
-    }
-    const result = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-    result.wrapS = THREE.RepeatWrapping;
-    result.wrapT = THREE.RepeatWrapping;
-    result.repeat.set(22, 22);
-    result.colorSpace = THREE.SRGBColorSpace;
-    result.magFilter = THREE.NearestFilter;
-    result.needsUpdate = true;
-    return result;
-  }, []);
+  const texture = useMemo(() => createGardenSurfaceTexture(), []);
 
   useEffect(() => () => texture.dispose(), [texture]);
   return texture;
