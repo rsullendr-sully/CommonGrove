@@ -17,7 +17,7 @@ import {
 import PipCharacter from './garden/PipCharacter';
 import StorybookGardenEnvironment from './garden/StorybookGardenEnvironment';
 import { actionEventForLiveTarget, actionLabelForLiveTarget, type InteractableId } from './garden/interaction';
-import { getFirstPersonMovementVector } from './garden/firstPersonMovement';
+import { getFirstPersonMovementVector, resolveFirstPersonGardenMove } from './garden/firstPersonMovement';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import { PAVILION_READING_POINT } from './garden/pavilionLayout';
@@ -189,17 +189,13 @@ function FirstPersonControls({ movement, speed, onCameraMount }: { movement: Mov
     candidatePosition.z += movementVector.z * frameDistance;
     candidatePosition.x = THREE.MathUtils.clamp(candidatePosition.x, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
     candidatePosition.z = THREE.MathUtils.clamp(candidatePosition.z, -GARDEN_HALF_SIZE + PLAYER_MARGIN, GARDEN_HALF_SIZE - PLAYER_MARGIN);
-
-    GARDEN_OBSTACLES.forEach((obstacle) => {
-      const dx = candidatePosition.x - obstacle.x;
-      const dz = candidatePosition.z - obstacle.z;
-      const distance = Math.hypot(dx, dz);
-      if (distance < obstacle.radius) {
-        const safeDistance = distance || 1;
-        candidatePosition.x = obstacle.x + (dx / safeDistance) * obstacle.radius;
-        candidatePosition.z = obstacle.z + (dz / safeDistance) * obstacle.radius;
-      }
-    });
+    const resolvedPosition = resolveFirstPersonGardenMove(
+      { x: camera.position.x, z: camera.position.z },
+      { x: candidatePosition.x - camera.position.x, z: candidatePosition.z - camera.position.z },
+      GARDEN_OBSTACLES,
+    );
+    candidatePosition.x = resolvedPosition.x;
+    candidatePosition.z = resolvedPosition.z;
 
     camera.position.set(candidatePosition.x, 1.7, candidatePosition.z);
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
