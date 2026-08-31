@@ -7,6 +7,8 @@ import type { GardenCorridor, StorybookEnvironmentLayout } from './environmentLa
 
 export type StorybookTerrainProps = Readonly<{
   grassTexture: Texture;
+  earthTexture: Texture;
+  limestoneTexture: Texture;
   layout: StorybookEnvironmentLayout;
 }>;
 
@@ -50,27 +52,50 @@ const BERM_MATERIALS = ['#6f8e58', '#78955d', '#688651'].map((color) => (
 const BED_MATERIALS = ['#526d43', '#5d7748', '#637d4c'].map((color) => (
   new THREE.MeshStandardMaterial({ color, roughness: 1 })
 ));
-const PATH_MATERIALS = ['#aeb487', '#b7b68b', '#a5af7e'].map((color) => (
-  new THREE.MeshStandardMaterial({ color, roughness: 1, transparent: true, opacity: 0.22, depthWrite: false })
-));
-const STONE_MATERIALS = ['#ddd3b4', '#d1c5a7', '#d8c39d', '#cbb796'].map((color) => (
-  new THREE.MeshStandardMaterial({ color, roughness: 0.98, flatShading: true })
-));
+const PATH_COLORS = ['#bdb18e', '#b5aa88', '#c3b694'] as const;
+const STONE_COLORS = ['#f0e3c5', '#dfd0b0', '#ead5aa', '#d9c29d'] as const;
 const HEDGE_MATERIAL = new THREE.MeshBasicMaterial({
   color: '#759465',
 });
 const boundaryHedges = createBoundaryHedges();
 
-export default function StorybookTerrain({ grassTexture, layout }: StorybookTerrainProps) {
+export default function StorybookTerrain({
+  grassTexture,
+  earthTexture,
+  limestoneTexture,
+  layout,
+}: StorybookTerrainProps) {
   const grassMaterial = useMemo(() => new THREE.MeshStandardMaterial({
     map: grassTexture,
-    color: '#ffffff',
+    color: '#a9b993',
     roughness: 1,
   }), [grassTexture]);
+  const pathMaterials = useMemo(() => PATH_COLORS.map((color) => (
+    new THREE.MeshStandardMaterial({
+      map: earthTexture,
+      color,
+      roughness: 1,
+      transparent: true,
+      opacity: 0.44,
+      depthWrite: false,
+    })
+  )), [earthTexture]);
+  const stoneMaterials = useMemo(() => STONE_COLORS.map((color) => (
+    new THREE.MeshStandardMaterial({
+      map: limestoneTexture,
+      color,
+      roughness: 0.96,
+      flatShading: true,
+    })
+  )), [limestoneTexture]);
   const steppingStones = useMemo(() => createSteppingStones(layout.corridors), [layout.corridors]);
   const pathBeds = useMemo(() => createGardenPathBeds(layout.corridors), [layout.corridors]);
 
-  useEffect(() => () => grassMaterial.dispose(), [grassMaterial]);
+  useEffect(() => () => {
+    grassMaterial.dispose();
+    pathMaterials.forEach((material) => material.dispose());
+    stoneMaterials.forEach((material) => material.dispose());
+  }, [grassMaterial, pathMaterials, stoneMaterials]);
 
   return (
     <group dispose={null}>
@@ -127,7 +152,7 @@ export default function StorybookTerrain({ grassTexture, layout }: StorybookTerr
         <group key={bed.id} position={[...bed.position]} rotation={[0, bed.rotationY, 0]}>
           <mesh
             geometry={PATH_GEOMETRY}
-            material={PATH_MATERIALS[bed.variant]}
+            material={pathMaterials[bed.variant]}
             rotation={[-Math.PI / 2, 0, 0]}
             scale={[bed.width, bed.length / 2, 1]}
             receiveShadow
@@ -139,7 +164,7 @@ export default function StorybookTerrain({ grassTexture, layout }: StorybookTerr
         <mesh
           key={stone.id}
           geometry={STONE_GEOMETRY}
-          material={STONE_MATERIALS[stone.variant]}
+          material={stoneMaterials[stone.variant]}
           position={[...stone.position]}
           rotation={[0, stone.rotationY, 0]}
           scale={[...stone.scale]}
@@ -216,7 +241,7 @@ export function createSteppingStones(corridors: readonly GardenCorridor[]): Step
         ] as const,
         scale: [0.38 + (index % 3) * 0.05, 0.72, 0.28 + ((index + 1) % 2) * 0.05] as const,
         rotationY: Math.atan2(-dz, dx) + (index % 2 ? 0.08 : -0.06),
-        variant: (index + corridorIndex) % STONE_MATERIALS.length,
+        variant: (index + corridorIndex) % STONE_COLORS.length,
       };
     });
   });
@@ -234,9 +259,9 @@ export function createGardenPathBeds(corridors: readonly GardenCorridor[]): Gard
         (corridor.start.z + corridor.end.z) / 2,
       ] as const,
       length: Math.hypot(dx, dz) + 0.8,
-      width: Math.max(0.9, Math.min(1.35, corridor.halfWidth * 0.82)),
+      width: Math.max(0.78, Math.min(1.08, corridor.halfWidth * 0.76)),
       rotationY: Math.atan2(dx, dz),
-      variant: index % PATH_MATERIALS.length,
+      variant: index % PATH_COLORS.length,
     };
   });
 }

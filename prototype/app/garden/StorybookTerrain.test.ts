@@ -35,6 +35,6 @@ describe('storybook stepping stones', () => {
 
     expect(beds).toHaveLength(corridors.length);
     expect(createGardenPathBeds(corridors)).toEqual(beds);
-    expect(beds.every((bed) => bed.width >= 0.9 && bed.width <= 1.35)).toBe(true);
+    expect(beds.every((bed) => bed.width >= 0.78 && bed.width <= 1.08)).toBe(true);
   });
 });

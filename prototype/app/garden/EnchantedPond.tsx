@@ -3,6 +3,7 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import type { Texture } from 'three';
 import {
   STORYBOOK_POND_DRESSING_RADII,
   type EnvironmentInstance,
@@ -15,6 +16,8 @@ import { createPondOutline, type PondOutlinePoint } from './pondShape';
 export type EnchantedPondProps = Readonly<{
   layout: StorybookEnvironmentLayout;
   presentation: EnvironmentPresentation;
+  earthTexture: Texture;
+  limestoneTexture: Texture;
 }>;
 
 const SHORE_STONE_GEOMETRY = new THREE.DodecahedronGeometry(
@@ -27,9 +30,7 @@ const REED_LEAF_GEOMETRY = new THREE.SphereGeometry(0.5, 8, 5).scale(0.55, 0.1, 
 const BANK_FLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.018, 0.026, 0.34, 6).translate(0, 0.17, 0);
 const BANK_FLOWER_HEAD_GEOMETRY = new THREE.IcosahedronGeometry(0.11, 0).translate(0, 0.39, 0);
 
-const SHORE_STONE_MATERIALS = ['#a5a18a', '#8d937f', '#b2aa8f'].map((color) => (
-  new THREE.MeshStandardMaterial({ color, roughness: 0.96, flatShading: true })
-));
+const SHORE_STONE_COLORS = ['#d6ccb1', '#bcbba6', '#e0d2b4'] as const;
 const REED_STALK_MATERIALS = ['#527957', '#65875b', '#789461'].map((color) => (
   new THREE.MeshStandardMaterial({ color, roughness: 0.94, flatShading: true })
 ));
@@ -58,7 +59,12 @@ function createOutlineGeometry(points: readonly PondOutlinePoint[]) {
   return new THREE.ShapeGeometry(shape, 8);
 }
 
-export default function EnchantedPond({ layout, presentation }: EnchantedPondProps) {
+export default function EnchantedPond({
+  layout,
+  presentation,
+  earthTexture,
+  limestoneTexture,
+}: EnchantedPondProps) {
   const ripples = useRef<THREE.Group>(null);
   const firstHighlight = useRef<THREE.Group>(null);
   const secondHighlight = useRef<THREE.Group>(null);
@@ -73,12 +79,21 @@ export default function EnchantedPond({ layout, presentation }: EnchantedPondPro
     depth: createOutlineGeometry(createPondOutline(6.04, 0.16, 64, 0.35)),
     water: createOutlineGeometry(createPondOutline(5.78, 0.12, 64, 0.82)),
   }), []);
+  const shoreStoneMaterials = useMemo(() => SHORE_STONE_COLORS.map((color) => (
+    new THREE.MeshStandardMaterial({
+      map: limestoneTexture,
+      color,
+      roughness: 0.96,
+      flatShading: true,
+    })
+  )), [limestoneTexture]);
 
   useEffect(() => () => {
     pondGeometry.bank.dispose();
     pondGeometry.depth.dispose();
     pondGeometry.water.dispose();
-  }, [pondGeometry]);
+    shoreStoneMaterials.forEach((material) => material.dispose());
+  }, [pondGeometry, shoreStoneMaterials]);
 
   useFrame(({ clock }) => {
     const frame = getPondMotionFrame(
@@ -96,11 +111,11 @@ export default function EnchantedPond({ layout, presentation }: EnchantedPondPro
     <group dispose={null}>
       <mesh position={[0, -0.16, 0]} receiveShadow>
         <cylinderGeometry args={[6.18, 6.22, 0.28, 64]} />
-        <meshStandardMaterial color="#566957" roughness={0.98} />
+        <meshStandardMaterial map={earthTexture} color="#708066" roughness={0.98} />
       </mesh>
 
       <mesh geometry={pondGeometry.bank} position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <meshStandardMaterial color="#87956f" roughness={0.98} />
+        <meshStandardMaterial map={earthTexture} color="#9aa87b" roughness={0.98} />
       </mesh>
 
       <mesh geometry={pondGeometry.depth} position={[0, 0.026, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -169,7 +184,12 @@ export default function EnchantedPond({ layout, presentation }: EnchantedPondPro
       </mesh>
 
       {layout.pondStones.map((stone, index) => (
-        <ShorelineStone key={stone.id} stone={stone} index={index} />
+        <ShorelineStone
+          key={stone.id}
+          stone={stone}
+          index={index}
+          materials={shoreStoneMaterials}
+        />
       ))}
       {layout.reeds.map((reeds) => <ReedCluster key={reeds.id} reeds={reeds} />)}
 
@@ -184,12 +204,20 @@ export default function EnchantedPond({ layout, presentation }: EnchantedPondPro
   );
 }
 
-function ShorelineStone({ stone, index }: { stone: EnvironmentInstance; index: number }) {
+function ShorelineStone({
+  stone,
+  index,
+  materials,
+}: {
+  stone: EnvironmentInstance;
+  index: number;
+  materials: readonly THREE.MeshStandardMaterial[];
+}) {
   return (
     <group position={[...stone.position]} rotation={[0, stone.rotationY, 0]} scale={[...stone.scale]}>
       <mesh
         geometry={SHORE_STONE_GEOMETRY}
-        material={SHORE_STONE_MATERIALS[stone.variant % SHORE_STONE_MATERIALS.length]}
+        material={materials[stone.variant % materials.length]}
         castShadow
         receiveShadow
         dispose={null}

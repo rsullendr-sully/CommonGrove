@@ -19,7 +19,7 @@ const CLOUD_PUFF_GEOMETRY = new THREE.SphereGeometry(1, 12, 8);
 const CLOUD_PUFF_MATERIAL = new THREE.MeshBasicMaterial({
   color: '#f6f3dc',
   transparent: true,
-  opacity: 0.62,
+  opacity: 0.54,
   depthWrite: false,
   fog: false,
 });
@@ -88,16 +88,16 @@ export default function MagicalAtmosphere({
 
   return (
     <>
-      <color attach="background" args={['#b9dedb']} />
-      <fog attach="fog" args={['#c9ded0', 36, 76]} />
-      <hemisphereLight args={['#eef7e7', '#637858', 1.65]} />
+      <color attach="background" args={['#b7d9d5']} />
+      <fog attach="fog" args={['#c4d8cb', 30, 72]} />
+      <hemisphereLight args={['#f2f7e9', '#526a50', 1.08]} />
       <directionalLight
-        position={[13, 24, 10]}
-        color="#ffe1a3"
-        intensity={2.05}
+        position={[15, 25, 11]}
+        color="#ffe7bd"
+        intensity={2.3}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-left={-24}
         shadow-camera-right={24}
         shadow-camera-top={24}
@@ -105,6 +105,11 @@ export default function MagicalAtmosphere({
         shadow-camera-near={1}
         shadow-camera-far={70}
         shadow-bias={-0.0002}
+      />
+      <directionalLight
+        position={[-14, 10, -8]}
+        color="#b7dcd7"
+        intensity={0.28}
       />
 
       <group ref={clouds}>

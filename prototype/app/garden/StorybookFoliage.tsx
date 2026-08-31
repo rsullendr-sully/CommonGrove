@@ -38,13 +38,15 @@ const TREE_CANOPY_GEOMETRY = new THREE.DodecahedronGeometry(1, 2);
 const TREE_TIP_GEOMETRY = new THREE.IcosahedronGeometry(0.26, 1);
 const ROOT_STONE_GEOMETRY = new THREE.DodecahedronGeometry(0.34, 0);
 
-const SHRUB_MATERIAL = new THREE.MeshBasicMaterial({
-  color: '#7d9b6e',
+const SHRUB_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#f4f1db',
+  roughness: 1,
+  flatShading: true,
 });
-const GRASS_MATERIAL = new THREE.MeshBasicMaterial({ color: '#8da973' });
-const FLOWER_STEM_MATERIAL = new THREE.MeshBasicMaterial({ color: '#5f8358' });
+const GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#f3f0d8', roughness: 1, flatShading: true });
+const FLOWER_STEM_MATERIAL = new THREE.MeshStandardMaterial({ color: '#e9ecd5', roughness: 1 });
 const FLOWER_HEAD_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#e3cedf',
+  color: '#f5efe1',
   emissive: '#cfaed0',
   emissiveIntensity: 0.1,
   roughness: 0.8,
@@ -108,28 +110,28 @@ export default function StorybookFoliage({ layout }: StorybookFoliageProps) {
         geometry={SHRUB_GEOMETRY}
         material={SHRUB_MATERIAL}
         colors={SHRUB_COLORS}
-        useInstanceColors={false}
+        useInstanceColors
       />
       <InstancedPlanting
         instances={layout.grassTufts}
         geometry={GRASS_GEOMETRY}
         material={GRASS_MATERIAL}
         colors={GRASS_COLORS}
-        useInstanceColors={false}
+        useInstanceColors
       />
       <InstancedPlanting
         instances={layout.flowers}
         geometry={FLOWER_STEM_GEOMETRY}
         material={FLOWER_STEM_MATERIAL}
         colors={STEM_COLORS}
-        useInstanceColors={false}
+        useInstanceColors
       />
       <InstancedPlanting
         instances={layout.flowers}
         geometry={FLOWER_HEAD_GEOMETRY}
         material={FLOWER_HEAD_MATERIAL}
         colors={FLOWER_COLORS}
-        useInstanceColors={false}
+        useInstanceColors
       />
       {layout.trees.map((tree) => <StorybookTree key={tree.id} tree={tree} />)}
     </group>

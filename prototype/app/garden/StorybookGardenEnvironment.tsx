@@ -1,7 +1,7 @@
 'use client';
 
-import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useFrame, useLoader } from '@react-three/fiber';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Texture } from 'three';
 import {
@@ -20,6 +20,7 @@ import {
 } from './pavilionLayout';
 import StorybookFoliage from './StorybookFoliage';
 import StorybookTerrain from './StorybookTerrain';
+import { GARDEN_TEXTURE_PATHS, prepareGardenTexture } from './gardenSurface';
 
 export type StorybookGardenEnvironmentProps = Readonly<{
   grassTexture: Texture;
@@ -55,13 +56,13 @@ const GOLD_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
   emissiveIntensity: 0.2,
 });
 
-function RockBackdrop() {
+function RockBackdrop({ limestoneTexture }: { limestoneTexture: Texture }) {
   return (
     <group>
       {rockData.map((rock, index) => (
         <mesh key={index} position={rock.position} scale={rock.scale} rotation={rock.rotation} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial color={rock.color} roughness={0.98} flatShading />
+          <meshStandardMaterial map={limestoneTexture} color={rock.color} roughness={0.98} flatShading />
         </mesh>
       ))}
       {[-4.1, -1.2, 2.1, 4.4].map((x, index) => (
@@ -83,9 +84,11 @@ function RockBackdrop() {
 function SpringSanctuary({
   glow,
   reducedMotion,
+  limestoneTexture,
 }: {
   glow: number;
   reducedMotion: boolean;
+  limestoneTexture: Texture;
 }) {
   const water = useRef<THREE.MeshPhysicalMaterial>(null);
   useFrame(({ clock }) => {
@@ -95,16 +98,16 @@ function SpringSanctuary({
     <group position={[0, 0, -8.4]}>
       <mesh position={[0, 1.9, 0.1]} castShadow receiveShadow>
         <boxGeometry args={[4.8, 3.8, 0.8]} />
-        <meshStandardMaterial color="#c2b99d" roughness={0.9} />
+        <meshStandardMaterial map={limestoneTexture} color="#d7cdb1" roughness={0.9} />
       </mesh>
       <mesh position={[0, 3.95, 0.05]} castShadow>
         <boxGeometry args={[5.5, 0.45, 1.15]} />
-        <meshStandardMaterial color="#dfd4ad" roughness={0.82} />
+        <meshStandardMaterial map={limestoneTexture} color="#f0dfb9" roughness={0.82} />
       </mesh>
       {[-1.75, 1.75].map((x) => (
         <mesh key={x} position={[x, 2, 0.65]} castShadow>
           <cylinderGeometry args={[0.34, 0.42, 3.8, 12]} />
-          <meshStandardMaterial color="#d2c7a8" roughness={0.9} />
+          <meshStandardMaterial map={limestoneTexture} color="#e4d6b7" roughness={0.9} />
         </mesh>
       ))}
       <mesh position={[0, 2.1, 0.72]}>
@@ -127,7 +130,7 @@ function SpringSanctuary({
       </mesh>
       <mesh position={[0, 0.42, 1.1]} castShadow>
         <cylinderGeometry args={[1.55, 1.8, 0.65, 32]} />
-        <meshStandardMaterial color="#c9bea1" roughness={0.88} />
+        <meshStandardMaterial map={limestoneTexture} color="#ddcfb1" roughness={0.88} />
       </mesh>
       <mesh position={[0, 0.79, 1.1]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[1.36, 32]} />
@@ -148,10 +151,14 @@ function Pavilion({
   glow,
   improved,
   reducedMotion,
+  limestoneTexture,
+  woodTexture,
 }: {
   glow: number;
   improved: boolean;
   reducedMotion: boolean;
+  limestoneTexture: Texture;
+  woodTexture: Texture;
 }) {
   const additions = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
@@ -170,38 +177,38 @@ function Pavilion({
           PAVILION_SURFACE.deck.height,
           12,
         ]} />
-        <meshStandardMaterial color="#c8b991" roughness={0.94} />
+        <meshStandardMaterial map={limestoneTexture} color="#d8c89f" roughness={0.94} />
       </mesh>
       {PAVILION_LOCAL_POSTS.map(({ x, z }) => (
         <mesh key={`${x}-${z}`} position={[x, 2.66, z]} castShadow>
           <cylinderGeometry args={[0.19, 0.25, 5, 10]} />
-          <meshStandardMaterial color="#956f55" roughness={0.88} />
+          <meshStandardMaterial map={woodTexture} color="#ad8060" roughness={0.88} />
         </mesh>
       ))}
       <mesh position={[0, 5.31, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <coneGeometry args={[4.3, 1.5, 4]} />
-        <meshStandardMaterial color="#8b665c" roughness={0.85} />
+        <meshStandardMaterial map={woodTexture} color="#8d6555" roughness={0.85} />
       </mesh>
       <mesh position={[0, 4.61, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
         <coneGeometry args={[4.38, 0.14, 4]} />
-        <meshStandardMaterial color="#b28a67" roughness={0.88} />
+        <meshStandardMaterial map={woodTexture} color="#c28e67" roughness={0.88} />
       </mesh>
       {PAVILION_LOCAL_POSTS.map(({ x, z }) => (
         <mesh key={`cap-${x}-${z}`} position={[x, 5.18, z]} castShadow>
           <cylinderGeometry args={[0.31, 0.27, 0.14, 10]} />
-          <meshStandardMaterial color="#b28a67" roughness={0.88} />
+          <meshStandardMaterial map={woodTexture} color="#c28e67" roughness={0.88} />
         </mesh>
       ))}
       {PAVILION_LOCAL_BENCHES.map(({ x, z, centerY, width, height, depth }) => (
         <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial color="#aa815e" roughness={0.9} />
+          <meshStandardMaterial map={woodTexture} color="#bb8761" roughness={0.9} />
         </mesh>
       ))}
       {PAVILION_PERMANENT_FURNITURE.map(({ x, z, centerY, width, height, depth }) => (
         <mesh key={`${x}-${z}`} position={[x, centerY, z]} castShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial color="#9b7456" roughness={0.92} />
+          <meshStandardMaterial map={woodTexture} color="#ad7b58" roughness={0.92} />
         </mesh>
       ))}
       <group ref={additions} scale={improved ? 1 : 0.03}>
@@ -238,7 +245,7 @@ function Pavilion({
       {PAVILION_SURFACE.approachSteps.map(({ z, centerY, height, width, depth }) => (
         <mesh key={z} position={[0, centerY, z]} castShadow receiveShadow>
           <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial color="#cdbf9d" roughness={0.94} />
+          <meshStandardMaterial map={limestoneTexture} color="#dfd1b3" roughness={0.94} />
         </mesh>
       ))}
     </group>
@@ -459,6 +466,19 @@ export default function StorybookGardenEnvironment({
   destinationVisible,
   reducedMotion,
 }: StorybookGardenEnvironmentProps) {
+  const [earthSource, limestoneSource, woodSource] = useLoader(
+    THREE.TextureLoader,
+    [
+      GARDEN_TEXTURE_PATHS.earth,
+      GARDEN_TEXTURE_PATHS.limestone,
+      GARDEN_TEXTURE_PATHS.wood,
+    ],
+  );
+  const finishTextures = useMemo(() => ({
+    earth: prepareGardenTexture(earthSource.clone(), 'earth'),
+    limestone: prepareGardenTexture(limestoneSource.clone(), 'limestone'),
+    wood: prepareGardenTexture(woodSource.clone(), 'wood'),
+  }), [earthSource, limestoneSource, woodSource]);
   const layout = useMemo(() => createStorybookEnvironmentLayout(), []);
   const presentation = useMemo(
     () => getEnvironmentPresentation({
@@ -479,22 +499,41 @@ export default function StorybookGardenEnvironment({
     ],
   );
 
+  useEffect(() => () => {
+    finishTextures.earth.dispose();
+    finishTextures.limestone.dispose();
+    finishTextures.wood.dispose();
+  }, [finishTextures]);
+
   return (
     <>
       <MagicalAtmosphere layout={layout} presentation={presentation} />
 
-      <StorybookTerrain grassTexture={grassTexture} layout={layout} />
+      <StorybookTerrain
+        grassTexture={grassTexture}
+        earthTexture={finishTextures.earth}
+        limestoneTexture={finishTextures.limestone}
+        layout={layout}
+      />
 
-      <EnchantedPond layout={layout} presentation={presentation} />
-      <RockBackdrop />
+      <EnchantedPond
+        layout={layout}
+        presentation={presentation}
+        earthTexture={finishTextures.earth}
+        limestoneTexture={finishTextures.limestone}
+      />
+      <RockBackdrop limestoneTexture={finishTextures.limestone} />
       <SpringSanctuary
         glow={presentation.sanctuaryGlow}
         reducedMotion={!presentation.moteMotion}
+        limestoneTexture={finishTextures.limestone}
       />
       <Pavilion
         glow={presentation.pavilionGlow}
         improved={presentation.pavilionGlow > 0.55}
         reducedMotion={!presentation.cloudMotion}
+        limestoneTexture={finishTextures.limestone}
+        woodTexture={finishTextures.wood}
       />
       <StorybookFoliage layout={layout} />
       <StarflowerPatch

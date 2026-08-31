@@ -1,6 +1,6 @@
 'use client';
 
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import Image from 'next/image';
 import { MutableRefObject, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -18,7 +18,7 @@ import PipCharacter from './garden/PipCharacter';
 import StorybookGardenEnvironment from './garden/StorybookGardenEnvironment';
 import { actionEventForLiveTarget, actionLabelForLiveTarget, type InteractableId } from './garden/interaction';
 import { getFirstPersonMovementVector, resolveFirstPersonGardenMove } from './garden/firstPersonMovement';
-import { createGardenSurfaceTexture } from './garden/gardenSurface';
+import { GARDEN_TEXTURE_PATHS, prepareGardenTexture } from './garden/gardenSurface';
 import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
 import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
 import { PAVILION_READING_POINT } from './garden/pavilionLayout';
@@ -92,7 +92,11 @@ function FrameCadence() {
 }
 
 function useGrassTexture() {
-  const texture = useMemo(() => createGardenSurfaceTexture(), []);
+  const source = useLoader(THREE.TextureLoader, GARDEN_TEXTURE_PATHS.grass);
+  const texture = useMemo(
+    () => prepareGardenTexture(source.clone(), 'grass'),
+    [source],
+  );
 
   useEffect(() => () => texture.dispose(), [texture]);
   return texture;
@@ -763,7 +767,18 @@ export default function GardenWorld({ rewardStage, starflowersVisible, pavilionI
 
   return (
     <div className="world-wrap">
-      <Canvas frameloop="demand" shadows="percentage" camera={{ fov: 68, near: 0.1, far: 120 }} dpr={0.7} gl={{ antialias: false, powerPreference: 'high-performance' }}>
+      <Canvas
+        frameloop="demand"
+        shadows="percentage"
+        camera={{ fov: 68, near: 0.1, far: 120 }}
+        dpr={[0.8, 1.25]}
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 0.98;
+          gl.outputColorSpace = THREE.SRGBColorSpace;
+        }}
+      >
         <GardenWorldScene
           movement={movement}
           movementSpeed={movementSpeed}

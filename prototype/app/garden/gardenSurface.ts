@@ -3,6 +3,22 @@ import * as THREE from 'three';
 export const GARDEN_SURFACE_SIZE = 96;
 export const GARDEN_SURFACE_REPEAT = 10;
 
+export type GardenTextureSurface = 'grass' | 'earth' | 'limestone' | 'wood';
+
+export const GARDEN_TEXTURE_PATHS = {
+  grass: '/textures/common-grove-grass.png',
+  earth: '/textures/common-grove-earth.png',
+  limestone: '/textures/common-grove-limestone.png',
+  wood: '/textures/common-grove-wood.png',
+} as const satisfies Record<GardenTextureSurface, string>;
+
+const GARDEN_TEXTURE_REPEATS: Record<GardenTextureSurface, readonly [number, number]> = {
+  grass: [18, 18],
+  earth: [5, 8],
+  limestone: [2.5, 2.5],
+  wood: [1.5, 3],
+};
+
 const COARSE_SIZE = 12;
 const BASE_COLOR = [112, 156, 91] as const;
 
@@ -67,6 +83,22 @@ export function createGardenSurfaceTexture(seed = 731) {
   texture.magFilter = THREE.LinearFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+export function prepareGardenTexture(
+  texture: THREE.Texture,
+  surface: GardenTextureSurface,
+): THREE.Texture {
+  const repeat = GARDEN_TEXTURE_REPEATS[surface];
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.repeat.set(...repeat);
   texture.needsUpdate = true;
   return texture;
 }
