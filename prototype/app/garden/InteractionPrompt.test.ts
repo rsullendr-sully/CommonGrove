@@ -5,10 +5,17 @@ import InteractionPrompt from './InteractionPrompt';
 import {
   activateFromInteractionKey,
   createInteractionHandlers,
+  interactionReticleClassName,
   isInteractionControlTarget,
 } from './InteractionPrompt';
 
 describe('contextual interaction input', () => {
+  it('visually activates the reticle whenever a contextual action is available', () => {
+    expect(interactionReticleClassName(null)).toBe('world-reticle');
+    expect(interactionReticleClassName('Greet Pip')).toBe('world-reticle active');
+    expect(interactionReticleClassName('Place toy')).toBe('world-reticle active');
+  });
+
   it('uses the same contextual action as the button accessible and visible label', () => {
     const markup = renderToStaticMarkup(createElement(InteractionPrompt, {
       label: 'Offer snack',

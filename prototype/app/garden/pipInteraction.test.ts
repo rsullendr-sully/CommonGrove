@@ -21,6 +21,7 @@ import {
   interactionPoseKind,
   projectPipPlacement,
   resolvePipPlacement,
+  shouldHoldPipForInteraction,
   shouldSuspendPipMotion,
   updateCarriedPipTransform,
   updatePlacedPipTransform,
@@ -121,6 +122,14 @@ describe('direct Pip interactions', () => {
     expect(canDirectlyInteractWithPip('ordinary')).toBe(true);
     expect(canDirectlyInteractWithPip('ordinary', 'greet')).toBe(false);
     expect(canDirectlyInteractWithPip('priority')).toBe(false);
+  });
+
+  it('holds Pip attentively only while an ordinary interaction target is available', () => {
+    expect(shouldHoldPipForInteraction(true, 'ordinary', null, 'none')).toBe(true);
+    expect(shouldHoldPipForInteraction(false, 'ordinary', null, 'none')).toBe(false);
+    expect(shouldHoldPipForInteraction(true, 'priority', null, 'none')).toBe(false);
+    expect(shouldHoldPipForInteraction(true, 'ordinary', 'greet', 'none')).toBe(false);
+    expect(shouldHoldPipForInteraction(true, 'ordinary', null, 'pet')).toBe(false);
   });
 
   it('places held Pip on Escape before unrelated dismissal handlers can run', () => {

@@ -13,12 +13,37 @@ export type InteractionTargetResult = {
 export type InteractionTargetCandidate = {
   target: unknown;
   distance: number;
+  aimOffset?: number;
+  maxDistance?: number;
 };
 
 export type InteractionTargetRegistration = {
   target: InteractableId;
   ref: RefObject<THREE.Object3D | null>;
+  maxDistance?: number;
 };
+
+export type InteractionAimSample = {
+  x: number;
+  y: number;
+  aimOffset: number;
+};
+
+export const INTERACTION_TARGET_LOSS_GRACE_SECONDS = 0.65;
+
+export function createInteractionAimSamples(): readonly InteractionAimSample[] {
+  return [
+    { x: 0, y: 0, aimOffset: 0 },
+    { x: -0.075, y: 0, aimOffset: 0.075 },
+    { x: 0.075, y: 0, aimOffset: 0.075 },
+    { x: 0, y: -0.075, aimOffset: 0.075 },
+    { x: 0, y: 0.075, aimOffset: 0.075 },
+    { x: -0.06, y: -0.06, aimOffset: Math.hypot(0.06, 0.06) },
+    { x: 0.06, y: -0.06, aimOffset: Math.hypot(0.06, 0.06) },
+    { x: -0.06, y: 0.06, aimOffset: Math.hypot(0.06, 0.06) },
+    { x: 0.06, y: 0.06, aimOffset: Math.hypot(0.06, 0.06) },
+  ];
+}
 
 function isInteractableId(target: unknown): target is InteractableId {
   return target === 'pip' || target === 'food' || target === 'toy';
@@ -29,32 +54,57 @@ export function selectNearestInteractionTarget(
   maxDistance: number,
 ): InteractionTargetResult | null {
   let nearest: InteractionTargetResult | null = null;
+  let nearestAimOffset = Number.POSITIVE_INFINITY;
 
   for (const candidate of candidates) {
+    const candidateMaxDistance = candidate.maxDistance ?? maxDistance;
+    const candidateAimOffset = candidate.aimOffset ?? 0;
     if (
       !isInteractableId(candidate.target) ||
       !Number.isFinite(candidate.distance) ||
+      !Number.isFinite(candidateMaxDistance) ||
+      !Number.isFinite(candidateAimOffset) ||
       candidate.distance < 0 ||
-      candidate.distance > maxDistance
+      candidate.distance > candidateMaxDistance ||
+      candidateAimOffset < 0
     ) {
       continue;
     }
-    if (nearest === null || candidate.distance < nearest.distance) {
+    if (
+      nearest === null ||
+      candidateAimOffset < nearestAimOffset ||
+      (candidateAimOffset === nearestAimOffset && candidate.distance < nearest.distance)
+    ) {
       nearest = { target: candidate.target, distance: candidate.distance };
+      nearestAimOffset = candidateAimOffset;
     }
   }
 
   return nearest;
 }
 
+export function resolveRetainedInteractionTarget(
+  previous: InteractionTargetResult | null,
+  next: InteractionTargetResult | null,
+  now: number,
+  lastSeenAt: number,
+  graceSeconds = INTERACTION_TARGET_LOSS_GRACE_SECONDS,
+): { target: InteractionTargetResult | null; lastSeenAt: number } {
+  if (next) return { target: next, lastSeenAt: now };
+  if (previous && now - lastSeenAt <= graceSeconds) {
+    return { target: previous, lastSeenAt };
+  }
+  return { target: null, lastSeenAt };
+}
+
 function findRegisteredTarget(
   object: THREE.Object3D,
-  roots: ReadonlyMap<THREE.Object3D, InteractableId>,
-): InteractableId | null {
+  roots: ReadonlyMap<THREE.Object3D, InteractionTargetRegistration>,
+): InteractionTargetRegistration | null {
   let current: THREE.Object3D | null = object;
   while (current) {
-    const registeredTarget = roots.get(current);
-    if (registeredTarget) return registeredTarget;
+    const registration = roots.get(current);
+    if (registration) return registration;
     current = current.parent;
   }
   return null;
@@ -65,24 +115,45 @@ export function useInteractionTarget(
   maxDistance: number,
 ): InteractionTargetResult | null {
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const aimSamples = useMemo(() => createInteractionAimSamples(), []);
   const latestTarget = useRef<InteractionTargetResult | null>(null);
   const publishedTarget = useRef<InteractionTargetResult | null>(null);
   const lastDistancePublication = useRef(Number.NEGATIVE_INFINITY);
+  const lastTargetSeenAt = useRef(Number.NEGATIVE_INFINITY);
   const [currentTarget, setCurrentTarget] = useState<InteractionTargetResult | null>(null);
 
   useFrame(({ camera, clock }) => {
-    const roots = new Map<THREE.Object3D, InteractableId>();
+    const roots = new Map<THREE.Object3D, InteractionTargetRegistration>();
     for (const registration of registrations) {
-      if (registration.ref.current) roots.set(registration.ref.current, registration.target);
+      if (registration.ref.current) roots.set(registration.ref.current, registration);
     }
 
-    raycaster.setFromCamera(CENTER_OF_VIEW, camera);
-    const intersections = raycaster.intersectObjects([...roots.keys()], true);
-    const candidates = intersections.map((intersection) => ({
-      target: findRegisteredTarget(intersection.object, roots),
-      distance: intersection.distance,
-    }));
-    const nextTarget = selectNearestInteractionTarget(candidates, maxDistance);
+    const candidates: InteractionTargetCandidate[] = [];
+    for (const sample of aimSamples) {
+      raycaster.setFromCamera(
+        sample.aimOffset === 0 ? CENTER_OF_VIEW : new THREE.Vector2(sample.x, sample.y),
+        camera,
+      );
+      const intersections = raycaster.intersectObjects([...roots.keys()], true);
+      for (const intersection of intersections) {
+        const registration = findRegisteredTarget(intersection.object, roots);
+        candidates.push({
+          target: registration?.target ?? null,
+          distance: intersection.distance,
+          aimOffset: sample.aimOffset,
+          maxDistance: registration?.maxDistance,
+        });
+      }
+    }
+    const rawTarget = selectNearestInteractionTarget(candidates, maxDistance);
+    const retained = resolveRetainedInteractionTarget(
+      latestTarget.current,
+      rawTarget,
+      clock.elapsedTime,
+      lastTargetSeenAt.current,
+    );
+    lastTargetSeenAt.current = retained.lastSeenAt;
+    const nextTarget = retained.target;
     const previousTarget = latestTarget.current;
     const targetChanged = previousTarget?.target !== nextTarget?.target;
     const distanceChanged = publishedTarget.current !== null && nextTarget !== null &&

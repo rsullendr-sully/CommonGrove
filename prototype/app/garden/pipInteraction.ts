@@ -45,6 +45,15 @@ export function canDirectlyInteractWithPip(
   return mode === 'ordinary' && activityKind !== 'greet';
 }
 
+export function shouldHoldPipForInteraction(
+  interactionEngaged: boolean,
+  mode: 'ordinary' | 'priority',
+  activityKind: string | null,
+  phase: PipInteractionPhase,
+): boolean {
+  return interactionEngaged && phase === 'none' && canDirectlyInteractWithPip(mode, activityKind);
+}
+
 export function handleHeldPipEscape(
   event: Pick<KeyboardEvent, 'key' | 'preventDefault' | 'stopImmediatePropagation'>,
   held: InteractableId | null,

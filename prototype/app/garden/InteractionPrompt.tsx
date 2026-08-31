@@ -16,6 +16,10 @@ type InteractionKeyEvent = {
 
 const SUPPRESSED_CONTROL_TAGS = new Set(['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'SUMMARY']);
 
+export function interactionReticleClassName(label: string | null): string {
+  return label ? 'world-reticle active' : 'world-reticle';
+}
+
 export function isInteractionControlTarget(target: unknown): boolean {
   let current = target;
   const visited = new Set<unknown>();
