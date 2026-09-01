@@ -74,10 +74,12 @@ export function advanceRewardRevealPlayback(
     visible: boolean;
     reducedMotion: boolean;
     deltaSeconds: number;
+    settleAfterSeconds?: number;
   },
 ): RewardRevealPlayback {
   if (!input.visible) return INITIAL_REWARD_REVEAL_PLAYBACK;
-  if (input.reducedMotion || state.completed) {
+  if (state.completed) return state;
+  if (input.reducedMotion) {
     return {
       elapsedSeconds: state.elapsedSeconds,
       completed: true,
@@ -85,11 +87,16 @@ export function advanceRewardRevealPlayback(
     };
   }
 
+  const elapsedSeconds = (state.wasVisible ? state.elapsedSeconds : 0) + Math.min(input.deltaSeconds, 0.05);
   return {
-    elapsedSeconds: (state.wasVisible ? state.elapsedSeconds : 0) + Math.min(input.deltaSeconds, 0.05),
-    completed: false,
+    elapsedSeconds,
+    completed: elapsedSeconds >= (input.settleAfterSeconds ?? Number.POSITIVE_INFINITY),
     wasVisible: true,
   };
+}
+
+export function getRewardRevealDuration(profile: RewardRevealProfile) {
+  return PROFILE_TIMING[profile].duration;
 }
 
 export function getRewardAuraPresentation(frame: RewardRevealFrame) {

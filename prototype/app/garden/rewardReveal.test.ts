@@ -151,4 +151,22 @@ describe('reward reveal presentation', () => {
     expect(active.moteOpacity).toBeGreaterThan(0);
     expect(settled).toEqual({ visible: false, moteOpacity: 0, rotationEnabled: false });
   });
+
+  it('latches natural completion and reuses the settled playback state', () => {
+    const completed = advanceRewardRevealPlayback(INITIAL_REWARD_REVEAL_PLAYBACK, {
+      visible: true,
+      reducedMotion: false,
+      deltaSeconds: 0.5,
+      settleAfterSeconds: 0.05,
+    });
+    const nextFrame = advanceRewardRevealPlayback(completed, {
+      visible: true,
+      reducedMotion: false,
+      deltaSeconds: 0.5,
+      settleAfterSeconds: 0.05,
+    });
+
+    expect(completed.completed).toBe(true);
+    expect(nextFrame).toBe(completed);
+  });
 });

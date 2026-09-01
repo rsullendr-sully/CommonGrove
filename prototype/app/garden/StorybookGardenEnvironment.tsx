@@ -24,6 +24,7 @@ import { createGardenTextureVariant, GARDEN_TEXTURE_PATHS } from './gardenSurfac
 import {
   advanceRewardRevealPlayback,
   getRewardAuraPresentation,
+  getRewardRevealDuration,
   getRewardRevealFrame,
   INITIAL_REWARD_REVEAL_PLAYBACK,
   type RewardRevealFrame,
@@ -99,11 +100,15 @@ function useRewardRevealGroup({
   }));
 
   useFrame((_, delta) => {
-    playback.current = advanceRewardRevealPlayback(playback.current, {
+    const previousPlayback = playback.current;
+    const nextPlayback = advanceRewardRevealPlayback(previousPlayback, {
       visible,
       reducedMotion,
       deltaSeconds: delta,
+      settleAfterSeconds: getRewardRevealDuration(profile) + delaySeconds,
     });
+    if (nextPlayback === previousPlayback && nextPlayback.completed) return;
+    playback.current = nextPlayback;
     frame.current = getRewardRevealFrame({
       elapsedSeconds: playback.current.elapsedSeconds,
       visible,
@@ -615,19 +620,6 @@ function CuriousSeed({
   earthTexture: Texture;
   limestoneTexture: Texture;
 }) {
-  const { group: discovery, frame } = useRewardRevealGroup({
-    visible,
-    reducedMotion,
-    profile: 'seed',
-  });
-  const seedObject = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    if (!seedObject.current) return;
-    const settled = frame.current.growth > 0.92;
-    seedObject.current.rotation.y = reducedMotion ? 0.25 : clock.elapsedTime * 0.22;
-    seedObject.current.position.y = 0.66 + (!reducedMotion && settled ? Math.sin(clock.elapsedTime * 1.35) * 0.045 : 0);
-  });
-
   return (
     <group position={[-8.5, 0, 7.4]}>
       <mesh position={[0, 0.06, 0]} receiveShadow>
@@ -640,8 +632,8 @@ function CuriousSeed({
           <meshStandardMaterial map={limestoneTexture} color={index % 2 ? '#d0c3a6' : '#bdb79d'} roughness={0.97} flatShading />
         </mesh>
       ))}
-      <group ref={discovery} scale={0.035} visible={visible}>
-        <group ref={seedObject} position={[0, 0.66, 0]}>
+      <group position={[0, 0.66, 0]} rotation={[0, 0.25, 0]}>
+        <RewardRevealPart visible={visible} reducedMotion={reducedMotion} profile="seed">
           <mesh position={[0, -0.05, 0]} scale={[0.62, 0.78, 0.56]} castShadow>
             <sphereGeometry args={[1, 18, 12]} />
             <meshStandardMaterial color="#c7944d" roughness={0.66} emissive="#b47c35" emissiveIntensity={0.12 + glow * 0.42} />
@@ -650,20 +642,26 @@ function CuriousSeed({
             <sphereGeometry args={[1, 16, 8]} />
             <meshStandardMaterial color="#765637" roughness={0.92} />
           </mesh>
+          <pointLight position={[0, 0.25, 0]} color="#e8bf67" intensity={visible ? 0.5 + glow * 0.35 : 0} distance={4.5} decay={2} />
+        </RewardRevealPart>
+        <RewardRevealPart visible={visible} reducedMotion={reducedMotion} profile="seed" delaySeconds={0.18}>
           <mesh position={[0.03, 0.83, 0]} rotation={[0.12, 0, -0.16]} castShadow>
             <cylinderGeometry args={[0.04, 0.065, 0.65, 7]} />
             <meshStandardMaterial color="#557149" roughness={0.94} />
           </mesh>
+        </RewardRevealPart>
+        <RewardRevealPart visible={visible} reducedMotion={reducedMotion} profile="seed" delaySeconds={0.32}>
           <mesh position={[-0.3, 0.94, 0]} rotation={[0.05, -0.2, -0.58]} scale={[0.42, 0.12, 0.22]} castShadow>
             <sphereGeometry args={[1, 12, 7]} />
             <meshStandardMaterial color="#66885b" roughness={0.9} />
           </mesh>
+        </RewardRevealPart>
+        <RewardRevealPart visible={visible} reducedMotion={reducedMotion} profile="seed" delaySeconds={0.41}>
           <mesh position={[0.32, 1.08, 0.02]} rotation={[0.05, 0.2, 0.62]} scale={[0.44, 0.13, 0.23]} castShadow>
             <sphereGeometry args={[1, 12, 7]} />
             <meshStandardMaterial color="#789a63" roughness={0.9} />
           </mesh>
-          <pointLight position={[0, 0.25, 0]} color="#e8bf67" intensity={visible ? 0.5 + glow * 0.35 : 0} distance={4.5} decay={2} />
-        </group>
+        </RewardRevealPart>
       </group>
       <RewardRevealAura visible={visible} reducedMotion={reducedMotion} profile="seed" radius={1.35} color="#d5b66a" />
     </group>
