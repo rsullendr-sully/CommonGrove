@@ -10,6 +10,18 @@ export type RewardRevealFrame = Readonly<{
   glowBoost: number;
 }>;
 
+export type RewardRevealPlayback = Readonly<{
+  elapsedSeconds: number;
+  completed: boolean;
+  wasVisible: boolean;
+}>;
+
+export const INITIAL_REWARD_REVEAL_PLAYBACK: RewardRevealPlayback = {
+  elapsedSeconds: 0,
+  completed: false,
+  wasVisible: false,
+};
+
 const HIDDEN_FRAME: RewardRevealFrame = {
   growth: 0,
   scale: 0.035,
@@ -54,6 +66,39 @@ function smoothstep(value: number) {
 function easeOutBack(value: number, overshoot: number) {
   const shifted = value - 1;
   return 1 + (overshoot + 1) * shifted ** 3 + overshoot * shifted ** 2;
+}
+
+export function advanceRewardRevealPlayback(
+  state: RewardRevealPlayback,
+  input: {
+    visible: boolean;
+    reducedMotion: boolean;
+    deltaSeconds: number;
+  },
+): RewardRevealPlayback {
+  if (!input.visible) return INITIAL_REWARD_REVEAL_PLAYBACK;
+  if (input.reducedMotion || state.completed) {
+    return {
+      elapsedSeconds: state.elapsedSeconds,
+      completed: true,
+      wasVisible: true,
+    };
+  }
+
+  return {
+    elapsedSeconds: (state.wasVisible ? state.elapsedSeconds : 0) + Math.min(input.deltaSeconds, 0.05),
+    completed: false,
+    wasVisible: true,
+  };
+}
+
+export function getRewardAuraPresentation(frame: RewardRevealFrame) {
+  const visible = frame.aura > 0.001;
+  return {
+    visible,
+    moteOpacity: visible ? frame.aura * frame.opacity * 0.72 : 0,
+    rotationEnabled: visible,
+  } as const;
 }
 
 export function getRewardRevealFrame(input: {

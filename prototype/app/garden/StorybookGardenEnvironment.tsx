@@ -1,7 +1,7 @@
 'use client';
 
 import { useFrame, useLoader } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 import type { Texture } from 'three';
 import {
@@ -22,8 +22,12 @@ import StorybookFoliage from './StorybookFoliage';
 import StorybookTerrain from './StorybookTerrain';
 import { createGardenTextureVariant, GARDEN_TEXTURE_PATHS } from './gardenSurface';
 import {
+  advanceRewardRevealPlayback,
+  getRewardAuraPresentation,
   getRewardRevealFrame,
+  INITIAL_REWARD_REVEAL_PLAYBACK,
   type RewardRevealFrame,
+  type RewardRevealPlayback,
   type RewardRevealProfile,
 } from './rewardReveal';
 
@@ -76,15 +80,16 @@ function useRewardRevealGroup({
   reducedMotion,
   profile,
   delaySeconds = 0,
+  baseY = 0,
 }: {
   visible: boolean;
   reducedMotion: boolean;
   profile: RewardRevealProfile;
   delaySeconds?: number;
+  baseY?: number;
 }) {
   const group = useRef<THREE.Group>(null);
-  const elapsedSeconds = useRef(0);
-  const previousVisible = useRef(visible);
+  const playback = useRef<RewardRevealPlayback>(INITIAL_REWARD_REVEAL_PLAYBACK);
   const frame = useRef<RewardRevealFrame>(getRewardRevealFrame({
     elapsedSeconds: 0,
     visible,
@@ -94,21 +99,24 @@ function useRewardRevealGroup({
   }));
 
   useFrame((_, delta) => {
-    if (previousVisible.current !== visible) {
-      previousVisible.current = visible;
-      elapsedSeconds.current = 0;
-    }
-    if (visible && !reducedMotion) elapsedSeconds.current += Math.min(delta, 0.05);
-    frame.current = getRewardRevealFrame({
-      elapsedSeconds: elapsedSeconds.current,
+    playback.current = advanceRewardRevealPlayback(playback.current, {
       visible,
       reducedMotion,
+      deltaSeconds: delta,
+    });
+    frame.current = getRewardRevealFrame({
+      elapsedSeconds: playback.current.elapsedSeconds,
+      visible,
+      reducedMotion: reducedMotion || playback.current.completed,
       profile,
       delaySeconds,
     });
     const current = frame.current;
-    group.current?.scale.set(current.scale, current.scaleY, current.scale);
-    if (group.current) group.current.position.y = current.rise;
+    if (group.current) {
+      group.current.visible = visible;
+      group.current.scale.set(current.scale, current.scaleY, current.scale);
+      group.current.position.y = baseY + current.rise;
+    }
   });
 
   return { group, frame };
@@ -127,27 +135,33 @@ function RewardRevealAura({
   radius: number;
   color: string;
 }) {
-  const { group: reveal, frame } = useRewardRevealGroup({ visible, reducedMotion, profile });
+  const { group: reveal, frame } = useRewardRevealGroup({ visible, reducedMotion, profile, baseY: 0.035 });
   const aura = useRef<THREE.Group>(null);
   const innerRing = useRef<THREE.MeshBasicMaterial>(null);
   const outerRing = useRef<THREE.MeshBasicMaterial>(null);
+  const moteMaterials = useRef<Array<THREE.MeshBasicMaterial | null>>([]);
   const light = useRef<THREE.PointLight>(null);
 
   useFrame(({ clock }) => {
     const intensity = frame.current.aura;
+    const presentation = getRewardAuraPresentation(frame.current);
     if (aura.current) {
-      aura.current.rotation.z = reducedMotion ? 0 : clock.elapsedTime * 0.18;
+      aura.current.visible = presentation.visible;
+      aura.current.rotation.z = presentation.rotationEnabled && !reducedMotion ? clock.elapsedTime * 0.18 : 0;
       const auraScale = Math.max(0.02, 0.78 + intensity * 0.42);
       aura.current.scale.setScalar(auraScale);
     }
+    moteMaterials.current.forEach((material) => {
+      if (material) material.opacity = presentation.moteOpacity;
+    });
     if (innerRing.current) innerRing.current.opacity = intensity * 0.34;
     if (outerRing.current) outerRing.current.opacity = intensity * 0.18;
-    if (light.current) light.current.intensity = intensity * 1.25;
+    if (light.current) light.current.intensity = intensity * 1.25 * frame.current.glowBoost;
   });
 
   return (
-    <group ref={reveal} position={[0, 0.035, 0]} scale={0.02}>
-      <group ref={aura}>
+    <group ref={reveal} position={[0, 0.035, 0]} scale={0.02} visible={visible}>
+      <group ref={aura} visible={false}>
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[radius * 0.68, radius * 0.75, 48]} />
           <meshBasicMaterial ref={innerRing} color={color} transparent opacity={0} depthWrite={false} />
@@ -165,12 +179,50 @@ function RewardRevealAura({
               position={[Math.cos(angle) * radius * 0.82, 0.08 + (index % 3) * 0.09, Math.sin(angle) * radius * 0.82]}
               scale={0.75 + (index % 2) * 0.3}
             >
-              <meshBasicMaterial color={color} transparent opacity={0.72} depthWrite={false} />
+              <meshBasicMaterial
+                ref={(material) => {
+                  moteMaterials.current[index] = material;
+                }}
+                color={color}
+                transparent
+                opacity={0}
+                depthWrite={false}
+              />
             </mesh>
           );
         })}
         <pointLight ref={light} position={[0, 0.55, 0]} color={color} intensity={0} distance={radius * 4.5} decay={2} />
       </group>
+    </group>
+  );
+}
+
+function RewardRevealPart({
+  children,
+  visible,
+  reducedMotion,
+  profile,
+  delaySeconds = 0,
+  position = [0, 0, 0],
+}: {
+  children: ReactNode;
+  visible: boolean;
+  reducedMotion: boolean;
+  profile: RewardRevealProfile;
+  delaySeconds?: number;
+  position?: readonly [number, number, number];
+}) {
+  const { group } = useRewardRevealGroup({
+    visible,
+    reducedMotion,
+    profile,
+    delaySeconds,
+    baseY: position[1],
+  });
+
+  return (
+    <group ref={group} position={[...position]} scale={0.035} visible={visible}>
+      {children}
     </group>
   );
 }
@@ -279,12 +331,6 @@ function Pavilion({
   limestoneTexture: Texture;
   woodTexture: Texture;
 }) {
-  const { group: additions } = useRewardRevealGroup({
-    visible: improved,
-    reducedMotion,
-    profile: 'structure',
-  });
-
   const bookColors = ['#a86752', '#667d65', '#c19252', '#77698b', '#9b705d', '#58737b'];
 
   return (
@@ -330,8 +376,12 @@ function Pavilion({
           <meshStandardMaterial color="#ad7b58" roughness={0.92} />
         </mesh>
       ))}
-      <group ref={additions} scale={0.035}>
-        <group position={[0, 0, -1.28]}>
+      <RewardRevealPart
+        visible={improved}
+        reducedMotion={reducedMotion}
+        profile="structure"
+        position={[0, 0, -1.28]}
+      >
           {[-1.42, 1.42].map((x) => (
             <mesh key={`shelf-post-${x}`} position={[x, 1.66, 0]} castShadow>
               <boxGeometry args={[0.18, 2.75, 0.38]} />
@@ -364,9 +414,16 @@ function Pavilion({
             <boxGeometry args={[3.35, 0.2, 0.58]} />
             <meshStandardMaterial map={woodTexture} color="#855f48" roughness={0.92} />
           </mesh>
-        </group>
-        {[-1.7, 1.7].map((x) => (
-          <group key={x} position={[x, 2.64, 0.25]}>
+      </RewardRevealPart>
+      {[-1.7, 1.7].map((x, index) => (
+          <RewardRevealPart
+            key={x}
+            visible={improved}
+            reducedMotion={reducedMotion}
+            profile="structure"
+            delaySeconds={0.22 + index * 0.14}
+            position={[x, 2.64, 0.25]}
+          >
             <mesh position={[0, 0.38, 0]} castShadow>
               <cylinderGeometry args={[0.035, 0.035, 0.7, 8]} />
               <meshStandardMaterial color="#665344" roughness={0.9} />
@@ -383,9 +440,8 @@ function Pavilion({
               <cylinderGeometry args={[0.24, 0.2, 0.1, 8]} />
               <meshStandardMaterial color="#765b49" roughness={0.85} />
             </mesh>
-          </group>
-        ))}
-      </group>
+          </RewardRevealPart>
+      ))}
       <RewardRevealAura
         visible={improved}
         reducedMotion={reducedMotion}
@@ -416,15 +472,29 @@ function BloomingFlower({
   rotationY,
   petalMaterial,
   glow,
+  visible,
+  reducedMotion,
+  delaySeconds,
 }: {
   position: readonly [number, number, number];
   height: number;
   rotationY: number;
   petalMaterial: THREE.MeshStandardMaterial;
   glow: number;
+  visible: boolean;
+  reducedMotion: boolean;
+  delaySeconds: number;
 }) {
+  const { group } = useRewardRevealGroup({
+    visible,
+    reducedMotion,
+    profile: 'flower',
+    delaySeconds,
+    baseY: position[1],
+  });
+
   return (
-    <group position={[...position]} rotation={[0, rotationY, 0]} dispose={null}>
+    <group ref={group} position={[...position]} rotation={[0, rotationY, 0]} scale={0.035} visible={visible} dispose={null}>
       <mesh
         geometry={STARFLOWER_STEM_GEOMETRY}
         material={STARFLOWER_STEM_MATERIAL}
@@ -483,21 +553,17 @@ function FlowerPatch({
   reducedMotion: boolean;
   delayOffset: number;
 }) {
-  const { group } = useRewardRevealGroup({
-    visible,
-    reducedMotion,
-    profile: 'flower',
-    delaySeconds: delayOffset,
-  });
-
   return (
-    <group ref={group} position={[...position]} scale={0.035} dispose={null}>
-      {STARFLOWER_CLUSTER.map((flower) => (
+    <group position={[...position]} dispose={null}>
+      {STARFLOWER_CLUSTER.map((flower, index) => (
         <BloomingFlower
           key={`${flower.position[0]}-${flower.position[2]}`}
           {...flower}
           petalMaterial={petalMaterial}
           glow={glow}
+          visible={visible}
+          reducedMotion={reducedMotion}
+          delaySeconds={delayOffset + index * 0.055}
         />
       ))}
     </group>
@@ -574,7 +640,7 @@ function CuriousSeed({
           <meshStandardMaterial map={limestoneTexture} color={index % 2 ? '#d0c3a6' : '#bdb79d'} roughness={0.97} flatShading />
         </mesh>
       ))}
-      <group ref={discovery} scale={0.035}>
+      <group ref={discovery} scale={0.035} visible={visible}>
         <group ref={seedObject} position={[0, 0.66, 0]}>
           <mesh position={[0, -0.05, 0]} scale={[0.62, 0.78, 0.56]} castShadow>
             <sphereGeometry args={[1, 18, 12]} />
@@ -617,26 +683,29 @@ function ChoiceDestination({
   limestoneTexture: Texture;
   woodTexture: Texture;
 }) {
-  const { group: destination } = useRewardRevealGroup({
-    visible: Boolean(choice),
-    reducedMotion,
-    profile: 'destination',
-  });
-
   return (
     <group position={[-13, 0, 11]}>
       {choice && (
-        <group ref={destination} scale={0.035}>
-          {[[-9.7, 8.5], [-10.8, 9.5], [-12, 10.2]].map(([x, z], index) => (
-            <mesh key={index} position={[x + 10.7, 0.045, z - 9.4]} scale={[0.9, 0.1, 0.58]} castShadow receiveShadow>
-              <cylinderGeometry args={[0.65, 0.72, 0.22, 9]} />
-              <meshStandardMaterial map={limestoneTexture} color="#d2c6a5" roughness={0.95} />
-            </mesh>
-          ))}
+        <group>
+          <RewardRevealPart visible reducedMotion={reducedMotion} profile="destination">
+            {[[-9.7, 8.5], [-10.8, 9.5], [-12, 10.2]].map(([x, z], index) => (
+              <mesh key={index} position={[x + 10.7, 0.045, z - 9.4]} scale={[0.9, 0.1, 0.58]} castShadow receiveShadow>
+                <cylinderGeometry args={[0.65, 0.72, 0.22, 9]} />
+                <meshStandardMaterial map={limestoneTexture} color="#d2c6a5" roughness={0.95} />
+              </mesh>
+            ))}
+          </RewardRevealPart>
           {choice === 'orchard' ? (
             <group>
               {[[-1.5, 0], [1.25, 0.7], [0, -1.35]].map(([x, z], index) => (
-                <group key={index} position={[x, 0, z]}>
+                <RewardRevealPart
+                  key={index}
+                  visible
+                  reducedMotion={reducedMotion}
+                  profile="destination"
+                  delaySeconds={0.16 + index * 0.17}
+                  position={[x, 0, z]}
+                >
                   <mesh position={[0, 1.2, 0]} castShadow>
                     <cylinderGeometry args={[0.15, 0.23, 2.4, 8]} />
                     <meshStandardMaterial map={woodTexture} color="#7f6047" roughness={0.95} />
@@ -653,46 +722,53 @@ function ChoiceDestination({
                       emissiveIntensity={glow}
                     />
                   </mesh>
-                </group>
+                </RewardRevealPart>
               ))}
             </group>
           ) : (
             <group>
-              <mesh position={[0, 0.24, 0]} castShadow receiveShadow>
-                <cylinderGeometry args={[2.25, 2.5, 0.48, 8]} />
-                <meshStandardMaterial map={limestoneTexture} color="#c0ad89" roughness={0.94} />
-              </mesh>
-              <mesh position={[0, 1.25, 0]} castShadow receiveShadow>
-                <boxGeometry args={[3.35, 1.65, 2.35]} />
-                <meshStandardMaterial map={woodTexture} color="#aa805d" roughness={0.92} />
-              </mesh>
-              {[-1.52, 0, 1.52].map((x) => (
-                <mesh key={`workshop-frame-${x}`} position={[x, 1.3, 1.2]} castShadow>
-                  <boxGeometry args={[0.16, 1.82, 0.16]} />
+              <RewardRevealPart visible reducedMotion={reducedMotion} profile="destination">
+                <mesh position={[0, 0.24, 0]} castShadow receiveShadow>
+                  <cylinderGeometry args={[2.25, 2.5, 0.48, 8]} />
+                  <meshStandardMaterial map={limestoneTexture} color="#c0ad89" roughness={0.94} />
+                </mesh>
+              </RewardRevealPart>
+              <RewardRevealPart visible reducedMotion={reducedMotion} profile="destination" delaySeconds={0.15}>
+                <mesh position={[0, 1.25, 0]} castShadow receiveShadow>
+                  <boxGeometry args={[3.35, 1.65, 2.35]} />
+                  <meshStandardMaterial map={woodTexture} color="#aa805d" roughness={0.92} />
+                </mesh>
+                {[-1.52, 0, 1.52].map((x) => (
+                  <mesh key={`workshop-frame-${x}`} position={[x, 1.3, 1.2]} castShadow>
+                    <boxGeometry args={[0.16, 1.82, 0.16]} />
+                    <meshStandardMaterial map={woodTexture} color="#76533f" roughness={0.92} />
+                  </mesh>
+                ))}
+                <mesh position={[0, 2.06, 1.22]} castShadow>
+                  <boxGeometry args={[3.38, 0.17, 0.18]} />
                   <meshStandardMaterial map={woodTexture} color="#76533f" roughness={0.92} />
                 </mesh>
-              ))}
-              <mesh position={[0, 2.06, 1.22]} castShadow>
-                <boxGeometry args={[3.38, 0.17, 0.18]} />
-                <meshStandardMaterial map={woodTexture} color="#76533f" roughness={0.92} />
-              </mesh>
-              <mesh position={[0, 2.52, -0.58]} rotation={[0.42, 0, 0]} castShadow>
-                <boxGeometry args={[3.95, 0.18, 1.9]} />
-                <meshStandardMaterial color="#7a5d50" roughness={0.91} />
-              </mesh>
-              <mesh position={[0, 2.52, 0.58]} rotation={[-0.42, 0, 0]} castShadow>
-                <boxGeometry args={[3.95, 0.18, 1.9]} />
-                <meshStandardMaterial color="#866653" roughness={0.91} />
-              </mesh>
-              <mesh position={[1.12, 3.02, -0.42]} castShadow>
-                <boxGeometry args={[0.42, 1.05, 0.42]} />
-                <meshStandardMaterial map={limestoneTexture} color="#a99c82" roughness={0.96} />
-              </mesh>
-              <mesh position={[1.12, 3.58, -0.42]} castShadow>
-                <boxGeometry args={[0.58, 0.13, 0.58]} />
-                <meshStandardMaterial color="#786759" roughness={0.94} />
-              </mesh>
-              <mesh position={[0.58, 1.1, 1.22]} castShadow>
+              </RewardRevealPart>
+              <RewardRevealPart visible reducedMotion={reducedMotion} profile="destination" delaySeconds={0.38}>
+                <mesh position={[0, 2.52, -0.58]} rotation={[0.42, 0, 0]} castShadow>
+                  <boxGeometry args={[3.95, 0.18, 1.9]} />
+                  <meshStandardMaterial color="#7a5d50" roughness={0.91} />
+                </mesh>
+                <mesh position={[0, 2.52, 0.58]} rotation={[-0.42, 0, 0]} castShadow>
+                  <boxGeometry args={[3.95, 0.18, 1.9]} />
+                  <meshStandardMaterial color="#866653" roughness={0.91} />
+                </mesh>
+                <mesh position={[1.12, 3.02, -0.42]} castShadow>
+                  <boxGeometry args={[0.42, 1.05, 0.42]} />
+                  <meshStandardMaterial map={limestoneTexture} color="#a99c82" roughness={0.96} />
+                </mesh>
+                <mesh position={[1.12, 3.58, -0.42]} castShadow>
+                  <boxGeometry args={[0.58, 0.13, 0.58]} />
+                  <meshStandardMaterial color="#786759" roughness={0.94} />
+                </mesh>
+              </RewardRevealPart>
+              <RewardRevealPart visible reducedMotion={reducedMotion} profile="destination" delaySeconds={0.29}>
+                <mesh position={[0.58, 1.1, 1.22]} castShadow>
                 <boxGeometry args={[1.25, 1.55, 0.12]} />
                 <meshStandardMaterial
                   color="#71869a"
@@ -734,6 +810,7 @@ function ChoiceDestination({
                 </mesh>
               </group>
               <pointLight position={[0.3, 1.55, 1.85]} color="#f0b967" intensity={glow * 0.55} distance={6} decay={2} />
+              </RewardRevealPart>
             </group>
           )}
           <pointLight

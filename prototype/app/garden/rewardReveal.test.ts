@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getRewardRevealFrame } from './rewardReveal';
+import {
+  advanceRewardRevealPlayback,
+  getRewardAuraPresentation,
+  getRewardRevealFrame,
+  INITIAL_REWARD_REVEAL_PLAYBACK,
+} from './rewardReveal';
 
 describe('reward reveal presentation', () => {
   it('keeps hidden rewards below the garden surface without residual light', () => {
@@ -77,5 +82,73 @@ describe('reward reveal presentation', () => {
       aura: 0,
       glowBoost: 1,
     });
+  });
+
+  it('keeps a visible reward settled after reduced motion is turned back off', () => {
+    const started = advanceRewardRevealPlayback(INITIAL_REWARD_REVEAL_PLAYBACK, {
+      visible: true,
+      reducedMotion: false,
+      deltaSeconds: 0.2,
+    });
+    const reduced = advanceRewardRevealPlayback(started, {
+      visible: true,
+      reducedMotion: true,
+      deltaSeconds: 0.1,
+    });
+    const restored = advanceRewardRevealPlayback(reduced, {
+      visible: true,
+      reducedMotion: false,
+      deltaSeconds: 0.1,
+    });
+
+    expect(reduced.completed).toBe(true);
+    expect(restored.completed).toBe(true);
+    expect(getRewardRevealFrame({
+      elapsedSeconds: restored.elapsedSeconds,
+      visible: true,
+      reducedMotion: restored.completed,
+      profile: 'seed',
+    }).growth).toBe(1);
+  });
+
+  it('resets completed playback only after a reward is hidden and revealed again', () => {
+    const completed = advanceRewardRevealPlayback(INITIAL_REWARD_REVEAL_PLAYBACK, {
+      visible: true,
+      reducedMotion: true,
+      deltaSeconds: 0,
+    });
+    const hidden = advanceRewardRevealPlayback(completed, {
+      visible: false,
+      reducedMotion: false,
+      deltaSeconds: 0.1,
+    });
+    const revealedAgain = advanceRewardRevealPlayback(hidden, {
+      visible: true,
+      reducedMotion: false,
+      deltaSeconds: 0.1,
+    });
+
+    expect(hidden).toEqual(INITIAL_REWARD_REVEAL_PLAYBACK);
+    expect(revealedAgain.completed).toBe(false);
+    expect(revealedAgain.elapsedSeconds).toBeGreaterThan(0);
+  });
+
+  it('fully culls aura motes and motion once a reveal settles', () => {
+    const active = getRewardAuraPresentation(getRewardRevealFrame({
+      elapsedSeconds: 0.3,
+      visible: true,
+      reducedMotion: false,
+      profile: 'flower',
+    }));
+    const settled = getRewardAuraPresentation(getRewardRevealFrame({
+      elapsedSeconds: 2,
+      visible: true,
+      reducedMotion: false,
+      profile: 'flower',
+    }));
+
+    expect(active.visible).toBe(true);
+    expect(active.moteOpacity).toBeGreaterThan(0);
+    expect(settled).toEqual({ visible: false, moteOpacity: 0, rotationEnabled: false });
   });
 });
