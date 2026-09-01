@@ -21,6 +21,11 @@ import {
 import StorybookFoliage from './StorybookFoliage';
 import StorybookTerrain from './StorybookTerrain';
 import { createGardenTextureVariant, GARDEN_TEXTURE_PATHS } from './gardenSurface';
+import {
+  getRewardRevealFrame,
+  type RewardRevealFrame,
+  type RewardRevealProfile,
+} from './rewardReveal';
 
 export type StorybookGardenEnvironmentProps = Readonly<{
   grassTexture: Texture;
@@ -40,9 +45,19 @@ const rockData: Array<{ position: [number, number, number]; scale: [number, numb
   { position: [2.5, 7, -17.7], scale: [3.3, 2.75, 2.4], rotation: [-0.15, 0.1, 0.18], color: '#6c795f' },
 ];
 
-const STARFLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.025, 0.035, 0.46, 7);
-const STARFLOWER_HEAD_GEOMETRY = new THREE.SphereGeometry(0.13, 8, 6);
+const STARFLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.025, 0.035, 1, 7);
+const STARFLOWER_PETAL_GEOMETRY = new THREE.SphereGeometry(1, 10, 6);
+const STARFLOWER_CENTER_GEOMETRY = new THREE.IcosahedronGeometry(0.11, 1);
+const STARFLOWER_LEAF_GEOMETRY = new THREE.SphereGeometry(1, 8, 5);
+const REWARD_AURA_MOTE_GEOMETRY = new THREE.IcosahedronGeometry(0.045, 0);
 const STARFLOWER_STEM_MATERIAL = new THREE.MeshStandardMaterial({ color: '#4d774b' });
+const STARFLOWER_LEAF_MATERIAL = new THREE.MeshStandardMaterial({ color: '#6f915f', roughness: 0.92 });
+const STARFLOWER_CENTER_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#d8a75f',
+  emissive: '#c68d48',
+  emissiveIntensity: 0.25,
+  roughness: 0.72,
+});
 const LAVENDER_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
   color: '#e6c5ef',
   roughness: 0.8,
@@ -55,6 +70,110 @@ const GOLD_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
   emissive: '#f3d58e',
   emissiveIntensity: 0.2,
 });
+
+function useRewardRevealGroup({
+  visible,
+  reducedMotion,
+  profile,
+  delaySeconds = 0,
+}: {
+  visible: boolean;
+  reducedMotion: boolean;
+  profile: RewardRevealProfile;
+  delaySeconds?: number;
+}) {
+  const group = useRef<THREE.Group>(null);
+  const elapsedSeconds = useRef(0);
+  const previousVisible = useRef(visible);
+  const frame = useRef<RewardRevealFrame>(getRewardRevealFrame({
+    elapsedSeconds: 0,
+    visible,
+    reducedMotion,
+    profile,
+    delaySeconds,
+  }));
+
+  useFrame((_, delta) => {
+    if (previousVisible.current !== visible) {
+      previousVisible.current = visible;
+      elapsedSeconds.current = 0;
+    }
+    if (visible && !reducedMotion) elapsedSeconds.current += Math.min(delta, 0.05);
+    frame.current = getRewardRevealFrame({
+      elapsedSeconds: elapsedSeconds.current,
+      visible,
+      reducedMotion,
+      profile,
+      delaySeconds,
+    });
+    const current = frame.current;
+    group.current?.scale.set(current.scale, current.scaleY, current.scale);
+    if (group.current) group.current.position.y = current.rise;
+  });
+
+  return { group, frame };
+}
+
+function RewardRevealAura({
+  visible,
+  reducedMotion,
+  profile,
+  radius,
+  color,
+}: {
+  visible: boolean;
+  reducedMotion: boolean;
+  profile: RewardRevealProfile;
+  radius: number;
+  color: string;
+}) {
+  const { group: reveal, frame } = useRewardRevealGroup({ visible, reducedMotion, profile });
+  const aura = useRef<THREE.Group>(null);
+  const innerRing = useRef<THREE.MeshBasicMaterial>(null);
+  const outerRing = useRef<THREE.MeshBasicMaterial>(null);
+  const light = useRef<THREE.PointLight>(null);
+
+  useFrame(({ clock }) => {
+    const intensity = frame.current.aura;
+    if (aura.current) {
+      aura.current.rotation.z = reducedMotion ? 0 : clock.elapsedTime * 0.18;
+      const auraScale = Math.max(0.02, 0.78 + intensity * 0.42);
+      aura.current.scale.setScalar(auraScale);
+    }
+    if (innerRing.current) innerRing.current.opacity = intensity * 0.34;
+    if (outerRing.current) outerRing.current.opacity = intensity * 0.18;
+    if (light.current) light.current.intensity = intensity * 1.25;
+  });
+
+  return (
+    <group ref={reveal} position={[0, 0.035, 0]} scale={0.02}>
+      <group ref={aura}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius * 0.68, radius * 0.75, 48]} />
+          <meshBasicMaterial ref={innerRing} color={color} transparent opacity={0} depthWrite={false} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius * 0.92, radius, 48]} />
+          <meshBasicMaterial ref={outerRing} color={color} transparent opacity={0} depthWrite={false} />
+        </mesh>
+        {Array.from({ length: 8 }, (_, index) => {
+          const angle = (index / 8) * Math.PI * 2;
+          return (
+            <mesh
+              key={index}
+              geometry={REWARD_AURA_MOTE_GEOMETRY}
+              position={[Math.cos(angle) * radius * 0.82, 0.08 + (index % 3) * 0.09, Math.sin(angle) * radius * 0.82]}
+              scale={0.75 + (index % 2) * 0.3}
+            >
+              <meshBasicMaterial color={color} transparent opacity={0.72} depthWrite={false} />
+            </mesh>
+          );
+        })}
+        <pointLight ref={light} position={[0, 0.55, 0]} color={color} intensity={0} distance={radius * 4.5} decay={2} />
+      </group>
+    </group>
+  );
+}
 
 function RockBackdrop({ limestoneTexture }: { limestoneTexture: Texture }) {
   return (
@@ -160,13 +279,13 @@ function Pavilion({
   limestoneTexture: Texture;
   woodTexture: Texture;
 }) {
-  const additions = useRef<THREE.Group>(null);
-  useFrame((_, delta) => {
-    if (!additions.current) return;
-    const target = improved ? 1 : 0.03;
-    const next = reducedMotion ? target : THREE.MathUtils.damp(additions.current.scale.x, target, improved ? 4.2 : 7, delta);
-    additions.current.scale.setScalar(next);
+  const { group: additions } = useRewardRevealGroup({
+    visible: improved,
+    reducedMotion,
+    profile: 'structure',
   });
+
+  const bookColors = ['#a86752', '#667d65', '#c19252', '#77698b', '#9b705d', '#58737b'];
 
   return (
     <group position={[PAVILION_CENTER.x, 0, PAVILION_CENTER.z]}>
@@ -211,30 +330,69 @@ function Pavilion({
           <meshStandardMaterial color="#ad7b58" roughness={0.92} />
         </mesh>
       ))}
-      <group ref={additions} scale={improved ? 1 : 0.03}>
-        <mesh position={[0, 2.86, 0]}>
-          <sphereGeometry args={[0.28, 16, 12]} />
-          <meshStandardMaterial color="#f4cf78" emissive="#e7a957" emissiveIntensity={glow} />
-        </mesh>
-        {[-0.9, -0.45, 0, 0.45, 0.9].map((x, index) => (
-          <mesh key={x} position={[x, 1.32, -1.11]} rotation={[0, 0, (index - 2) * 0.035]} castShadow>
-            <boxGeometry args={[0.25, 1.2 - (index % 3) * 0.08, 0.28]} />
-            <meshStandardMaterial color={['#ad7658', '#6e8266', '#c59a58', '#7f6d91', '#b98263'][index]} roughness={0.86} />
-          </mesh>
-        ))}
-        {[-1.7, 1.7].map((x) => (
-          <group key={x} position={[x, 2.71, 0.25]}>
-            <mesh castShadow>
-              <cylinderGeometry args={[0.18, 0.24, 0.5, 8]} />
-              <meshStandardMaterial color="#e6b763" emissive="#d99745" emissiveIntensity={glow} />
+      <group ref={additions} scale={0.035}>
+        <group position={[0, 0, -1.28]}>
+          {[-1.42, 1.42].map((x) => (
+            <mesh key={`shelf-post-${x}`} position={[x, 1.66, 0]} castShadow>
+              <boxGeometry args={[0.18, 2.75, 0.38]} />
+              <meshStandardMaterial map={woodTexture} color="#986f52" roughness={0.92} />
             </mesh>
-            <mesh position={[0, 0.48, 0]}>
-              <cylinderGeometry args={[0.025, 0.025, 0.5, 6]} />
-              <meshStandardMaterial color="#655446" />
+          ))}
+          {[0.38, 1.22, 2.06, 2.92].map((y) => (
+            <mesh key={`shelf-${y}`} position={[0, y, 0]} castShadow>
+              <boxGeometry args={[3.02, 0.16, 0.5]} />
+              <meshStandardMaterial map={woodTexture} color="#a97a58" roughness={0.9} />
+            </mesh>
+          ))}
+          {Array.from({ length: 15 }, (_, index) => {
+            const row = Math.floor(index / 5);
+            const column = index % 5;
+            const height = 0.48 + ((index * 3) % 4) * 0.055;
+            return (
+              <mesh
+                key={`book-${index}`}
+                position={[-1.02 + column * 0.5, 0.54 + row * 0.84 + height / 2, -0.02]}
+                rotation={[0, 0, (column - 2) * 0.025]}
+                castShadow
+              >
+                <boxGeometry args={[0.25 + (index % 2) * 0.04, height, 0.32]} />
+                <meshStandardMaterial color={bookColors[index % bookColors.length]} roughness={0.86} />
+              </mesh>
+            );
+          })}
+          <mesh position={[0, 3.16, 0]} castShadow>
+            <boxGeometry args={[3.35, 0.2, 0.58]} />
+            <meshStandardMaterial map={woodTexture} color="#855f48" roughness={0.92} />
+          </mesh>
+        </group>
+        {[-1.7, 1.7].map((x) => (
+          <group key={x} position={[x, 2.64, 0.25]}>
+            <mesh position={[0, 0.38, 0]} castShadow>
+              <cylinderGeometry args={[0.035, 0.035, 0.7, 8]} />
+              <meshStandardMaterial color="#665344" roughness={0.9} />
+            </mesh>
+            <mesh position={[0, 0.02, 0]} castShadow>
+              <cylinderGeometry args={[0.22, 0.26, 0.12, 8]} />
+              <meshStandardMaterial color="#8a674f" metalness={0.05} roughness={0.8} />
+            </mesh>
+            <mesh position={[0, -0.21, 0]} castShadow>
+              <cylinderGeometry args={[0.2, 0.16, 0.48, 8]} />
+              <meshStandardMaterial color="#f2c16f" emissive="#e2a454" emissiveIntensity={glow * 0.75} roughness={0.5} />
+            </mesh>
+            <mesh position={[0, -0.48, 0]} castShadow>
+              <cylinderGeometry args={[0.24, 0.2, 0.1, 8]} />
+              <meshStandardMaterial color="#765b49" roughness={0.85} />
             </mesh>
           </group>
         ))}
       </group>
+      <RewardRevealAura
+        visible={improved}
+        reducedMotion={reducedMotion}
+        profile="structure"
+        radius={3.15}
+        color="#f0c982"
+      />
       <pointLight
         position={[0, 2.86, 0]}
         color="#ffd88a"
@@ -252,31 +410,95 @@ function Pavilion({
   );
 }
 
-function FlowerPatch({
+function BloomingFlower({
   position,
-  headMaterial,
+  height,
+  rotationY,
+  petalMaterial,
   glow,
 }: {
-  position: [number, number, number];
-  headMaterial: THREE.MeshStandardMaterial;
+  position: readonly [number, number, number];
+  height: number;
+  rotationY: number;
+  petalMaterial: THREE.MeshStandardMaterial;
   glow: number;
 }) {
   return (
-    <group position={position} dispose={null}>
-      {[[-0.7, 0], [-0.2, 0.35], [0.35, -0.2], [0.75, 0.2], [0.1, -0.65]].map(([x, z], index) => (
-        <group key={index} position={[x, 0, z]}>
-          <mesh
-            geometry={STARFLOWER_STEM_GEOMETRY}
-            material={STARFLOWER_STEM_MATERIAL}
-            position={[0, 0.24, 0]}
-          />
-          <mesh
-            geometry={STARFLOWER_HEAD_GEOMETRY}
-            material={headMaterial}
-            material-emissiveIntensity={glow}
-            position={[0, 0.52, 0]}
-          />
-        </group>
+    <group position={[...position]} rotation={[0, rotationY, 0]} dispose={null}>
+      <mesh
+        geometry={STARFLOWER_STEM_GEOMETRY}
+        material={STARFLOWER_STEM_MATERIAL}
+        position={[0, height / 2, 0]}
+        scale={[1, height, 1]}
+      />
+      <mesh
+        geometry={STARFLOWER_LEAF_GEOMETRY}
+        material={STARFLOWER_LEAF_MATERIAL}
+        position={[0.09, height * 0.48, 0]}
+        rotation={[0.08, 0.25, -0.55]}
+        scale={[0.18, 0.035, 0.075]}
+      />
+      <group position={[0, height, 0]} rotation={[0.12, 0, -0.08]}>
+        {Array.from({ length: 6 }, (_, index) => {
+          const angle = (index / 6) * Math.PI * 2;
+          return (
+            <mesh
+              key={index}
+              geometry={STARFLOWER_PETAL_GEOMETRY}
+              material={petalMaterial}
+              material-emissiveIntensity={glow * 0.18}
+              position={[Math.cos(angle) * 0.18, 0, Math.sin(angle) * 0.18]}
+              rotation={[0, -angle, 0]}
+              scale={[0.22, 0.055, 0.1]}
+              castShadow
+            />
+          );
+        })}
+        <mesh geometry={STARFLOWER_CENTER_GEOMETRY} material={STARFLOWER_CENTER_MATERIAL} position={[0, 0.025, 0]} />
+      </group>
+    </group>
+  );
+}
+
+const STARFLOWER_CLUSTER = [
+  { position: [-0.7, 0, 0] as const, height: 0.84, rotationY: -0.4 },
+  { position: [-0.2, 0, 0.35] as const, height: 1.02, rotationY: 0.25 },
+  { position: [0.35, 0, -0.2] as const, height: 0.92, rotationY: -0.1 },
+  { position: [0.75, 0, 0.2] as const, height: 1.14, rotationY: 0.5 },
+  { position: [0.1, 0, -0.65] as const, height: 0.96, rotationY: -0.6 },
+] as const;
+
+function FlowerPatch({
+  position,
+  petalMaterial,
+  glow,
+  visible,
+  reducedMotion,
+  delayOffset,
+}: {
+  position: readonly [number, number, number];
+  petalMaterial: THREE.MeshStandardMaterial;
+  glow: number;
+  visible: boolean;
+  reducedMotion: boolean;
+  delayOffset: number;
+}) {
+  const { group } = useRewardRevealGroup({
+    visible,
+    reducedMotion,
+    profile: 'flower',
+    delaySeconds: delayOffset,
+  });
+
+  return (
+    <group ref={group} position={[...position]} scale={0.035} dispose={null}>
+      {STARFLOWER_CLUSTER.map((flower) => (
+        <BloomingFlower
+          key={`${flower.position[0]}-${flower.position[2]}`}
+          {...flower}
+          petalMaterial={petalMaterial}
+          glow={glow}
+        />
       ))}
     </group>
   );
@@ -286,29 +508,30 @@ function StarflowerPatch({
   glow,
   visible,
   reducedMotion,
+  earthTexture,
+  limestoneTexture,
 }: {
   glow: number;
   visible: boolean;
   reducedMotion: boolean;
+  earthTexture: Texture;
+  limestoneTexture: Texture;
 }) {
-  const flowers = useRef<THREE.Group>(null);
-  useFrame((_, delta) => {
-    if (!flowers.current) return;
-    const target = visible ? 1 : 0.04;
-    const next = reducedMotion ? target : THREE.MathUtils.damp(flowers.current.scale.x, target, visible ? 4.8 : 7, delta);
-    flowers.current.scale.setScalar(next);
-  });
-
   return (
-    <group position={[8.2, 0, 6.6]}>
-      <mesh position={[0, 0.018, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[1.22, 24]} />
-        <meshStandardMaterial color="#596f45" roughness={1} />
+    <group position={[6.35, 0, 6.6]}>
+      <mesh position={[0, 0.045, 0]} receiveShadow>
+        <cylinderGeometry args={[1.34, 1.44, 0.09, 24]} />
+        <meshStandardMaterial map={earthTexture} color="#7d7652" roughness={1} />
       </mesh>
-      <group ref={flowers} scale={visible ? 1 : 0.04}>
-        <FlowerPatch position={[0, 0, 0]} headMaterial={LAVENDER_STARFLOWER_MATERIAL} glow={glow} />
-        <FlowerPatch position={[0.7, 0, 0.55]} headMaterial={GOLD_STARFLOWER_MATERIAL} glow={glow} />
-      </group>
+      {[[-1.16, 0.12], [0.92, -0.76], [0.8, 0.9], [-0.55, -1.02]].map(([x, z], index) => (
+        <mesh key={index} position={[x, 0.13, z]} rotation={[0.2, index * 0.8, 0.12]} scale={[0.23, 0.14, 0.18]} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial map={limestoneTexture} color={index % 2 ? '#d6c7aa' : '#c8bea2'} roughness={0.96} flatShading />
+        </mesh>
+      ))}
+      <FlowerPatch position={[-0.32, 0.09, -0.08]} petalMaterial={LAVENDER_STARFLOWER_MATERIAL} glow={glow} visible={visible} reducedMotion={reducedMotion} delayOffset={0} />
+      <FlowerPatch position={[0.52, 0.09, 0.42]} petalMaterial={GOLD_STARFLOWER_MATERIAL} glow={glow} visible={visible} reducedMotion={reducedMotion} delayOffset={0.18} />
+      <RewardRevealAura visible={visible} reducedMotion={reducedMotion} profile="flower" radius={1.5} color="#d8c5f0" />
     </group>
   );
 }
@@ -317,48 +540,66 @@ function CuriousSeed({
   glow,
   visible,
   reducedMotion,
+  earthTexture,
+  limestoneTexture,
 }: {
   glow: number;
   visible: boolean;
   reducedMotion: boolean;
+  earthTexture: Texture;
+  limestoneTexture: Texture;
 }) {
-  const discovery = useRef<THREE.Group>(null);
-  useFrame(({ clock }, delta) => {
-    if (!discovery.current) return;
-    const target = visible ? 1 : 0.03;
-    const next = reducedMotion ? target : THREE.MathUtils.damp(discovery.current.scale.x, target, visible ? 4.4 : 7, delta);
-    discovery.current.scale.setScalar(next);
-    discovery.current.rotation.y = reducedMotion ? 0 : clock.elapsedTime * 0.32;
-    const targetY = visible ? 0.72 + Math.sin(clock.elapsedTime * 1.6) * 0.08 : 0.08;
-    discovery.current.position.y = reducedMotion ? (visible ? 0.72 : 0.08) : THREE.MathUtils.damp(discovery.current.position.y, targetY, visible ? 4.4 : 7, delta);
+  const { group: discovery, frame } = useRewardRevealGroup({
+    visible,
+    reducedMotion,
+    profile: 'seed',
+  });
+  const seedObject = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (!seedObject.current) return;
+    const settled = frame.current.growth > 0.92;
+    seedObject.current.rotation.y = reducedMotion ? 0.25 : clock.elapsedTime * 0.22;
+    seedObject.current.position.y = 0.66 + (!reducedMotion && settled ? Math.sin(clock.elapsedTime * 1.35) * 0.045 : 0);
   });
 
   return (
     <group position={[-8.5, 0, 7.4]}>
-      <mesh position={[0, 0.035, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[0.7, 1.1, 20]} />
-        <meshStandardMaterial color="#c8bea1" roughness={0.96} />
+      <mesh position={[0, 0.06, 0]} receiveShadow>
+        <cylinderGeometry args={[1.05, 1.18, 0.12, 24]} />
+        <meshStandardMaterial map={earthTexture} color="#776f4e" roughness={1} />
       </mesh>
-      <group ref={discovery} position={[0, 0.72, 0]} scale={visible ? 1 : 0.03}>
-        <mesh castShadow>
-          <dodecahedronGeometry args={[0.42, 1]} />
-          <meshStandardMaterial
-            color="#d2ad59"
-            roughness={0.48}
-            emissive="#9d7938"
-            emissiveIntensity={glow}
-            flatShading
-          />
+      {[[-0.92, -0.22], [0.72, -0.66], [0.78, 0.58]].map(([x, z], index) => (
+        <mesh key={index} position={[x, 0.15, z]} rotation={[0.15, index * 0.7, 0.08]} scale={[0.22, 0.15, 0.2]} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial map={limestoneTexture} color={index % 2 ? '#d0c3a6' : '#bdb79d'} roughness={0.97} flatShading />
         </mesh>
-        <mesh position={[-0.28, 0.38, 0]} rotation={[0.1, 0, -0.72]} scale={[0.34, 0.12, 0.18]}>
-          <sphereGeometry args={[1, 12, 8]} />
-          <meshStandardMaterial color="#68865a" roughness={0.88} />
-        </mesh>
-        <mesh position={[0.28, 0.38, 0]} rotation={[0.1, 0, 0.72]} scale={[0.34, 0.12, 0.18]}>
-          <sphereGeometry args={[1, 12, 8]} />
-          <meshStandardMaterial color="#789664" roughness={0.88} />
-        </mesh>
+      ))}
+      <group ref={discovery} scale={0.035}>
+        <group ref={seedObject} position={[0, 0.66, 0]}>
+          <mesh position={[0, -0.05, 0]} scale={[0.62, 0.78, 0.56]} castShadow>
+            <sphereGeometry args={[1, 18, 12]} />
+            <meshStandardMaterial color="#c7944d" roughness={0.66} emissive="#b47c35" emissiveIntensity={0.12 + glow * 0.42} />
+          </mesh>
+          <mesh position={[0, 0.55, 0]} scale={[0.65, 0.21, 0.59]} castShadow>
+            <sphereGeometry args={[1, 16, 8]} />
+            <meshStandardMaterial color="#765637" roughness={0.92} />
+          </mesh>
+          <mesh position={[0.03, 0.83, 0]} rotation={[0.12, 0, -0.16]} castShadow>
+            <cylinderGeometry args={[0.04, 0.065, 0.65, 7]} />
+            <meshStandardMaterial color="#557149" roughness={0.94} />
+          </mesh>
+          <mesh position={[-0.3, 0.94, 0]} rotation={[0.05, -0.2, -0.58]} scale={[0.42, 0.12, 0.22]} castShadow>
+            <sphereGeometry args={[1, 12, 7]} />
+            <meshStandardMaterial color="#66885b" roughness={0.9} />
+          </mesh>
+          <mesh position={[0.32, 1.08, 0.02]} rotation={[0.05, 0.2, 0.62]} scale={[0.44, 0.13, 0.23]} castShadow>
+            <sphereGeometry args={[1, 12, 7]} />
+            <meshStandardMaterial color="#789a63" roughness={0.9} />
+          </mesh>
+          <pointLight position={[0, 0.25, 0]} color="#e8bf67" intensity={visible ? 0.5 + glow * 0.35 : 0} distance={4.5} decay={2} />
+        </group>
       </group>
+      <RewardRevealAura visible={visible} reducedMotion={reducedMotion} profile="seed" radius={1.35} color="#d5b66a" />
     </group>
   );
 }
@@ -367,27 +608,29 @@ function ChoiceDestination({
   choice,
   glow,
   reducedMotion,
+  limestoneTexture,
+  woodTexture,
 }: {
   choice: GardenChoice | null;
   glow: number;
   reducedMotion: boolean;
+  limestoneTexture: Texture;
+  woodTexture: Texture;
 }) {
-  const destination = useRef<THREE.Group>(null);
-  useFrame((_, delta) => {
-    if (!destination.current) return;
-    const target = choice ? 1 : 0.03;
-    const next = reducedMotion ? target : THREE.MathUtils.damp(destination.current.scale.x, target, choice ? 3.5 : 7, delta);
-    destination.current.scale.setScalar(next);
+  const { group: destination } = useRewardRevealGroup({
+    visible: Boolean(choice),
+    reducedMotion,
+    profile: 'destination',
   });
 
   return (
     <group position={[-13, 0, 11]}>
       {choice && (
-        <group ref={destination} scale={0.03}>
+        <group ref={destination} scale={0.035}>
           {[[-9.7, 8.5], [-10.8, 9.5], [-12, 10.2]].map(([x, z], index) => (
             <mesh key={index} position={[x + 10.7, 0.045, z - 9.4]} scale={[0.9, 0.1, 0.58]} castShadow receiveShadow>
               <cylinderGeometry args={[0.65, 0.72, 0.22, 9]} />
-              <meshStandardMaterial color="#d2c6a5" roughness={0.95} />
+              <meshStandardMaterial map={limestoneTexture} color="#d2c6a5" roughness={0.95} />
             </mesh>
           ))}
           {choice === 'orchard' ? (
@@ -396,7 +639,7 @@ function ChoiceDestination({
                 <group key={index} position={[x, 0, z]}>
                   <mesh position={[0, 1.2, 0]} castShadow>
                     <cylinderGeometry args={[0.15, 0.23, 2.4, 8]} />
-                    <meshStandardMaterial color="#7f6047" roughness={0.95} />
+                    <meshStandardMaterial map={woodTexture} color="#7f6047" roughness={0.95} />
                   </mesh>
                   <mesh position={[0, 2.65, 0]} scale={[1.05, 0.9, 1]} castShadow>
                     <dodecahedronGeometry args={[1, 1]} />
@@ -417,31 +660,80 @@ function ChoiceDestination({
             <group>
               <mesh position={[0, 0.24, 0]} castShadow receiveShadow>
                 <cylinderGeometry args={[2.25, 2.5, 0.48, 8]} />
-                <meshStandardMaterial color="#c0ad89" roughness={0.94} />
+                <meshStandardMaterial map={limestoneTexture} color="#c0ad89" roughness={0.94} />
               </mesh>
-              <mesh position={[0, 1.15, 0]} castShadow>
-                <boxGeometry args={[3.2, 1.35, 2.3]} />
-                <meshStandardMaterial color="#a97b55" roughness={0.9} />
+              <mesh position={[0, 1.25, 0]} castShadow receiveShadow>
+                <boxGeometry args={[3.35, 1.65, 2.35]} />
+                <meshStandardMaterial map={woodTexture} color="#aa805d" roughness={0.92} />
               </mesh>
-              <mesh position={[0, 2.25, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
-                <coneGeometry args={[2.65, 1.2, 4]} />
-                <meshStandardMaterial color="#765f55" roughness={0.88} />
+              {[-1.52, 0, 1.52].map((x) => (
+                <mesh key={`workshop-frame-${x}`} position={[x, 1.3, 1.2]} castShadow>
+                  <boxGeometry args={[0.16, 1.82, 0.16]} />
+                  <meshStandardMaterial map={woodTexture} color="#76533f" roughness={0.92} />
+                </mesh>
+              ))}
+              <mesh position={[0, 2.06, 1.22]} castShadow>
+                <boxGeometry args={[3.38, 0.17, 0.18]} />
+                <meshStandardMaterial map={woodTexture} color="#76533f" roughness={0.92} />
               </mesh>
-              <mesh position={[0, 1.05, 1.2]} castShadow>
-                <boxGeometry args={[2.1, 0.22, 0.7]} />
+              <mesh position={[0, 2.52, -0.58]} rotation={[0.42, 0, 0]} castShadow>
+                <boxGeometry args={[3.95, 0.18, 1.9]} />
+                <meshStandardMaterial color="#7a5d50" roughness={0.91} />
+              </mesh>
+              <mesh position={[0, 2.52, 0.58]} rotation={[-0.42, 0, 0]} castShadow>
+                <boxGeometry args={[3.95, 0.18, 1.9]} />
+                <meshStandardMaterial color="#866653" roughness={0.91} />
+              </mesh>
+              <mesh position={[1.12, 3.02, -0.42]} castShadow>
+                <boxGeometry args={[0.42, 1.05, 0.42]} />
+                <meshStandardMaterial map={limestoneTexture} color="#a99c82" roughness={0.96} />
+              </mesh>
+              <mesh position={[1.12, 3.58, -0.42]} castShadow>
+                <boxGeometry args={[0.58, 0.13, 0.58]} />
+                <meshStandardMaterial color="#786759" roughness={0.94} />
+              </mesh>
+              <mesh position={[0.58, 1.1, 1.22]} castShadow>
+                <boxGeometry args={[1.25, 1.55, 0.12]} />
                 <meshStandardMaterial
-                  color="#8ca5cf"
+                  color="#71869a"
                   emissive="#c58b65"
-                  emissiveIntensity={glow}
+                  emissiveIntensity={glow * 0.12}
                   roughness={0.82}
                 />
               </mesh>
-              {[-0.55, 0, 0.55].map((x, index) => (
-                <mesh key={x} position={[x, 1.55 + index * 0.08, 1.18]} rotation={[0, 0, index * 0.3 - 0.3]}>
-                  <boxGeometry args={[0.16, 0.7, 0.16]} />
-                  <meshStandardMaterial color={index === 1 ? '#6a8065' : '#d0b064'} roughness={0.8} />
+              <mesh position={[-0.82, 1.42, 1.24]} castShadow>
+                <boxGeometry args={[0.9, 0.72, 0.12]} />
+                <meshPhysicalMaterial color="#9cc4c1" emissive="#79aaa5" emissiveIntensity={0.18} roughness={0.24} clearcoat={0.35} />
+              </mesh>
+              <mesh position={[-0.82, 1.42, 1.31]}>
+                <boxGeometry args={[0.08, 0.75, 0.08]} />
+                <meshStandardMaterial color="#70513e" roughness={0.9} />
+              </mesh>
+              <mesh position={[-0.82, 1.42, 1.31]} rotation={[0, 0, Math.PI / 2]}>
+                <boxGeometry args={[0.08, 0.92, 0.08]} />
+                <meshStandardMaterial color="#70513e" roughness={0.9} />
+              </mesh>
+              <group position={[-0.95, 0.72, 1.82]}>
+                <mesh position={[0, 0.32, 0]} castShadow>
+                  <boxGeometry args={[1.25, 0.16, 0.62]} />
+                  <meshStandardMaterial map={woodTexture} color="#8c674c" roughness={0.94} />
                 </mesh>
-              ))}
+                {[-0.48, 0.48].map((x) => (
+                  <mesh key={x} position={[x, -0.02, 0]} castShadow>
+                    <boxGeometry args={[0.12, 0.68, 0.12]} />
+                    <meshStandardMaterial map={woodTexture} color="#75533e" roughness={0.94} />
+                  </mesh>
+                ))}
+                <mesh position={[0.28, 0.55, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[0.19, 0.055, 8, 12]} />
+                  <meshStandardMaterial color="#c69a54" metalness={0.18} roughness={0.7} />
+                </mesh>
+                <mesh position={[-0.3, 0.58, 0]} rotation={[0, 0, -0.5]}>
+                  <boxGeometry args={[0.11, 0.6, 0.1]} />
+                  <meshStandardMaterial color="#6f7c73" metalness={0.16} roughness={0.66} />
+                </mesh>
+              </group>
+              <pointLight position={[0.3, 1.55, 1.85]} color="#f0b967" intensity={glow * 0.55} distance={6} decay={2} />
             </group>
           )}
           <pointLight
@@ -450,6 +742,13 @@ function ChoiceDestination({
             intensity={glow * 0.6}
             distance={7.5}
             decay={2}
+          />
+          <RewardRevealAura
+            visible={Boolean(choice)}
+            reducedMotion={reducedMotion}
+            profile="destination"
+            radius={3.1}
+            color={choice === 'orchard' ? '#d4bd6e' : '#93acd2'}
           />
         </group>
       )}
@@ -541,16 +840,22 @@ export default function StorybookGardenEnvironment({
         glow={presentation.starflowerGlow}
         visible={presentation.starflowerGlow > 0.2}
         reducedMotion={!presentation.moteMotion}
+        earthTexture={finishTextures.earthTerrain}
+        limestoneTexture={finishTextures.limestoneSmall}
       />
       <CuriousSeed
         glow={presentation.seedGlow}
         visible={presentation.seedGlow > 0.15}
         reducedMotion={!presentation.moteMotion}
+        earthTexture={finishTextures.earthTerrain}
+        limestoneTexture={finishTextures.limestoneSmall}
       />
       <ChoiceDestination
         choice={presentation.destinationAccent}
         glow={presentation.destinationGlow}
         reducedMotion={!presentation.moteMotion}
+        limestoneTexture={finishTextures.limestoneSmall}
+        woodTexture={finishTextures.woodPosts}
       />
     </>
   );
