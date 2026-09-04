@@ -53,10 +53,9 @@ export function shouldHoldPipForInteraction(
   mode: 'ordinary' | 'priority',
   phase: PipInteractionPhase,
 ): boolean {
-  if (phase !== 'none' || !canDirectlyInteractWithPip(mode)) return false;
+  if (phase !== 'none' || !canDirectlyInteractWithPip(mode) || activityKind === 'greet') return false;
 
-  return interactionEngaged
-    || (visitorDistance <= PIP_INTERACTION_INVITATION_DISTANCE && activityKind !== 'greet');
+  return interactionEngaged || visitorDistance <= PIP_INTERACTION_INVITATION_DISTANCE;
 }
 
 export function handleHeldPipEscape(

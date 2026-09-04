@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import GardenWorld from './GardenWorld';
-import { deriveGardenVisibility, type GardenChoice, type GardenView } from './garden/rewardState';
+import { type GardenChoice, type GardenView } from './garden/rewardState';
+import { createJourney, journeyReducer, projectJourneyScene, getPipJourneyProfile, RETURN_CHAPTERS, type MemoryKind } from './garden/journey';
+import JourneyJournal from './garden/JourneyJournal';
+import './garden/journey.css';
 
 export default function Home() {
-  const [rewardStage, setRewardStage] = useState<0 | 1 | 2 | 3>(0);
+  const [journey, dispatchJourney] = useReducer(journeyReducer, undefined, createJourney);
+  const { rewardStage, choice: gardenChoice } = journey;
+  const [interactionBusy, setInteractionBusy] = useState(false);
   const [gardenView, setGardenView] = useState<GardenView>('before');
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<GardenChoice | null>(null);
-  const [gardenChoice, setGardenChoice] = useState<GardenChoice | null>(null);
   const [visitPreviewOpen, setVisitPreviewOpen] = useState(false);
   const [comfortResponse, setComfortResponse] = useState<'comfortable' | 'unsure' | 'invasive' | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
@@ -51,26 +55,33 @@ export default function Home() {
   }, [choiceOpen, visitPreviewOpen]);
 
   const simulateAchievement = () => {
-    setRewardStage((current) => Math.min(3, current + 1) as 0 | 1 | 2 | 3);
+    dispatchJourney({ type: 'accomplishment' });
     setGardenView('now');
   };
 
-  const activeReward = rewardStage === 3 ? 'seed' : rewardStage === 2 ? 'pavilion' : 'starflowers';
-  const { starflowersVisible, pavilionImproved, seedVisible, destinationVisible } = deriveGardenVisibility({ rewardStage, gardenView, gardenChoice });
+  const { visit: sceneVisit, ...scene } = projectJourneyScene(journey, gardenView);
+  const comparing = gardenView === 'before' && rewardStage > 0;
+  const worldJourney = useMemo(() => ({ visit: journey.visit, sceneVisit, comparing, profile: getPipJourneyProfile(journey) }), [journey, sceneVisit, comparing]);
+  const rememberInteraction = useCallback((interaction: MemoryKind) => dispatchJourney({ type: 'remember', interaction }), []);
+  const returnLater = () => {
+    if (interactionBusy) return;
+    dispatchJourney({ type: 'return' });
+    setGardenView('now');
+  };
 
   const confirmChoice = () => {
     if (!pendingChoice) return;
-    setGardenChoice(pendingChoice);
+    dispatchJourney({ type: 'choose', choice: pendingChoice });
     setChoiceOpen(false);
     setGardenView('now');
   };
 
   const restartPrototype = () => {
-    setRewardStage(0);
+    dispatchJourney({ type: 'reset' });
     setGardenView('before');
     setChoiceOpen(false);
     setPendingChoice(null);
-    setGardenChoice(null);
+    setInteractionBusy(false);
     setVisitPreviewOpen(false);
     setComfortResponse(null);
     setSessionKey((current) => current + 1);
@@ -83,7 +94,7 @@ export default function Home() {
           <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
           <span>Common Grove</span>
         </a>
-        <div className="day-label"><span aria-hidden="true">●</span> Friday morning · peaceful</div>
+        <div className="day-label"><span aria-hidden="true">●</span> {RETURN_CHAPTERS[journey.visit].time} · simulated</div>
         <div className="profile-button" aria-label="Your private garden">
           <span className="profile-dot">R</span>
           <span className="profile-copy"><strong>Your garden</strong><small>Private · growing</small></span>
@@ -92,69 +103,19 @@ export default function Home() {
 
       <section className="world-panel immersive-world" id="garden" aria-label="Explore your first-person Common Grove garden">
         <GardenWorld
-          key={sessionKey}
+          key={`${sessionKey}-${journey.visit}`}
           rewardStage={rewardStage}
-          starflowersVisible={starflowersVisible}
-          pavilionImproved={pavilionImproved}
-          seedVisible={seedVisible}
-          destinationVisible={destinationVisible}
+          {...scene}
           gardenChoice={gardenChoice}
+          journey={worldJourney}
+          onMemory={rememberInteraction}
+          onBusyChange={setInteractionBusy}
         />
       </section>
 
-      <details className="garden-guide" open>
-        <summary><span>Garden journal</span><b aria-hidden="true">+</b></summary>
-        <div className="garden-guide-content">
-          <p className="overline">Welcome back</p>
-          <h1>{rewardStage === 3 ? 'The garden found a possibility.' : rewardStage === 2 ? 'The pavilion feels warmer.' : rewardStage === 1 ? 'Something new is blooming.' : 'The grove is listening.'}</h1>
-          <p>{rewardStage === 3
-            ? 'Something shared with the team revealed a curious seed beside an unopened path. It can wait until you are ready.'
-            : rewardStage === 2
-              ? 'Progress on important work brought finished shelves, new books, and warm lantern light to the reading pavilion.'
-            : rewardStage === 1
-              ? 'A recent contribution helped someone move forward. Fresh water reached the garden, and a patch of starflowers opened near the pond.'
-              : 'This private prototype control simulates accomplishments so you can see how work becomes calm garden changes.'}</p>
-
-          <div className="reward-controls" aria-label="Reward-loop prototype controls">
-            <button type="button" onClick={simulateAchievement} disabled={rewardStage === 3}>
-              {rewardStage === 3 ? 'Three accomplishments received' : rewardStage > 0 ? 'Simulate next accomplishment' : 'Simulate accomplishment'}
-            </button>
-            <div className="moment-toggle" aria-label="Compare the garden before and now">
-              <button type="button" className={gardenView === 'before' ? 'active' : ''} onClick={() => setGardenView('before')}>Before</button>
-              <button type="button" className={gardenView === 'now' ? 'active' : ''} onClick={() => setGardenView('now')} disabled={rewardStage === 0}>Now</button>
-            </div>
-          </div>
-
-          <div className="garden-moments">
-            <span className={rewardStage >= 1 ? 'arrived' : 'waiting'}><i className="moment-flower" />{rewardStage >= 1 ? 'Starflowers bloomed' : 'A quiet flower bed'}</span>
-            <span className={rewardStage >= 2 ? 'arrived pavilion-arrived' : 'waiting'}><i className="moment-pavilion" />{rewardStage >= 2 ? 'The reading pavilion grew' : 'A quiet reading pavilion'}</span>
-            <span className={rewardStage >= 3 ? 'arrived seed-arrived' : 'waiting'}><i className="moment-seed" />{rewardStage >= 3 ? 'A curious seed appeared' : 'An unopened garden path'}</span>
-          </div>
-          {rewardStage > 0 && (
-            <div className="private-change" role="status">
-              <span>Private explanation</span>
-              <p>{activeReward === 'seed'
-                ? 'A reusable improvement that strengthened the team revealed a discovery seed beside the unopened path.'
-                : activeReward === 'pavilion'
-                  ? 'Moving important work forward supplied the finished shelves, books, and lanterns for the pavilion.'
-                  : 'A contribution that helped someone succeed brought fresh water to the starflower bed.'}</p>
-            </div>
-          )}
-          {rewardStage === 3 && !gardenChoice && (
-            <button type="button" className="seed-choice-button" onClick={() => { setPendingChoice(null); setChoiceOpen(true); }}>Choose where the seed leads <b>→</b></button>
-          )}
-          {gardenChoice && (
-            <div className="chosen-path" role="status">
-              <span>Path remembered</span>
-              <strong>{gardenChoice === 'orchard' ? 'The Lantern Orchard' : 'The Tinker Workshop'}</strong>
-              <p>Pip will keep exploring while this destination grows. Nothing needs your attention.</p>
-              <button type="button" onClick={() => setVisitPreviewOpen(true)}>Preview an optional garden visit</button>
-            </div>
-          )}
-          <button type="button" className="restart-prototype" onClick={restartPrototype}>Restart prototype</button>
-          <small>No scores. No upkeep. Just progress.</small>
-        </div>
-      </details>
+      <JourneyJournal state={journey} view={gardenView} busy={interactionBusy} onSimulate={simulateAchievement}
+        onView={(view) => { if (view === 'now' || !interactionBusy) setGardenView(view); }} onReturn={returnLater} onChoice={() => { setPendingChoice(null); setChoiceOpen(true); }}
+        onPrivacy={() => setVisitPreviewOpen(true)} onRestart={restartPrototype} />
 
       {choiceOpen && (
         <section className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="choice-title">

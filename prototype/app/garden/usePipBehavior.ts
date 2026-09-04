@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PipJourneyProfile } from './journey';
 import {
   activityDefinitions,
   chooseNextActivity,
@@ -55,6 +56,7 @@ export type PipBehaviorFrameInput = {
   rewardMission: PipPriorityMission | null;
   choiceMission: PipPriorityMission | null;
   randomValue: number;
+  profile?: PipJourneyProfile;
 };
 
 const GREETING_DISTANCE = 2.4;
@@ -68,9 +70,9 @@ const poseForActivity = (kind: PipActivityKind): PipPoseKind => {
   return 'idle';
 };
 
-const greetingMessage = (hasGreeted: boolean) => hasGreeted
+const greetingMessage = (hasGreeted: boolean, profile?: PipJourneyProfile) => hasGreeted
   ? 'Pip pauses, perks up one ear, and listens.'
-  : 'Oh! You’re here. I saved the quiet spot by the spring for you.';
+  : profile?.greeting ?? 'Oh! You’re here. I saved the quiet spot by the spring for you.';
 
 export function createPipBehaviorState(
   overrides: Partial<PipBehaviorState> = {},
@@ -132,6 +134,7 @@ function selectOrdinaryActivity(
     employeeNearby: false,
     availableInterestIds: availableInterestIds(input.interests),
     cooldownUntil: state.cooldownUntil,
+    preferredKind: input.profile?.preferredKind,
   }, input.randomValue);
 
   if (!activity) {
@@ -164,7 +167,8 @@ function selectOrdinaryActivity(
     ...state,
     activity,
     target: interest?.position ?? null,
-    message: activity.kind === 'greet' ? greetingMessage(state.hasGreeted) : null,
+    message: activity.kind === 'greet' ? greetingMessage(state.hasGreeted, input.profile)
+      : !isTraveling && activity.kind === input.profile?.preferredKind ? input.profile.routineMessage : null,
     poseKind: isTraveling ? 'walk' : poseForActivity(activity.kind),
     phase: isTraveling ? 'traveling' : 'performing',
     mode: 'ordinary',
@@ -195,9 +199,9 @@ function selectGreeting(state: PipBehaviorState, input: PipBehaviorFrameInput) {
     : { target: { ...input.pipPosition }, route: [{ ...input.pipPosition }] };
   return {
     ...state,
-    activity: greeting,
+    activity: input.profile && !state.hasGreeted ? { ...greeting, durationSeconds: 10 } : greeting,
     target: approach.target,
-    message: greetingMessage(state.hasGreeted),
+    message: greetingMessage(state.hasGreeted, input.profile),
     poseKind: 'walk' as const,
     phase: 'traveling' as const,
     startedAt: input.now,
@@ -325,7 +329,7 @@ export function advancePipBehavior(
         target: null,
         message: current.mode === 'priority'
           ? current.activeMission?.completionMessage ?? current.message
-          : current.message,
+          : current.activity.kind === input.profile?.preferredKind ? input.profile.routineMessage : current.message,
         poseKind: poseForActivity(current.activity.kind),
         phase: 'performing',
         startedAt: input.now,
@@ -358,16 +362,19 @@ export type UsePipBehaviorResult = Pick<
 export function usePipBehavior(
   interests: readonly GardenInterest[],
   random: () => number = Math.random,
+  profile?: PipJourneyProfile,
 ): UsePipBehaviorResult {
   const interestsRef = useRef(interests);
   const randomRef = useRef(random);
+  const profileRef = useRef(profile);
   const [snapshot, setSnapshot] = useState<PipBehaviorState>(() => createPipBehaviorState());
   const stateRef = useRef(snapshot);
 
   useEffect(() => {
     interestsRef.current = interests;
     randomRef.current = random;
-  }, [interests, random]);
+    profileRef.current = profile;
+  }, [interests, random, profile]);
 
   const commit = useCallback((next: PipBehaviorState) => {
     if (next !== stateRef.current) {
@@ -381,6 +388,7 @@ export function usePipBehavior(
     ...input,
     interests: interestsRef.current,
     randomValue: randomRef.current(),
+    profile: profileRef.current,
   }), []);
 
   const advance = useCallback((input: Omit<PipBehaviorFrameInput, 'interests' | 'randomValue'>) => (

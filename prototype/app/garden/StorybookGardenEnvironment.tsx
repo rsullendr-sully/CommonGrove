@@ -1,7 +1,7 @@
 'use client';
 
 import { useFrame, useLoader } from '@react-three/fiber';
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 import type { Texture } from 'three';
 import {
@@ -11,6 +11,9 @@ import {
 import EnchantedPond from './EnchantedPond';
 import MagicalAtmosphere from './MagicalAtmosphere';
 import type { GardenChoice } from './rewardState';
+import type { Visit } from './journey';
+import { getJourneyGrowth, DESTINATION_OBSTACLE, WORKSHOP_ROOF_PANELS } from './journeyLayout';
+import JourneyGrowth from './JourneyGrowth';
 import {
   PAVILION_CENTER,
   PAVILION_LOCAL_BENCHES,
@@ -33,6 +36,8 @@ import {
 } from './rewardReveal';
 
 export type StorybookGardenEnvironmentProps = Readonly<{
+  visit?: Visit;
+  settledRewards?: boolean;
   grassTexture: Texture;
   rewardStage: number;
   starflowersVisible: boolean;
@@ -76,6 +81,15 @@ const GOLD_STARFLOWER_MATERIAL = new THREE.MeshStandardMaterial({
   emissiveIntensity: 0.2,
 });
 
+const SettledRewardsContext = createContext(false);
+const WORKSHOP_GABLE = new THREE.Shape([
+  new THREE.Vector2(-1.175, 2.04),
+  new THREE.Vector2(-1.175, 2.21),
+  new THREE.Vector2(0, 2.76),
+  new THREE.Vector2(1.175, 2.21),
+  new THREE.Vector2(1.175, 2.04),
+]);
+
 function useRewardRevealGroup({
   visible,
   reducedMotion,
@@ -89,9 +103,11 @@ function useRewardRevealGroup({
   delaySeconds?: number;
   baseY?: number;
 }) {
+  const settled = useContext(SettledRewardsContext);
   const group = useRef<THREE.Group>(null);
   const playback = useRef<RewardRevealPlayback>(INITIAL_REWARD_REVEAL_PLAYBACK);
   const frame = useRef<RewardRevealFrame>(getRewardRevealFrame({
+    settled,
     elapsedSeconds: 0,
     visible,
     reducedMotion,
@@ -102,6 +118,7 @@ function useRewardRevealGroup({
   useFrame((_, delta) => {
     const previousPlayback = playback.current;
     const nextPlayback = advanceRewardRevealPlayback(previousPlayback, {
+      settled,
       visible,
       reducedMotion,
       deltaSeconds: delta,
@@ -110,6 +127,7 @@ function useRewardRevealGroup({
     if (nextPlayback === previousPlayback && nextPlayback.completed) return;
     playback.current = nextPlayback;
     frame.current = getRewardRevealFrame({
+      settled,
       elapsedSeconds: playback.current.elapsedSeconds,
       visible,
       reducedMotion: reducedMotion || playback.current.completed,
@@ -576,12 +594,14 @@ function FlowerPatch({
 }
 
 function StarflowerPatch({
+  visit,
   glow,
   visible,
   reducedMotion,
   earthTexture,
   limestoneTexture,
 }: {
+  visit: Visit;
   glow: number;
   visible: boolean;
   reducedMotion: boolean;
@@ -602,6 +622,12 @@ function StarflowerPatch({
       ))}
       <FlowerPatch position={[-0.32, 0.09, -0.08]} petalMaterial={LAVENDER_STARFLOWER_MATERIAL} glow={glow} visible={visible} reducedMotion={reducedMotion} delayOffset={0} />
       <FlowerPatch position={[0.52, 0.09, 0.42]} petalMaterial={GOLD_STARFLOWER_MATERIAL} glow={glow} visible={visible} reducedMotion={reducedMotion} delayOffset={0.18} />
+      {Array.from({ length: getJourneyGrowth(visit, null).flowerClusters }, (_, index) => {
+        const angle = index * Math.PI / 3;
+        return <group key={index} position={[Math.cos(angle) * 1.02, .09, Math.sin(angle) * 1.02]} scale={.5}>
+          <FlowerPatch position={[0, 0, 0]} petalMaterial={index % 2 ? GOLD_STARFLOWER_MATERIAL : LAVENDER_STARFLOWER_MATERIAL} glow={glow} visible={visible} reducedMotion={true} delayOffset={0} />
+        </group>;
+      })}
       <RewardRevealAura visible={visible} reducedMotion={reducedMotion} profile="flower" radius={1.5} color="#d8c5f0" />
     </group>
   );
@@ -669,20 +695,25 @@ function CuriousSeed({
 }
 
 function ChoiceDestination({
+  visit,
   choice,
   glow,
   reducedMotion,
   limestoneTexture,
   woodTexture,
 }: {
+  visit: Visit;
   choice: GardenChoice | null;
   glow: number;
   reducedMotion: boolean;
   limestoneTexture: Texture;
   woodTexture: Texture;
 }) {
+  const growth = getJourneyGrowth(visit, choice);
   return (
     <group position={[-13, 0, 11]}>
+      <mesh position={[0, .08, 0]} receiveShadow><cylinderGeometry args={[DESTINATION_OBSTACLE.radius, DESTINATION_OBSTACLE.radius, .16, 32]} /><meshStandardMaterial color="#7a7654" roughness={1} /></mesh>
+      <mesh position={[0, .2, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow><torusGeometry args={[2.43, .17, 8, 32]} /><meshStandardMaterial map={limestoneTexture} color="#d2c6a5" roughness={.95} /></mesh>
       {choice && (
         <group>
           <RewardRevealPart visible reducedMotion={reducedMotion} profile="destination">
@@ -704,22 +735,23 @@ function ChoiceDestination({
                   delaySeconds={0.16 + index * 0.17}
                   position={[x, 0, z]}
                 >
-                  <mesh position={[0, 1.2, 0]} castShadow>
-                    <cylinderGeometry args={[0.15, 0.23, 2.4, 8]} />
+                  <mesh position={[0, 1.2 + growth.trunkGrowth / 2, 0]} castShadow>
+                    <cylinderGeometry args={[0.15, 0.23, 2.4 + growth.trunkGrowth, 10]} />
                     <meshStandardMaterial map={woodTexture} color="#7f6047" roughness={0.95} />
                   </mesh>
-                  <mesh position={[0, 2.65, 0]} scale={[1.05, 0.9, 1]} castShadow>
-                    <dodecahedronGeometry args={[1, 1]} />
-                    <meshStandardMaterial color={index % 2 ? '#668457' : '#587a54'} roughness={1} flatShading />
+                  <mesh position={[0, 2.65 + growth.trunkGrowth, 0]} scale={[1.05 * growth.canopyScale, .9 * growth.canopyScale, growth.canopyScale]} castShadow>
+                    <sphereGeometry args={[1, 16, 12]} />
+                    <meshStandardMaterial color={index % 2 ? '#839c66' : '#648657'} roughness={1} />
                   </mesh>
-                  <mesh position={[0.35, 2.25, 0.55]}>
-                    <sphereGeometry args={[0.16, 12, 8]} />
-                    <meshStandardMaterial
-                      color="#d7b85a"
-                      emissive="#7fa65b"
-                      emissiveIntensity={glow}
-                    />
-                  </mesh>
+                  {Array.from({ length: 1 + growth.lanternCount }, (_, lantern) => {
+                    const angle = lantern * Math.PI * 2 / (1 + growth.lanternCount) + index;
+                    const x = Math.cos(angle) * growth.canopyScale * .7;
+                    const z = Math.sin(angle) * growth.canopyScale * .7;
+                    return <group key={lantern} position={[x, growth.lanternHeight + .16, z]}>
+                      <mesh position={[0, .22, 0]}><cylinderGeometry args={[.02, .02, .7, 6]} /><meshStandardMaterial color="#8b784e" /></mesh>
+                      <mesh position={[0, -.16, 0]}><sphereGeometry args={[.16, 10, 8]} /><meshStandardMaterial color="#f4d28a" emissive="#e3b663" emissiveIntensity={.75} roughness={.65} /></mesh>
+                    </group>;
+                  })}
                 </RewardRevealPart>
               ))}
             </group>
@@ -748,14 +780,16 @@ function ChoiceDestination({
                 </mesh>
               </RewardRevealPart>
               <RewardRevealPart visible reducedMotion={reducedMotion} profile="destination" delaySeconds={0.38}>
-                <mesh position={[0, 2.52, -0.58]} rotation={[0.42, 0, 0]} castShadow>
-                  <boxGeometry args={[3.95, 0.18, 1.9]} />
-                  <meshStandardMaterial color="#7a5d50" roughness={0.91} />
+                <mesh position={[-1.675, 0, 0]} rotation={[0, Math.PI / 2, 0]} castShadow>
+                  <extrudeGeometry args={[WORKSHOP_GABLE, { depth: 3.35, bevelEnabled: false }]} />
+                  <meshStandardMaterial map={woodTexture} color="#aa805d" roughness={.92} />
                 </mesh>
-                <mesh position={[0, 2.52, 0.58]} rotation={[-0.42, 0, 0]} castShadow>
-                  <boxGeometry args={[3.95, 0.18, 1.9]} />
-                  <meshStandardMaterial color="#866653" roughness={0.91} />
-                </mesh>
+                {WORKSHOP_ROOF_PANELS.map((panel, index) => (
+                  <mesh key={index} position={panel.position} rotation={panel.rotation} castShadow>
+                    <boxGeometry args={panel.dimensions} />
+                    <meshStandardMaterial color={index ? '#866653' : '#7a5d50'} roughness={0.91} />
+                  </mesh>
+                ))}
                 <mesh position={[1.12, 3.02, -0.42]} castShadow>
                   <boxGeometry args={[0.42, 1.05, 0.42]} />
                   <meshStandardMaterial map={limestoneTexture} color="#a99c82" roughness={0.96} />
@@ -832,6 +866,8 @@ function ChoiceDestination({
 }
 
 export default function StorybookGardenEnvironment({
+  visit = 1,
+  settledRewards = false,
   grassTexture,
   rewardStage,
   starflowersVisible,
@@ -882,6 +918,7 @@ export default function StorybookGardenEnvironment({
 
   return (
     <>
+      <SettledRewardsContext.Provider value={settledRewards}>
       <MagicalAtmosphere layout={layout} presentation={presentation} />
 
       <StorybookTerrain
@@ -912,6 +949,7 @@ export default function StorybookGardenEnvironment({
       />
       <StorybookFoliage layout={layout} />
       <StarflowerPatch
+        visit={visit}
         glow={presentation.starflowerGlow}
         visible={presentation.starflowerGlow > 0.2}
         reducedMotion={!presentation.moteMotion}
@@ -926,12 +964,15 @@ export default function StorybookGardenEnvironment({
         limestoneTexture={finishTextures.limestoneSmall}
       />
       <ChoiceDestination
+        visit={visit}
         choice={presentation.destinationAccent}
         glow={presentation.destinationGlow}
         reducedMotion={!presentation.moteMotion}
         limestoneTexture={finishTextures.limestoneSmall}
         woodTexture={finishTextures.woodPosts}
       />
+      <JourneyGrowth visit={visit} choice={presentation.destinationAccent} reducedMotion={reducedMotion} />
+      </SettledRewardsContext.Provider>
     </>
   );
 }

@@ -15,7 +15,32 @@ Common Grove is an internal employee experience where accomplishments from exist
 - [Staff interview guide](docs/research/release-0-interview-guide.md) — 20–25 minute qualitative session
 - [Short staff survey](docs/research/release-0-survey.md) — anonymous follow-up questions
 - [Validation tracker](docs/research/release-0-validation-tracker.md) — participant plan, session notes, and gate scorecard
-- [Current design review](docs/reviews/prototype-design-review-2026-08-25.md) — active findings and refinement order
+- [Current project review](docs/reviews/project-review-2026-09-04.md) — setup, goals, gaps, and completion direction
+- [Four-return implementation](docs/superpowers/plans/2026-09-04-four-return-journey.md) — current simulation milestone and checks
+
+## Run the local prototype
+
+The application is in `prototype/`. On the configured Windows workstation, use its already-installed runtime without triggering a dependency reinstall:
+
+```powershell
+cd prototype
+.\node_modules\.bin\vinext.cmd dev --hostname 127.0.0.1 --port 3001
+```
+
+Open [the local garden](http://127.0.0.1:3001/). In Garden journal, expand Simulation controls and simulate three accomplishments. Choose the Lantern Orchard or Tinker Workshop now or later, then use the return buttons to preview a week, several weeks, and a season of development. Last return compares the preceding garden; Now resumes Pip. A completed pet, snack, or toy interaction can influence his next greeting and preferred activity.
+
+Nothing is connected to workplace systems. Refresh or Restart journey clears all progress and memories. Both choice and care are optional. No hosting, source upload, or staff distribution is authorized.
+
+Verification from `prototype/`:
+
+```powershell
+.\node_modules\.bin\vitest.cmd run
+.\node_modules\.bin\eslint.cmd . --ignore-pattern dist --ignore-pattern .next
+.\node_modules\.bin\vinext.cmd build
+.\node_modules\.bin\tsc.cmd --noEmit --incremental false
+```
+
+See STATUS.md for the latest results and the currently failing standalone typecheck; a successful build alone is not evidence of type safety.
 
 ## Working rule
 

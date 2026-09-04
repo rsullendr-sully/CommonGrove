@@ -73,13 +73,14 @@ export function advanceRewardRevealPlayback(
   input: {
     visible: boolean;
     reducedMotion: boolean;
+    settled?: boolean;
     deltaSeconds: number;
     settleAfterSeconds?: number;
   },
 ): RewardRevealPlayback {
   if (!input.visible) return INITIAL_REWARD_REVEAL_PLAYBACK;
   if (state.completed) return state;
-  if (input.reducedMotion) {
+  if (input.reducedMotion || input.settled) {
     return {
       elapsedSeconds: state.elapsedSeconds,
       completed: true,
@@ -112,11 +113,12 @@ export function getRewardRevealFrame(input: {
   elapsedSeconds: number;
   visible: boolean;
   reducedMotion: boolean;
+  settled?: boolean;
   profile: RewardRevealProfile;
   delaySeconds?: number;
 }): RewardRevealFrame {
   if (!input.visible) return HIDDEN_FRAME;
-  if (input.reducedMotion) return SETTLED_FRAME;
+  if (input.reducedMotion || input.settled) return SETTLED_FRAME;
 
   const timing = PROFILE_TIMING[input.profile];
   const localSeconds = Math.max(0, input.elapsedSeconds - (input.delaySeconds ?? 0));

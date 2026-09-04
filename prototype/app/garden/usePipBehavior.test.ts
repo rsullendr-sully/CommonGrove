@@ -59,6 +59,23 @@ const choiceMission: PipPriorityMission = {
 };
 
 describe('Pip behavior lifecycle', () => {
+  it('uses the return greeting only for a fresh greeting, then keeps the quiet repeat response', () => {
+    const input = { ...ordinaryInput, now: 1, randomValue: 0, employeeDistance: 1.5,
+      profile: { memory: null, greeting: 'Welcome to your next return.', preferredKind: 'watch-pond' as const, routineMessage: 'Pond routine.' } };
+    const first = advancePipBehavior(createPipBehaviorState(), input);
+    expect(first.message).toBe('Welcome to your next return.');
+    const repeat = advancePipBehavior(createPipBehaviorState({ hasGreeted: true }), input);
+    expect(repeat.message).not.toBe(input.profile.greeting);
+  });
+
+  it('describes the favorite activity after arriving, not while traveling', () => {
+    const profile = { memory: null, greeting: 'Hello.', preferredKind: 'watch-pond' as const, routineMessage: 'Pond routine.' };
+    const traveling = advancePipBehavior(createPipBehaviorState(), { ...ordinaryInput, now: 0, randomValue: 0.55, profile });
+    expect(traveling.activity?.kind).toBe('watch-pond');
+    expect(traveling.message).toBeNull();
+    const arrived = advancePipBehavior(traveling, { ...ordinaryInput, now: 1, randomValue: 0.55, profile, locomotionComplete: true });
+    expect(arrived.message).toBe('Pond routine.');
+  });
   it('starts a stationary activity, records its cooldown, and completes it after its duration', () => {
     const started = advancePipBehavior(createPipBehaviorState(), {
       ...ordinaryInput,

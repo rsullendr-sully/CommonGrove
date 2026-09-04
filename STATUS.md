@@ -1,6 +1,6 @@
 # Common Grove — Current Status
 
-Last updated: 2026-08-29
+Last updated: 2026-09-04
 
 ## Current objective
 
@@ -8,7 +8,7 @@ Validate whether internal employees understand and value the personal-garden loo
 
 ## Active slice
 
-**Release 0B: Prototype design refinement**
+**Release 0B: Four-return journey and owner-directed polish**
 
 Review and refine the prototype experience before voluntary staff sessions:
 
@@ -40,7 +40,19 @@ Review and refine the prototype experience before voluntary staff sessions:
 
 ## Immediate next outcome
 
-Run the Release 0 owner walkthrough using the readiness checklist, then begin a small voluntary staff-validation round only after the owner approves the complete journey.
+Let the owner experience where the garden leads across four returns, with both destination branches and optional Pip memories. Continue local visual and technical refinement; this is not an invitation-ready or production-complete build.
+
+## Latest implementation
+
+- Four authored visits: beginning, one week later, several weeks later, and one season later.
+- Flowers accumulate; the pavilion gains cushions, books and lanterns; Orchard crowns/lanterns and Workshop inventions develop within a fixed destination plot.
+- An optional seed choice survives returns and may be made late. Earlier comparisons preserve the choice that existed then.
+- Completed pet, snack and toy interactions can produce a remembered next-return greeting and weighted activity preference. Neutral returns remain available with no interaction.
+- Return/restart clears transient carrying/reactions; return and historical comparison are disabled while a direct interaction is unfinished.
+- Historical comparison pauses Pip and suppresses live interactions/commentary. Already-established rewards mount settled on return rather than replaying their reveal.
+- Arrival attention no longer prevents greetings or queued rewards. Initial camera framing shows Pip more fully.
+- Workshop roof slopes now meet at a ridge, its attic is closed, and outdoor inventions no longer crowd the roof.
+- Everything remains fictional, session-local, original and local-only. No backend, authentication, persistent state, real event mapping or real social features were added.
 
 ## Completed in this slice
 
@@ -84,7 +96,16 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 - Pip exploration expansion implementation completed: Pip can autonomously greet, accept petting, be carried and safely placed, and temporarily react to one snack and one wooden-ring toy. These session-local interactions add no scores, needs, upkeep, inventory, or persistent penalties.
 - Soft Storybook Grove environment polish implemented with deterministic layered foliage, an organic luminous pond, warm storybook lighting, localized landmark glow, pooled motes, refined paths, and state-driven reward and destination accents. The 40 × 40 meter footprint, 4 meter-per-second movement speed, ground plane, pond exclusion, obstacles, interaction coordinates, and product behavior remain unchanged.
 
-## Verification evidence
+## Verification evidence — 2026-09-04
+
+- Current full suite: **261 tests in 24 files pass**. ESLint and the production build exit 0. Build retains the large-chunk advisory and Vinext route-classification notice; the parallel final build also printed a plugin-timing advisory.
+- Browser: completed pet → remembered return greeting/journal; deferred Workshop choice on return 3 → historical seed comparison → return 4; second no-care Orchard run through return 4; final Workshop roof and Orchard lantern inspection; refresh and Restart journey both reset state. The preview is left at a clean beginning. Final branch inspection is recorded in the implementation plan.
+- Independent read-only review found and then rechecked the greeting starvation, current-vs-historical behavior mismatch, and replaying reward reveals. No remaining material issue was found in that scoped re-review.
+- Standalone TypeScript check still fails: missing `@types/three`, resulting implicit-any errors, and older tuple/literal fixture types in environment/movement/interaction tests. New journey fixture typing was corrected. No dependency reinstall or `any` declaration workaround was used.
+- No fresh mobile viewport, OS reduced-motion, precise FPS/GPU benchmark, full snack/toy offer or full unsafe-placement browser pass is claimed for this milestone. Those remain explicit checks before owner acceptance.
+- Local feature branch: `feat/four-return-journey`. No upload, deployment or merge to main. Unrelated root dependency directories were preserved.
+
+### Earlier evidence (2026-08-29; not a fresh result)
 
 - **Automated technical verification:** 201 tests in 16 files pass, including locomotion, safe navigation, autonomous priorities and recovery, direct Pip interactions, snack and toy reactions, deterministic environment placement, boundary and main-corridor clearance, static reduced-motion presentation, and reward and destination mapping. Lint and the production build exit 0. The build reports its existing large-chunk advisory and vinext route-classification notice.
 - **Environment browser review at `http://localhost:3001/`:** the starting view, both directions around the pond, pavilion, sanctuary, three canonical trees, starflower area, seed and destination area, snack, and toy were inspected. Main routes remained visually open; the pond read clearly near and far; snack and toy prompts were legible; toy pickup/place completed; all reward changes and both equal-scale destination choices rendered; `390 × 844` and `768 × 800` layouts showed no observed control, journal, garden, or Pip-status clipping. The console contained zero application errors and eight identical instances of the pre-existing `THREE.Clock` deprecation warning, once per fresh renderer/session.
@@ -93,4 +114,4 @@ Run the Release 0 owner walkthrough using the readiness checklist, then begin a 
 
 ## Resume here
 
-Run the full Release 0 owner walkthrough in `docs/releases/release-0-validation.md`, including the remaining direct Pip interactions, snack/toy offerings, unsafe-placement attempts, operating-system reduced motion, and final visual approval. Implementation and automated verification are complete, but owner acceptance is not recorded. Staff invitations and testing remain paused until the owner explicitly approves the complete journey. Do not begin production architecture, integrations, hosted access, or prototype distribution.
+Start the local app using README.md. Walk the full four-return journey, compare both destinations, and judge whether the accumulating place and Pip's remembered moments make returning meaningful. Next technical work is a clean standalone typecheck, exact performance baseline on the GPU workstation and an ordinary laptop, then the remaining interaction/accessibility checks and focused art refinement. See BACKLOG.md. Staff invitations remain paused until explicit owner approval. Do not begin production integrations, hosted access or distribution.

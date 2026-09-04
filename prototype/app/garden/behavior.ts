@@ -22,6 +22,7 @@ export type BehaviorContext = {
   employeeNearby: boolean;
   availableInterestIds: readonly string[];
   cooldownUntil: Partial<Record<PipActivityKind, number>>;
+  preferredKind?: PipActivityKind;
 };
 
 export const activityDefinitions: readonly PipActivity[] = [
@@ -55,11 +56,12 @@ export function chooseNextActivity(context: BehaviorContext, randomValue: number
   const eligible = notCooled.filter((definition) => isAvailable(definition, context, true));
   const pool = eligible.length > 0 ? eligible : notCooled;
 
-  const totalWeight = pool.reduce((sum, definition) => sum + definition.weight, 0);
+  const weight = (definition: PipActivity) => definition.weight * (definition.kind === context.preferredKind ? 2 : 1);
+  const totalWeight = pool.reduce((sum, definition) => sum + weight(definition), 0);
   const target = normalizedRandomValue(randomValue) * totalWeight;
   let cumulative = 0;
   for (const definition of pool) {
-    cumulative += definition.weight;
+    cumulative += weight(definition);
     if (target < cumulative) return definition;
   }
   return pool[pool.length - 1];

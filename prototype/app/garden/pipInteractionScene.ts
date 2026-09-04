@@ -4,6 +4,7 @@ import {
   type InteractionState,
   type InteractableId,
 } from './interaction';
+import type { MemoryKind } from './journey';
 import {
   GARDEN_OBSTACLES,
   nearestSafePoint,
@@ -36,6 +37,7 @@ export type PipInteractionSceneState = {
   reactionStarted: boolean;
   greetingArrived: boolean;
   toyNudged: boolean;
+  completedMemory: { kind: MemoryKind; sequence: number } | null;
 };
 
 export type PipInteractionSceneEvent =
@@ -83,6 +85,7 @@ export function createPipInteractionSceneState(): PipInteractionSceneState {
     reactionStarted: false,
     greetingArrived: false,
     toyNudged: false,
+    completedMemory: null,
   };
 }
 
@@ -146,6 +149,7 @@ export function pipInteractionSceneReducer(
         ...state,
         interaction: interactionReducer(state.interaction, { type: 'reaction-complete' }),
         phase: 'none',
+        completedMemory: { kind: 'pet', sequence: (state.completedMemory?.sequence ?? 0) + 1 },
         resumeSequence: state.resumeSequence + 1,
       };
     }
@@ -231,6 +235,7 @@ export function pipInteractionSceneReducer(
         ...state,
         interaction: interactionReducer(state.interaction, { type: 'reaction-complete' }),
         phase: 'none',
+        completedMemory: { kind: offered === 'food' ? 'snack' : 'toy', sequence: (state.completedMemory?.sequence ?? 0) + 1 },
         objectPositions: { ...state.objectPositions, [offered]: resetPosition },
         reactionStarted: false,
         toyNudged: false,

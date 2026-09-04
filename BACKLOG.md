@@ -4,6 +4,20 @@
 
 Only these items are active.
 
+### CG-008 — Make the long-term return loop understandable
+
+**Outcome:** A local four-visit journey shows why someone would return over time, not just what three reward buttons do.
+
+- [x] Four authored visits with cumulative flowers, pavilion details and both destination branches
+- [x] Optional late/no choice, no-interaction progress, terminal visit and clean restart
+- [x] Completed pet/snack/toy memory events, familiar greetings and preferred activities without upkeep
+- [x] Previous-return comparison that cannot alter past state or expose current Pip commentary
+- [x] Retained rewards stay settled; new details preserve safe routes and the approved footprint
+- [x] Full automated regression, lint/build and scoped independent review
+- [ ] Owner assessment of the complete journey's emotional clarity and visual quality
+
+This is an authored local simulation. Persistent or inferred memories, real elapsed-time growth and workplace connections remain later work.
+
 ### CG-007 — Refine the employee-facing prototype
 
 **Outcome:** Research controls no longer compete with the garden experience, and Pip becomes the emotional focus of the return moment.
@@ -37,6 +51,9 @@ Delivered environment work:
 
 ## Next
 
+- Repair the standalone TypeScript baseline: add matching Three.js declarations through a controlled dependency update, then correct the older test fixture types; require a clean typecheck alongside tests/lint/build
+- Record performance on the GPU workstation and an ordinary laptop; establish a frame-time budget before increasing scene detail
+- Complete focused asset/material/lighting refinement based on the four-return owner walkthrough, including consistent destination and pavilion finish
 - Complete the Release 0 owner walkthrough, including direct Pip interactions and snack/toy offerings, unsafe-placement recovery, operating-system reduced motion, and explicit owner visual approval
 - Run voluntary staff validation with 6–10 participants only after invitations resume
 - Summarize findings and evaluate the Release 0 gate
@@ -64,7 +81,6 @@ Delivered environment work:
 Ideas belong here until they support the active validation question.
 
 - Multiple companions
-- Browser-based 3D movement
 - Creature travel
 - Expanded garden biomes
-- Long-term relationships and memories
+- Persistent long-term relationships and memories beyond the authored local journey

@@ -7,6 +7,12 @@ import {
 } from './rewardReveal';
 
 describe('reward reveal presentation', () => {
+  it('starts established return-visit rewards settled without disabling ambient motion', () => {
+    const input = { visible: true, reducedMotion: false, settled: true, elapsedSeconds: 0, profile: 'structure' as const };
+    expect(getRewardRevealFrame(input)).toMatchObject({ scale: 1, scaleY: 1, rise: 0, aura: 0 });
+    expect(advanceRewardRevealPlayback(INITIAL_REWARD_REVEAL_PLAYBACK, { ...input, deltaSeconds: 0 })).toMatchObject({ completed: true, wasVisible: true });
+    expect(getRewardRevealFrame({ ...input, visible: false }).opacity).toBe(0);
+  });
   it('keeps hidden rewards below the garden surface without residual light', () => {
     expect(getRewardRevealFrame({
       elapsedSeconds: 4,

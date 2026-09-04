@@ -4,7 +4,7 @@ The roadmap preserves the full direction. It does not authorize all listed work 
 
 ## Release 0 — Concept validation (active)
 
-Build a scripted 2.5D prototype with one companion, one garden, representative accomplishments, visible changes, a welcome-back summary, and one meaningful choice.
+Build a scripted first-person 3D prototype with one companion, one bounded garden, representative accomplishments, cumulative changes across four returns, truthful session-local memories, and one non-expiring destination choice. The current owner-polish milestone precedes staff invitations.
 
 **Gate:** Employees understand the loop, show interest in returning, prefer autonomous growth, and do not experience strong surveillance or role-fairness concerns.
 

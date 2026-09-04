@@ -1,4 +1,5 @@
 import { PAVILION_OBSTACLES } from './pavilionLayout';
+import { DESTINATION_OBSTACLE } from './journeyLayout';
 
 export const SAFE_GARDEN_HALF_SIZE = 18.7;
 export const SAFE_POND_RADIUS = 7.1;
@@ -27,6 +28,7 @@ export const GARDEN_OBSTACLES: readonly GardenObstacle[] = [
   { x: 11.8, z: -9.2, radius: 1.15 },
   { x: 14.4, z: 5.8, radius: 1.15 },
   { x: -14.8, z: 4.5, radius: 1.15 },
+  DESTINATION_OBSTACLE,
 ];
 
 export type GardenInterest = {

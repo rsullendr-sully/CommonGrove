@@ -10,6 +10,15 @@ const context: BehaviorContext = {
 };
 
 describe('Pip behavior selection', () => {
+  it('gives a remembered favorite more opportunities without bypassing cooldowns', () => {
+    const base = { ...context, recentKind: null, availableInterestIds: ['pond'] };
+    const sample = (preferredKind?: BehaviorContext['preferredKind']) => Array.from({ length: 100 }, (_, index) =>
+      chooseNextActivity({ ...base, preferredKind }, index / 100)?.kind).filter((kind) => kind === 'watch-pond').length;
+    expect(sample('watch-pond')).toBeGreaterThan(sample());
+    for (const random of [0, 0.3, 0.6, 0.99]) {
+      expect(chooseNextActivity({ ...base, preferredKind: 'watch-pond', cooldownUntil: { 'watch-pond': 40 } }, random)?.kind).not.toBe('watch-pond');
+    }
+  });
   it('does not immediately repeat an ordinary activity', () => {
     const next = chooseNextActivity(context, 0);
     expect(next).not.toBeNull();

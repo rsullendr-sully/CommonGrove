@@ -31,7 +31,7 @@ An internal team of approximately 14 people across:
 
 These are provisional and may be changed after validation:
 
-- Web-first, stylized 2.5D presentation
+- Web-first, original stylized 3D presentation with bounded first-person exploration
 - One companion per employee
 - One personal garden per employee
 - Automatic use of ordinary resources
@@ -53,7 +53,7 @@ These categories describe contribution without requiring every role to perform t
 - Production integrations
 - Authentication or organization administration
 - Real-time multiplayer
-- Full 3D navigation
+- Open-world expansion beyond the approved 40 × 40 metre garden
 - Competitive systems or leaderboards
 - Breeding, complex economies, hunger, sickness, or death
 - Mandatory check-ins or expiring choices
@@ -62,4 +62,10 @@ These categories describe contribution without requiring every role to perform t
 ## First question to answer
 
 Do employees understand and care about a garden that visibly changes because of their accomplishments, without feeling monitored or burdened?
+
+## Current prototype scope
+
+Four authored returns demonstrate that question over an illustrative season. Three fictional contributions establish the garden; subsequent visits accumulate flowers, a lived-in reading pavilion, and an optional Lantern Orchard or Tinker Workshop. Pip can remember a completed pet, snack, or toy interaction during the current session. His warmth and activity preferences change, without requiring care.
+
+This is a local simulation, not elapsed-time computation, a working integration, or persistent memory. Refresh and Restart journey clear it. Owner-directed polish continues before anyone is invited to use the prototype.
 

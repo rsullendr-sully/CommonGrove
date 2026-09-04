@@ -133,6 +133,10 @@ describe('direct Pip interactions', () => {
     expect(shouldHoldPipForInteraction(true, 3.4, 'wander', 'ordinary', 'pet')).toBe(false);
   });
 
+  it('lets an autonomous greeting finish even when the visitor is looking at Pip', () => {
+    expect(shouldHoldPipForInteraction(true, 2.2, 'greet', 'ordinary', 'none')).toBe(false);
+  });
+
   it('places held Pip on Escape before unrelated dismissal handlers can run', () => {
     const order: string[] = [];
     const event = {
