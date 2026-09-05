@@ -2,7 +2,7 @@
 
 Date: 2026-09-05
 
-Status: Direction and gradual arrivals approved; written design awaiting owner review. No multi-resident gameplay has been implemented yet.
+Status: Direction and gradual arrivals approved; appearance revised after owner feedback and written design awaiting final review. No multi-resident gameplay has been implemented yet.
 
 ## Intent and approval
 
@@ -20,19 +20,29 @@ Duplicating the current Pip component would be quicker to display but would reta
 
 ## Residents and gradual arrivals
 
-Working names for the first roster are Pip, Moss and Fern. Names and visual differences are data, not special cases in the behavior code.
+Working names for the first roster are Pip, Moss and Fern. These are three example individuals, not three fixed visual classes. Names, appearance and personality are separate data, not special cases in the behavior code.
 
-| Resident | First present | Appearance direction | Behavioral tendency |
+| Resident | First present | Example appearance combination | Behavioral tendency |
 | --- | --- | --- | --- |
 | Pip | Return 1 | Existing model and clay finish unchanged | Curious observer; explores landmarks and greets the visitor |
 | Moss | Return 2 | Muted sage clay, rounder ears and a subtle original face marking | Quieter; favors resting and watching the pond |
 | Fern | Return 3 | Warm apricot clay, a different ear silhouette and face marking | More playful; favors the toy and approaching another resident |
 
-All three remain present on return 4. Neither destination selection nor petting/feeding is required for arrival. These are authored fictional arrivals at existing return milestones, not timed hatchings or additional work quotas. They are the same original creature family, with restrained shape and color differences in the approved art style; do not import Sega assets or redesign Pip.
+All three remain present on return 4. Neither destination selection nor petting/feeding is required for arrival. These are authored fictional arrivals at existing return milestones, not timed hatchings or additional work quotas. They share the same original base body style, with individual colors and features as specified below; do not import Sega assets or redesign Pip.
 
 The journal briefly identifies a new arrival on its first eligible return. Newcomers use separated, validated ground positions and settle into ordinary behavior; do not spawn all residents at Pip's feet. Arrival copy must not imply a previous meeting. Historical comparison shows only the residents present on the compared return.
 
 Add a discreet simulation control, “Preview three residents,” which advances the existing fictional journey to return 3 with its three initial accomplishment stages. Preserve any existing destination choice and genuinely completed interaction memories. Do not select a destination, invent interactions, regress a later visit or replay an arrival on repeat activation. Disable the shortcut while carrying, reacting, or in historical comparison. Its label/help text explains that it advances the local simulation; Restart journey remains the way back to the beginning.
+
+## Shared body style, individual appearance
+
+Owner clarification: every little guy should have its own style, while sharing a common body style. Colors and features may be common to several residents or distinctive to a particular individual. The shared body, proportions, clay finish and animation rig keep them recognizable as the same creature family. Differences come from a composed appearance profile rather than creating a different species for each resident.
+
+For this milestone, profiles combine body/accent colors, ear shape or tip treatment, and facial/cheek markings. Reuse the original Pip profile unchanged. Common traits, such as a plain coat or rounded ears, may repeat; distinctive markings or an ear combination can give an individual a signature look. Each of the first three must have a different overall combination, including at least one readable non-color feature. Not every trait must be exclusive, and a resident with mostly common features is equally valued.
+
+Keep appearance independent of temperament, arrival order and name: sage coloring must not mean every such creature is quiet, and Moss's name must not select a hard-coded model. Store each explicit appearance profile with its resident definition. It remains identical across rerenders, comparisons and returns. The initial roster is authored and deterministic; no per-frame randomization, rarity tiers, rewards for unusual traits, genetics, procedural population generation, character editor or new persistence is part of this slice. Profiles and feature options should allow later residents to reuse and recombine traits without changing the renderer.
+
+Feature geometry stays within conservative authored interaction/movement bounds, and the common body stays at Pip's approved scale. Preserve warm matte materials and readable expressions; differences must remain visible in the garden, not only in close-up portraits. The table above is an example set built from these options, not a permanent color-to-personality mapping.
 
 ## Individual state and direct interaction
 
@@ -69,7 +79,7 @@ Static terrain/obstacle routing remains authoritative. Add resident separation a
 
 ## Component boundaries and data flow
 
-- `residents.ts`: roster, IDs, appearance/temperament definitions and visit eligibility; no rendering dependencies.
+- `residents.ts`: roster, IDs, independent composable appearance and temperament definitions, and visit eligibility; no rendering dependencies. Appearance options select shared body features rather than hard-coded resident-specific meshes.
 - `journey.ts`: per-resident completed memories and return snapshots; existing garden progression and destination logic remain independent of care.
 - `ResidentActor.tsx`: extract the existing actor from `GardenWorld.tsx`; instance-local behavior, navigation, pose and direct reactions. Reuse or parameterize `PipCharacter.tsx` with defaults that preserve Pip.
 - `residentCoordination.ts`: pure claim/release, social matching and movement-yield decisions from a shared frame snapshot; no React state mutation per animation frame.
@@ -83,6 +93,8 @@ Flow: journey projection determines the roster and memory profiles; resident act
 ## Failure handling and verification
 
 Pure tests precede implementation. Cover population across returns and history; idempotent preview advancement; independent state and memory; stale/wrong-recipient completions; one held target; exclusive and fairly released toy claims; cancelled offers; pair cancellation; safe toy sweeps and resident separation; blocked-route recovery; reset and reduced-motion branches. Retain all existing Pip and garden regression tests, adapting singleton fixtures without weakening their safety assertions.
+
+Appearance tests cover valid composable profiles, the unchanged Pip defaults, distinct initial combinations, readable non-color variation, independence from temperament/name, stable profiles across returns, and feature bounds. Repeated common traits are valid; exact duplicate initial appearances are not.
 
 Browser acceptance must include: normal gradual arrivals; the three-resident shortcut; walking up to and petting/carrying/offering to each resident; two nearby creatures without target crossover; a completed shared toy sequence; autonomous activity while no controls are used; the raised reading approach; a return and historical comparison; and reset. Verify both destination paths still render and all residents remain distinguishable without relying on color alone.
 
@@ -99,5 +111,6 @@ This milestone is complete only when three individual creatures coexist, respond
 - No unresolved implementation requirements or placeholder sections remain in this proposed slice; the working names and exact arrival returns are stated for owner review.
 - Care is optional and arrivals depend on authored return progression, not interaction counts or absence.
 - Three residents are a milestone, not a permanent cap; no social multiplayer or backend work is implied.
+- All residents share the base body style. Individual looks combine reusable and distinctive traits independently of their names or personalities; no rarity hierarchy or fixed three-class character system is implied.
 - The preview shortcut uses the real fictional journey rather than a hidden alternate population state that could corrupt historical comparisons.
 - Ownership, memory attribution, route conflicts and transient cancellation are specified explicitly; locked art is out of scope.
