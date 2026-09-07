@@ -5,7 +5,7 @@ import { createPlanterProgress, reducePlanterProgress, type PlanterEvent, type P
 import { RESIDENTS, type ResidentId } from './residents';
 import type { ResidentSnapshot } from './residentCoordination';
 import { stepProjectTravel, type ProjectTravel } from './projectActivity';
-import { isSafeGardenSegment } from './navigation';
+import { isSafeGardenPoint, isSafeGardenSegment } from './navigation';
 import { PIP_MOTION_CONFIG } from './locomotion';
 import { PLANTER_LAYOUT } from './planterLayout';
 import type { GardenPoint } from './navigation';
@@ -13,9 +13,19 @@ import { createGardenSession, gardenSessionReducer, visiblePlanter, type GardenS
 
 const DT = .05;
 
-/** Actors begin at authored spawns. Every subsequent position must come from safe locomotion. */
+/** Reserve the finished footprint for coordinator reachability, travel and safety checks alike. */
+class FinalFootprintCommunity extends GardenCommunity {
+  override obstacles(id: ResidentId | null) {
+    const obstacles = super.obstacles(id);
+    const final = { ...PLANTER_LAYOUT.planter, radius: PLANTER_LAYOUT.planterRadius };
+    return obstacles.some(o => o.x === final.x && o.z === final.z && o.radius === final.radius)
+      ? obstacles : [...obstacles, final];
+  }
+}
+
+/** Full loops use authored spawns; teaching fixtures declare their initial positions. */
 function garden(count: number, initial = createPlanterProgress(), fixtures: Partial<Record<ResidentId, GardenPoint>> = {}) {
-  const community = new GardenCommunity();
+  const community = new FinalFootprintCommunity();
   const actors: ResidentSnapshot[] = RESIDENTS.slice(0, count).map(r => ({
     id: r.id, available: true, position: { ...fixtures[r.id] ?? { x: r.spawn[0], z: r.spawn[2] } },
   }));
@@ -56,7 +66,7 @@ function garden(count: number, initial = createPlanterProgress(), fixtures: Part
           // The established route stepper settles the final <=.16 units onto a safe waypoint.
           expect(next.motion.moving).toBe(false);
           expect(next.motion.speed).toBe(0);
-          expect(distance).toBeLessThanOrEqual(PIP_MOTION_CONFIG.arrivalRadius + 1e-8);
+          expect(distance).toBeLessThanOrEqual(.16 + 1e-8);
           expect(next.waypoints.some(p => p.x === next.motion.position.x && p.z === next.motion.position.z)).toBe(true);
         }
         expect(next.motion.distanceTravelled - previous.motion.distanceTravelled).toBeCloseTo(distance, 8);
@@ -91,8 +101,17 @@ function garden(count: number, initial = createPlanterProgress(), fixtures: Part
 }
 
 describe('planter real-navigation lifecycle', () => {
+  it.each(['empty', 'planted'] as const)('reserves the final footprint exactly once during %s-stage routing', stage => {
+    const sim = garden(1, { ...createPlanterProgress(), stage });
+    sim.tick();
+    const obstacles = sim.community.obstacles('pip');
+    expect(isSafeGardenPoint(PLANTER_LAYOUT.planter, obstacles)).toBe(false);
+    expect(obstacles.filter(o => o.x === PLANTER_LAYOUT.planter.x && o.z === PLANTER_LAYOUT.planter.z
+      && o.radius === PLANTER_LAYOUT.planterRadius)).toHaveLength(1);
+  });
+
   for (const count of [1, 3]) for (const order of ['materials-first', 'knowledge-first']) {
-    it(`finishes ${order}, ${count} resident(s), within 240 active seconds without teleporting`, async () => {
+    it(`finishes ${order}, ${count} resident(s), within 240 active seconds using safe routes and bounded waypoint settling`, async () => {
       const sim = garden(count);
       if (order === 'materials-first') {
         sim.apply([{ type: 'materials', id: 'supplies' }]);
