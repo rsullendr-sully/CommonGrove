@@ -22,6 +22,7 @@ import {
 } from './planterLayout';
 import { createPlanterProgress, type PlanterProgress } from './planterProgress';
 import { RESIDENTS } from './residents';
+import { createStorybookEnvironmentLayout } from './environmentLayout';
 
 const projectStates: readonly PlanterProgress[] = [
   createPlanterProgress(),
@@ -63,6 +64,31 @@ function footprintElevations(obstacle: GardenObstacle) {
       );
     }),
   ];
+}
+
+function renderedBermClearance(point: GardenPoint, clearance: number) {
+  return createStorybookEnvironmentLayout().berms.map((berm, index) => {
+    const radiusX = berm.radius * 1.06 + clearance;
+    const radiusZ = berm.radius * (index % 2 ? .58 : .66) + clearance;
+    const x = (point.x - berm.center.x) / radiusX;
+    const z = (point.z - berm.center.z) / radiusZ;
+    return x * x + z * z;
+  });
+}
+
+function expectRouteClearOfRenderedBerms(start: GardenPoint, route: readonly GardenPoint[]) {
+  let previous = start;
+  for (const point of route) {
+    for (let step = 0; step <= 24; step += 1) {
+      const progress = step / 24;
+      const sample = {
+        x: previous.x + (point.x - previous.x) * progress,
+        z: previous.z + (point.z - previous.z) * progress,
+      };
+      expect(Math.min(...renderedBermClearance(sample, .35))).toBeGreaterThanOrEqual(1);
+    }
+    previous = point;
+  }
 }
 
 describe('shared planter layout', () => {
@@ -110,6 +136,20 @@ describe('shared planter layout', () => {
     for (const obstacle of planterObstacles(progress)) {
       const elevations = footprintElevations(obstacle);
       expect(Math.max(...elevations) - Math.min(...elevations)).toBeLessThanOrEqual(.08);
+    }
+  });
+
+  it('keeps the basket and carrying routes above the authored raised berms', () => {
+    expect(Math.min(...renderedBermClearance(PLANTER_LAYOUT.basket, BASKET_RADIUS))).toBeGreaterThanOrEqual(1);
+    expect(Math.min(...renderedBermClearance(PLANTER_LAYOUT.slots.pickup, .35))).toBeGreaterThanOrEqual(1);
+    expect(Math.min(...renderedBermClearance(PLANTER_LAYOUT.slots.carryDrop, .35))).toBeGreaterThanOrEqual(1);
+
+    for (const resident of RESIDENTS) {
+      const spawn = { x: resident.spawn[0], z: resident.spawn[2] };
+      const toPickup = createSafeGardenRoute(spawn, PLANTER_LAYOUT.slots.pickup, GARDEN_OBSTACLES);
+      const toDrop = createSafeGardenRoute(PLANTER_LAYOUT.slots.pickup, PLANTER_LAYOUT.slots.carryDrop, GARDEN_OBSTACLES);
+      expectRouteClearOfRenderedBerms(spawn, toPickup);
+      expectRouteClearOfRenderedBerms(PLANTER_LAYOUT.slots.pickup, toDrop);
     }
   });
 

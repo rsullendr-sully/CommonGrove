@@ -22,11 +22,11 @@ export const BASKET_RADIUS = .5;
  */
 export const PLANTER_LAYOUT: PlanterLayout = {
   book: { x: PAVILION_READING_POINT.x, z: PAVILION_READING_POINT.z - .8 },
-  basket: { x: -17, z: -1.5 },
+  basket: { x: -16, z: -3.1 },
   planter: { x: -15, z: -1.8 },
   slots: {
     read: { ...PAVILION_READING_POINT },
-    pickup: { x: -17, z: -.3 },
+    pickup: { x: -16.7, z: -3.9 },
     carryDrop: { x: -15, z: -3.15 },
     work: { x: -13.65, z: -1.8 },
     observe: { x: -13.65, z: -.4 },
