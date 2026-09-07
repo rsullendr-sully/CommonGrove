@@ -15,7 +15,7 @@ function simulation(progress: PlanterProgress = { ...createPlanterProgress(), bo
     get runtime() { return runtime; },
     tick(frames = 1, follow = false) {
       for (let i = 0; i < frames; i++) {
-        if (follow) for (const actor of actors) {
+        if (follow) for (const actor of input.actors) {
           const directive = runtime.claims[actor.id]?.directive;
           if (directive) actor.position = { ...directive.target };
         }
@@ -29,6 +29,13 @@ function simulation(progress: PlanterProgress = { ...createPlanterProgress(), bo
 }
 
 describe('planter coordinator', () => {
+  it('follows the current roster after the input actors are replaced', () => {
+    const sim = simulation();
+    sim.input.actors = [{ id: 'moss', position: { x: -5, z: 10 }, available: true }];
+    sim.tick(140, true);
+    expect(sim.input.progress.knowledge.moss).toEqual(['assembly', 'planting']);
+    expect(sim.input.progress.knowledge.pip).toEqual([]);
+  });
   it('does not advance time while paused', () => {
     const out = stepProject(createProjectRuntime(37, 0), {
       delta: 60, paused: true, epoch: 0, progress: createPlanterProgress(),
