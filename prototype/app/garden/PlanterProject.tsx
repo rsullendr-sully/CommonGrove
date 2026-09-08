@@ -14,6 +14,36 @@ import type { ResidentId } from './residents';
 
 export type PlanterPart = 'base' | 'base-fasteners' | 'frame' | 'frame-fasteners' | 'soil' | 'sprouts';
 export type BasketItem = NonNullable<ProjectDirective['tool']>;
+type ReusableTool = Extract<BasketItem, 'mallet' | 'can'>;
+
+const PROJECT_TOOL_GEOMETRY = {
+  mallet: { handleY: -.035, handleHeight: .25, handleRadius: .032, handleRotationZ: -.12, headY: .09, headHeight: .09 },
+  can: { bodyYRadius: .13, spoutY: .015, spoutHeight: .18, spoutRadius: .052, spoutRotationZ: -Math.PI / 2,
+    handleY: .115, handleTubeRadius: .018 },
+} as const;
+
+function rotatedCylinderVerticalRadius(height: number, radius: number, rotationZ: number): number {
+  return Math.abs(Math.cos(rotationZ)) * height / 2 + Math.abs(Math.sin(rotationZ)) * radius;
+}
+
+/** Vertical bounds match the code-native meshes below after their authored rotations. */
+export function projectToolVerticalExtent(kind: ReusableTool): Readonly<{ min: number; max: number }> {
+  if (kind === 'mallet') {
+    const g = PROJECT_TOOL_GEOMETRY.mallet;
+    const handleYRadius = rotatedCylinderVerticalRadius(g.handleHeight, g.handleRadius, g.handleRotationZ);
+    return {
+      min: Math.min(g.handleY - handleYRadius, g.headY - g.headHeight / 2),
+      max: Math.max(g.handleY + handleYRadius, g.headY + g.headHeight / 2),
+    };
+  }
+  const g = PROJECT_TOOL_GEOMETRY.can;
+  // The spout rotates its axis onto X; the handle torus rotates into X/Z.
+  const spoutYRadius = rotatedCylinderVerticalRadius(g.spoutHeight, g.spoutRadius, g.spoutRotationZ);
+  return {
+    min: Math.min(-g.bodyYRadius, g.spoutY - spoutYRadius, g.handleY - g.handleTubeRadius),
+    max: Math.max(g.bodyYRadius, g.spoutY + spoutYRadius, g.handleY + g.handleTubeRadius),
+  };
+}
 
 /** Shared authored-project wood treatment; each caller owns and disposes its clone. */
 export function useProjectWoodTexture() {
@@ -65,13 +95,13 @@ export function ProjectTool({ kind }: { kind: BasketItem }): React.JSX.Element {
     <mesh position={[0, .01, .02]} scale={[.038, .052, .008]}><sphereGeometry args={[1, 14, 9]} /><meshStandardMaterial color="#66884f" roughness={1} /></mesh>
   </group>;
   if (kind === 'mallet') return <group name="planter-mallet">
-    <mesh position={[0, -.035, 0]} rotation={[0, 0, -.12]} castShadow><cylinderGeometry args={[.025, .032, .25, 10]} /><meshStandardMaterial color="#8c6748" roughness={1} /></mesh>
-    <mesh position={[0, .09, 0]} castShadow><SoftBoxGeometry args={[.18, .09, .11]} /><meshStandardMaterial color="#c5aa82" roughness={.98} /></mesh>
+    <mesh position={[0, PROJECT_TOOL_GEOMETRY.mallet.handleY, 0]} rotation={[0, 0, PROJECT_TOOL_GEOMETRY.mallet.handleRotationZ]} castShadow><cylinderGeometry args={[.025, PROJECT_TOOL_GEOMETRY.mallet.handleRadius, PROJECT_TOOL_GEOMETRY.mallet.handleHeight, 10]} /><meshStandardMaterial color="#8c6748" roughness={1} /></mesh>
+    <mesh position={[0, PROJECT_TOOL_GEOMETRY.mallet.headY, 0]} castShadow><SoftBoxGeometry args={[.18, PROJECT_TOOL_GEOMETRY.mallet.headHeight, .11]} /><meshStandardMaterial color="#c5aa82" roughness={.98} /></mesh>
   </group>;
   return <group name="planter-watering-can">
-    <mesh scale={[.12, .13, .105]} castShadow><sphereGeometry args={[1, 20, 14]} /><meshStandardMaterial color="#7faaa0" roughness={.92} /></mesh>
-    <mesh position={[.13, .015, 0]} rotation={[0, 0, -Math.PI / 2]} castShadow><cylinderGeometry args={[.027, .052, .18, 10]} /><meshStandardMaterial color="#7faaa0" roughness={.92} /></mesh>
-    <mesh position={[-.01, .115, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.085, .018, 10, 20, Math.PI]} /><meshStandardMaterial color="#628d83" roughness={.96} /></mesh>
+    <mesh scale={[.12, PROJECT_TOOL_GEOMETRY.can.bodyYRadius, .105]} castShadow><sphereGeometry args={[1, 20, 14]} /><meshStandardMaterial color="#7faaa0" roughness={.92} /></mesh>
+    <mesh position={[.13, PROJECT_TOOL_GEOMETRY.can.spoutY, 0]} rotation={[0, 0, PROJECT_TOOL_GEOMETRY.can.spoutRotationZ]} castShadow><cylinderGeometry args={[.027, PROJECT_TOOL_GEOMETRY.can.spoutRadius, PROJECT_TOOL_GEOMETRY.can.spoutHeight, 10]} /><meshStandardMaterial color="#7faaa0" roughness={.92} /></mesh>
+    <mesh position={[-.01, PROJECT_TOOL_GEOMETRY.can.handleY, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.085, PROJECT_TOOL_GEOMETRY.can.handleTubeRadius, 10, 20, Math.PI]} /><meshStandardMaterial color="#628d83" roughness={.96} /></mesh>
   </group>;
 }
 

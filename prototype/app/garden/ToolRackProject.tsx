@@ -5,7 +5,7 @@ import { groundGardenPosition } from './gardenElevation';
 import { PROJECT_RECIPES } from './projectDefinitions';
 import type { ProjectLayout, ReusableTool } from './projectLayout';
 import type { ProjectState } from './projectProgress';
-import { useProjectWoodTexture } from './PlanterProject';
+import { projectToolVerticalExtent, useProjectWoodTexture } from './PlanterProject';
 
 export type ToolRackPart = 'base' | 'base-fasteners' | 'upright' | 'upright-fasteners' | 'crossbar' | 'crossbar-fasteners';
 
@@ -30,9 +30,11 @@ export type RestingToolPose = {
 
 /** Poses hang each tool from the matching completed-rack hook, clear of its base. */
 export function toolRackStoredPose(tool: ReusableTool): RestingToolPose {
+  const hookElevation = .89;
+  const elevation = hookElevation - projectToolVerticalExtent(tool).max;
   return tool === 'mallet'
-    ? { elevation: .755, rotation: [0, 0, .08] }
-    : { elevation: .672, rotation: [0, Math.PI, 0] };
+    ? { elevation, rotation: [0, .08, 0] }
+    : { elevation, rotation: [0, Math.PI, 0] };
 }
 
 function JointPeg({ position, rotation = [Math.PI / 2, 0, 0] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
