@@ -4,6 +4,17 @@
 
 Only these items are active.
 
+### Learning foundations — Verify reusable knowledge across two projects
+
+**Outcome:** Spirits earn individual B1/B2/G1/G2 knowledge through real reading or valid observation, practice only performed actions, and reuse building knowledge in a planter and tool rack.
+
+- [x] Implement four enabled abilities, two recipes, exclusive resources and isolated solo/three-resident demo controls
+- [x] Retain the 20-ability catalog with sixteen later abilities explicitly planned and unavailable
+- [ ] Finish the normal-camera action/lifecycle walkthrough and resolve any material findings
+- [ ] Record explicit owner acceptance of each enabled ability
+
+See the [September 8 verification record](docs/reviews/2026-09-08-learning-foundations-verification.md) for current automated and visual evidence. Environment polish is paused for this milestone. Staff invitations, hosting, persistence, workplace integrations and multiplayer remain outside this local slice.
+
 ### CG-009 — Design the shared companion garden
 
 **Outcome:** The next gameplay slice supports the owner's intended multiple-creature garden, not a permanently single-pet experience.

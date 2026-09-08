@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { createRequire } from 'node:module';
 import { PIP_MOTION_CONFIG, stepSafeRouteLocomotion, type SafeRouteLocomotionProgress } from './locomotion';
 import { createSafeGardenRoute, GARDEN_OBSTACLES, type GardenPoint } from './navigation';
 import { PLANTER_LAYOUT } from './planterLayout';
 import { PROJECT_LAYOUTS, projectObstacles, toolRestAnchor } from './projectLayout';
-import { createProjectsProgress, reduceProjectProgress, type ProjectEvent, type ProjectsProgress } from './projectProgress';
+import { createProjectsProgress, reduceProjectProgress, type ProjectEvent } from './projectProgress';
 import { createProjectRuntime, stepProject, type ProjectInput } from './projectScheduler';
 import { RESIDENTS, type ResidentId } from './residents';
 import { learnAbility } from './spiritKnowledge';
@@ -12,7 +13,8 @@ import { learnAbility } from './spiritKnowledge';
 type TestVector3 = { x: number; y: number; z: number; clone(): TestVector3;
   sub(other: TestVector3): TestVector3; length(): number; normalize(): TestVector3;
   addScaledVector(other: TestVector3, scale: number): TestVector3 };
-const { Vector3 }: { Vector3: new (x: number, y: number, z: number) => TestVector3 } = require('three');
+const loadTestRuntime = createRequire(import.meta.url);
+const { Vector3 }: { Vector3: new (x: number, y: number, z: number) => TestVector3 } = loadTestRuntime('three');
 
 function prepared(project: 'planter' | 'tool-rack' = 'planter', step = 0) {
   const p = createProjectsProgress();

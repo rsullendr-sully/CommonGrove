@@ -1,16 +1,18 @@
 # Common Grove — Current Status
 
-Last updated: 2026-09-06
+Last updated: 2026-09-08
 
 ## Current objective
 
-Validate whether internal employees understand and value the personal-garden loop before building production infrastructure.
+Verify the approved reusable-learning foundations locally: individual knowledge, autonomous planter construction and transfer into a tool rack. Four abilities are enabled; sixteen later abilities remain planned. Environment polish, staff invitations and hosting remain paused.
 
 ## Active slice
 
-**Release 0B: Four-return journey and owner-directed polish**
+**Learning foundations: B1, B2, G1 and G2**
 
-Review and refine the prototype experience before voluntary staff sessions:
+The new Learning demo controls expose five isolated scenarios, solo/three-resident rosters, explicit book/material opportunities, knowledge sources and a one-time Watch turn. Reading grants familiarity; only performed work grants practice, and observation credits only the action witnessed. Full owner acceptance remains open; see the [dated verification record](docs/reviews/2026-09-08-learning-foundations-verification.md).
+
+The established Release 0B journey remains available:
 
 1. An employee returns after being away.
 2. The companion has acted on several accomplishments.
@@ -40,10 +42,11 @@ Review and refine the prototype experience before voluntary staff sessions:
 
 ## Immediate next outcome
 
-The approved shared-companion slice is implemented locally: review the three-resident shortcut, direct targeting and shared-play behavior in `docs/superpowers/specs/2026-09-05-shared-companion-garden-design.md` and its plan. Keep the four-return journey, approved crafted visual style and local-only constraints; this is not an invitation-ready or production-complete build.
+Complete the learning-foundations action and lifecycle walkthrough, review the exact implementation and record owner observations. Automated navigation evidence and visual evidence are tracked separately in the dated verification record. Retain the four-return journey, approved crafted visual style and local-only constraints; owner acceptance does not automatically resume staff invitations or hosting.
 
 ## Latest implementation
 
+- September 8: reusable B1 fitting, B2 fastening, G1 soil filling and G2 seed planting; shared planter/tool-rack recipes, exclusive reusable tools, isolated demonstration sessions, confirmation/replay and accessible knowledge controls are implemented locally. The catalog contains 20 abilities across five paths, with only these four enabled. New commits after the previously recorded push remain local.
 - Creature art direction updated to the approved non-animal, soft-technology family: Pip uses B/Wisp (the future most-common default), Fern uses A/Roundling, and Moss uses C/Pebblekin. Defined sculpted heads, expressive layered eyes, tiny paddles/feet and subtle amber insets replace the previous ears and limbs. See `docs/design/garden-beings-2026-09-05.md` and the saved approved concept. Future rarity is a design decision only; current authored arrivals are unchanged.
 - This visual pass passed 28 focused pose/identity/interaction tests, targeted lint and a production build; the subsequent eye-depth adjustment was linted and checked in the live browser.
 - Four authored visits: beginning, one week later, several weeks later, and one season later.
