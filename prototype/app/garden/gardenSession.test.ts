@@ -1,32 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { createProjectRuntime, stepProject } from './planterCoordinator';
-import { reducePlanterProgress } from './planterProgress';
+import { createProjectRuntime, stepProject } from './projectScheduler';
+import { reduceProjectProgress } from './projectProgress';
 import {
   createGardenMountHandshake,
   createGardenSession,
   gardenSessionReducer,
-  visiblePlanter,
+  visibleProjects,
 } from './gardenSession';
 
 describe('garden session project history', () => {
   it('keeps pre-reward project snapshots while the live project receives the reading book', () => {
     let session = createGardenSession();
     session = gardenSessionReducer(session, { type: 'materials', id: 'bundle-1' });
-    expect(visiblePlanter(session).supplies).toBe('available');
+    expect(visibleProjects(session).projects.planter.supplies).toBe('available');
 
     session = gardenSessionReducer(session, { type: 'journey', event: { type: 'accomplishment' } });
-    expect(session.previousProject).toMatchObject({ supplies: 'available', book: false });
-    expect(visiblePlanter(session)).toBe(session.previousProject);
+    expect(session.previousProject).toMatchObject({ projects: { planter: { supplies: 'available' } }, book: false });
+    expect(visibleProjects(session)).toBe(session.previousProject);
 
     session = gardenSessionReducer(session, { type: 'view', view: 'now' });
     session = gardenSessionReducer(session, { type: 'journey', event: { type: 'accomplishment' } });
     expect(session.journey.rewardStage).toBe(2);
-    expect(session.project).toMatchObject({ supplies: 'available', book: true });
-    expect(session.previousProject).toMatchObject({ supplies: 'available', book: false });
-    expect(visiblePlanter(session)).toBe(session.project);
+    expect(session.project).toMatchObject({ projects: { planter: { supplies: 'available' } }, book: true });
+    expect(session.previousProject).toMatchObject({ projects: { planter: { supplies: 'available' } }, book: false });
+    expect(visibleProjects(session)).toBe(session.project);
 
     session = gardenSessionReducer(session, { type: 'view', view: 'before' });
-    expect(visiblePlanter(session)).toBe(session.previousProject);
+    expect(visibleProjects(session)).toBe(session.previousProject);
   });
 
   it('captures project progress immediately before a successful return', () => {
@@ -37,7 +37,7 @@ describe('garden session project history', () => {
     session = gardenSessionReducer(session, { type: 'view', view: 'now' });
     session = gardenSessionReducer(session, {
       type: 'project', epoch: session.epoch,
-      events: [{ type: 'learn', id: 'pip-read', resident: 'pip', abilities: ['assembly', 'planting'] }],
+      events: [{ type: 'learn', id: 'pip-read', resident: 'pip', ability: 'B1', source: { kind: 'book', id: 'book' } }],
     });
     const projectBeforeReturn = session.project;
 
@@ -46,12 +46,12 @@ describe('garden session project history', () => {
     expect(session.previousProject).toBe(projectBeforeReturn);
 
     session = gardenSessionReducer(session, { type: 'project', epoch: session.epoch, events: [
-      { type: 'learn', id: 'moss-read', resident: 'moss', abilities: ['assembly'] },
+      { type: 'learn', id: 'moss-read', resident: 'moss', ability: 'B1', source: { kind: 'book', id: 'book' } },
     ] });
-    expect(session.project.knowledge.moss).toEqual(['assembly']);
-    expect(session.previousProject.knowledge.moss).toEqual([]);
+    expect(session.project.knowledge.moss).toMatchObject({ B1: { status: 'familiar' } });
+    expect(session.previousProject.knowledge.moss).toEqual({});
     session = gardenSessionReducer(session, { type: 'view', view: 'before' });
-    expect(visiblePlanter(session)).toBe(projectBeforeReturn);
+    expect(visibleProjects(session)).toBe(projectBeforeReturn);
   });
 
   it('makes preview history coherent with the expanded nook without inventing knowledge', () => {
@@ -60,14 +60,14 @@ describe('garden session project history', () => {
     session = gardenSessionReducer(session, { type: 'journey', event: { type: 'preview-community' } });
 
     expect(session.journey.visit).toBe(3);
-    expect(session.project).toMatchObject({ book: true, supplies: 'available' });
-    expect(session.previousProject).toMatchObject({ book: true, supplies: 'available' });
-    expect(session.project.knowledge).toEqual({ pip: [], moss: [], fern: [] });
-    expect(session.previousProject.knowledge).toEqual({ pip: [], moss: [], fern: [] });
+    expect(session.project).toMatchObject({ book: true, projects: { planter: { supplies: 'available' } } });
+    expect(session.previousProject).toMatchObject({ book: true, projects: { planter: { supplies: 'available' } } });
+    expect(session.project.knowledge).toEqual({ pip: {}, moss: {}, fern: {} });
+    expect(session.previousProject.knowledge).toEqual({ pip: {}, moss: {}, fern: {} });
 
     session = gardenSessionReducer(session, { type: 'view', view: 'before' });
-    expect(visiblePlanter(session)).toBe(session.previousProject);
-    expect(visiblePlanter(session).book).toBe(true);
+    expect(visibleProjects(session)).toBe(session.previousProject);
+    expect(visibleProjects(session).book).toBe(true);
   });
 });
 
@@ -75,7 +75,7 @@ describe('garden session event delivery', () => {
   it('accepts only one materials delivery and leaves duplicate sessions unchanged', () => {
     const fresh = createGardenSession();
     const delivered = gardenSessionReducer(fresh, { type: 'materials', id: 'bundle-1' });
-    expect(delivered.project).toMatchObject({ supplies: 'available', processed: ['bundle-1'] });
+    expect(delivered.project).toMatchObject({ projects: { planter: { supplies: 'available' } }, processed: ['bundle-1'] });
     expect(gardenSessionReducer(delivered, { type: 'materials', id: 'bundle-1' })).toBe(delivered);
     expect(gardenSessionReducer(delivered, { type: 'materials', id: 'bundle-2' })).toBe(delivered);
   });
@@ -83,7 +83,7 @@ describe('garden session event delivery', () => {
   it('rejects an event emitted by an old scene', () => {
     const session = createGardenSession();
     expect(gardenSessionReducer(session, { type: 'project', epoch: session.epoch - 1,
-      events: [{ type: 'materials', id: 'old' }] })).toBe(session);
+      events: [{ type: 'materials', id: 'old', project: 'planter' }] })).toBe(session);
   });
 
   it('rejects live project changes while comparing and resumes them in Now', () => {
@@ -93,11 +93,11 @@ describe('garden session event delivery', () => {
     const comparing = session;
     expect(gardenSessionReducer(comparing, { type: 'materials', id: 'hidden-bundle' })).toBe(comparing);
     expect(gardenSessionReducer(comparing, { type: 'project', epoch: comparing.epoch,
-      events: [{ type: 'materials', id: 'hidden-project-bundle' }] })).toBe(comparing);
+      events: [{ type: 'materials', id: 'hidden-project-bundle', project: 'planter' }] })).toBe(comparing);
 
     session = gardenSessionReducer(session, { type: 'view', view: 'now' });
     session = gardenSessionReducer(session, { type: 'materials', id: 'visible-bundle' });
-    expect(session.project.supplies).toBe('available');
+    expect(session.project.projects.planter.supplies).toBe('available');
   });
 
   it('accepts resident events only for residents present on the current visit', () => {
@@ -107,15 +107,15 @@ describe('garden session event delivery', () => {
     session = gardenSessionReducer(session, { type: 'journey', event: { type: 'accomplishment' } });
 
     const rejected = gardenSessionReducer(session, { type: 'project', epoch: session.epoch, events: [
-      { type: 'learn', id: 'moss-too-early', resident: 'moss', abilities: ['assembly'] },
+      { type: 'learn', id: 'moss-too-early', resident: 'moss', ability: 'B1', source: { kind: 'book', id: 'book' } },
     ] });
     expect(rejected).toBe(session);
     expect(rejected.project.processed).not.toContain('moss-too-early');
 
     const accepted = gardenSessionReducer(session, { type: 'project', epoch: session.epoch, events: [
-      { type: 'learn', id: 'pip-read', resident: 'pip', abilities: ['assembly'] },
+      { type: 'learn', id: 'pip-read', resident: 'pip', ability: 'B1', source: { kind: 'book', id: 'book' } },
     ] });
-    expect(accepted.project.knowledge.pip).toEqual(['assembly']);
+    expect(accepted.project.knowledge.pip).toMatchObject({ B1: { status: 'familiar' } });
   });
 
   it('increments epochs only for accepted scene changes, view toggles, reset, and remount', () => {
@@ -155,10 +155,10 @@ describe('garden mount handshake', () => {
   });
 
   it('uses the acknowledged remount epoch as a fresh task ID namespace', () => {
-    const progress = reducePlanterProgress(createGardenSession().project, { type: 'book', id: 'book' });
+    const progress = reduceProjectProgress(createGardenSession().project, { type: 'book', id: 'book' });
     const actor = [{ id: 'pip' as const, available: true, position: { x: 0, z: 0 } }];
     const taskFor = (epoch: number) => stepProject(createProjectRuntime(1, epoch), {
-      delta: 0, paused: false, epoch, progress, actors: actor, reachable: () => true, footprintClear: true,
+      delta: .05, paused: false, epoch, progress, actors: actor, reachable: () => true, footprintClear: { planter: true, 'tool-rack': true },
     }).directives.pip!.key;
     const oldTask = taskFor(4);
 

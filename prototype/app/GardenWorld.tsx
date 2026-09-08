@@ -24,10 +24,12 @@ import type { MemoryKind, PipJourneyProfile } from './garden/journey';
 import type { GardenChoice } from './garden/rewardState';
 import { residentLookAngles, type FindResidentRequest } from './garden/findResident';
 import { createGardenMountHandshake } from './garden/gardenSession';
-import type { PlanterEvent, PlanterProgress } from './garden/planterProgress';
+import type { ProjectEvent, ProjectsProgress } from './garden/projectProgress';
+import { projectPlanter } from './garden/planterProgress';
+import type { ProjectId } from './garden/projectDefinitions';
 import PlanterProject from './garden/PlanterProject';
 import { PLANTER_LAYOUT } from './garden/planterLayout';
-import type { ProjectDirective } from './garden/planterCoordinator';
+import type { ProjectDirective } from './garden/projectScheduler';
 
 type WorldJourney = ResidentJourney & { profiles: Record<ResidentId, PipJourneyProfile> };
 type ResidentRefs = Record<ResidentId, MutableRefObject<THREE.Group | null>>;
@@ -201,9 +203,10 @@ function InteractionTargetTracker({ registrations, onTargetChange, republishSequ
   return null;
 }
 
-function PlanterProjectScene({ community, progress }: { community: GardenCommunity; progress: PlanterProgress }) {
+function PlanterProjectScene({ community, progress }: { community: GardenCommunity; progress: ProjectsProgress }) {
   const [directives, setDirectives] = useState<Partial<Record<ResidentId, ProjectDirective>>>({});
   const presentationKey = useRef('');
+  const [toolAnchors, setToolAnchors] = useState(() => community.projectRuntime?.toolAnchors);
   useFrame(() => {
     const next = Object.fromEntries(RESIDENTS.flatMap(({ id }) => {
       const directive = community.projectDirective(id);
@@ -212,13 +215,15 @@ function PlanterProjectScene({ community, progress }: { community: GardenCommuni
     const key = RESIDENTS.map(({ id }) => {
       const directive = next[id];
       return directive ? `${id}:${directive.key}:${directive.action}:${directive.phase}:${directive.tool ?? ''}` : `${id}:`;
-    }).join('|');
+    }).join('|') + JSON.stringify(community.projectRuntime?.toolAnchors);
     if (key !== presentationKey.current) {
       presentationKey.current = key;
       setDirectives(next);
+      setToolAnchors(community.projectRuntime?.toolAnchors);
     }
   }, -.4);
-  return <PlanterProject progress={progress} layout={PLANTER_LAYOUT} directives={directives} />;
+  const supplied = Object.values(progress.projects).some(p => p.supplies !== 'absent');
+  return <PlanterProject progress={projectPlanter(progress)} layout={PLANTER_LAYOUT} directives={directives} toolAnchors={supplied ? toolAnchors : undefined} />;
 }
 
 type ResidentSlotProps = {
@@ -252,10 +257,13 @@ function ResidentSlot({ resident, journey, onMount, player, onMessage, onPriorit
     interactionEngaged={props.focused === id} placedPosition={player.placements[id] ?? null} resumeSequence={player.resumes[id]} />;
 }
 
-export default function GardenWorld({ journey, project, projection, epoch: projectEpoch, onProjectEvents, onRemount, onMemory, onBusyChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, findRequest = null }: {
+export default function GardenWorld({ journey, project, projection, demoResidents, activated, onActivities, epoch: projectEpoch, onProjectEvents, onRemount, onMemory, onBusyChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, findRequest = null }: {
   journey: WorldJourney; onMemory: (kind: MemoryKind, id: ResidentId) => void; onBusyChange: (busy: boolean) => void;
-  project: PlanterProgress; projection: PlanterProgress; epoch: number;
-  onProjectEvents: (epoch: number, events: PlanterEvent[]) => void; onRemount: () => void;
+  demoResidents?: 1 | 3;
+  activated?: readonly ProjectId[];
+  onActivities?: (activities: Partial<Record<ResidentId, string>>) => void;
+  project: ProjectsProgress; projection: ProjectsProgress; epoch: number;
+  onProjectEvents: (epoch: number, events: ProjectEvent[]) => void; onRemount: () => void;
   rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean;
   destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null;
   findRequest?: FindResidentRequest | null;
@@ -266,7 +274,7 @@ export default function GardenWorld({ journey, project, projection, epoch: proje
     if (projectMount.mount()) onRemountRef.current();
     return () => projectMount.unmount();
   }, [projectMount]);
-  const emitProjectEvents = useCallback((events: PlanterEvent[]) => {
+  const emitProjectEvents = useCallback((events: ProjectEvent[]) => {
     const acknowledgedEpoch = projectMount.acknowledgedEpoch(projectEpoch);
     if (acknowledgedEpoch !== null && events.length > 0) onProjectEvents(acknowledgedEpoch, events);
   }, [onProjectEvents, projectEpoch, projectMount]);
@@ -290,7 +298,7 @@ export default function GardenWorld({ journey, project, projection, epoch: proje
   const [lastSpeaker, setLastSpeaker] = useState<ResidentId>('pip');
   const [priorities, setPriorities] = useState<Record<ResidentId, boolean>>({ pip: false, moss: false, fern: false });
   const reducedMotion = useReducedMotion();
-  const roster = useMemo(() => residentsForVisit(journey.sceneVisit), [journey.sceneVisit]);
+  const roster = useMemo(() => demoResidents ? RESIDENTS.slice(0, demoResidents) : residentsForVisit(journey.sceneVisit), [demoResidents, journey.sceneVisit]);
   const { scene, activeId, epoch } = player;
   const { interaction, phase, placementMessage, objectPositions, toyNudged, greetingArrived } = scene;
   const eligibleTarget = isResidentId(liveTarget) && priorities[liveTarget] ? null : liveTarget;
@@ -401,7 +409,7 @@ export default function GardenWorld({ journey, project, projection, epoch: proje
       <FrameCadence />
       <CommunityCoordinator community={community} roster={roster} actors={refs} player={player} focused={eligibleTarget}
         priorities={priorities} comparing={journey.comparing} reducedMotion={reducedMotion}
-        project={project} projection={projection} epoch={projectMount.acknowledgedEpoch(projectEpoch)} onProjectEvents={emitProjectEvents} />
+        project={project} projection={projection} activated={activated} onActivities={onActivities} epoch={projectMount.acknowledgedEpoch(projectEpoch)} onProjectEvents={emitProjectEvents} />
       <PlanterProjectScene community={community} progress={projection} />
       <GardenEnvironment journey={journey} rewardStage={rewardStage} starflowersVisible={starflowersVisible} pavilionImproved={pavilionImproved}
         seedVisible={seedVisible} destinationVisible={destinationVisible} reducedMotion={reducedMotion} />

@@ -1,4 +1,5 @@
 import type { AbilityId } from './abilities';
+import type { PlanterProgress } from './planterProgress';
 import {
   PROJECT_RECIPES,
   type ProjectId,
@@ -49,6 +50,25 @@ export function createProjectsProgress(): ProjectsProgress {
     active: null,
     processed: [],
   };
+}
+
+/** One-way local fixture migration. Coarse flags contain no evidence of practice. */
+export function migrateLegacyPlanter(legacy: PlanterProgress): ProjectsProgress {
+  const progress = createProjectsProgress();
+  const completedSteps = { empty: 0, base: 2, frame: 4, soil: 5, planted: 6 }[legacy.stage];
+  let knowledge = progress.knowledge;
+  for (const resident of ['pip', 'moss', 'fern'] as const) for (const coarse of legacy.knowledge[resident]) {
+    const abilities = coarse === 'assembly' ? ['B1', 'B2'] as const : ['G1', 'G2'] as const;
+    for (const ability of abilities) knowledge = learnAbility(knowledge, resident, ability,
+      { kind: 'legacy', id: `legacy:planter:${resident}:${coarse}` });
+  }
+  const input = { empty: 'piece', base: 'piece', frame: 'soil', soil: 'seeds', planted: null }[legacy.stage];
+  const next = PROJECT_RECIPES.planter[completedSteps];
+  const committed = legacy.supplies === 'committed' && !!next;
+  return { ...progress, book: legacy.book, knowledge, processed: [...legacy.processed],
+    active: committed ? 'planter' : null,
+    projects: { ...progress.projects, planter: { supplies: legacy.supplies, completedSteps,
+      deliveredForStep: committed && legacy.delivered && next.tool === input ? completedSteps : null } } };
 }
 
 export function nextRecipeStep(p: ProjectsProgress, id: ProjectId): RecipeStep | null {

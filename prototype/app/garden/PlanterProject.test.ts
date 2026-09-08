@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ProjectDirective } from './planterCoordinator';
+import type { ProjectDirective } from './projectScheduler';
 import { createPlanterProgress } from './planterProgress';
 import { basketItems, planterParts } from './PlanterProject';
 
@@ -18,7 +18,7 @@ describe('planter scene presentation', () => {
     const carrying: ProjectDirective = {
       key: 'planter:1:2', actor: 'pip', action: 'carry', phase: 'approach',
       target: { x: -15, z: -3.15 }, lookAt: { x: -15, z: -1.8 },
-      tool: 'piece', elapsed: 0,
+      tool: 'piece', elapsed: 0, project: 'planter', step: 0, ability: 'B1',
     };
 
     expect(basketItems(progress, { pip: carrying })).toEqual(['soil', 'seeds', 'mallet', 'can']);

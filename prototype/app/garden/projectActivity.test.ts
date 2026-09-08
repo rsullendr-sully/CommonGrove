@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { projectMotion, projectVisual, stepProjectTravel, type ProjectTravel } from './projectActivity';
-import type { ProjectDirective } from './planterCoordinator';
+import type { ProjectDirective } from './projectScheduler';
 import { GARDEN_OBSTACLES } from './navigation';
 
-const directive: ProjectDirective = { key: 'work:1', actor: 'pip', action: 'assemble', tool: 'mallet', elapsed: .25,
-  phase: 'perform', target: { x: 2, z: 12 }, lookAt: { x: 3, z: 12 } };
+const directive: ProjectDirective = { key: 'work:1', actor: 'pip', action: 'tap', tool: 'mallet', elapsed: .25,
+  project: 'planter', step: 1, ability: 'B2', phase: 'perform', target: { x: 2, z: 12 }, lookAt: { x: 3, z: 12 } };
 describe('project acting', () => {
   it('keeps reduced-motion tool use readable without rhythmic taps', () => {
     const a = projectMotion(projectVisual(directive, true));

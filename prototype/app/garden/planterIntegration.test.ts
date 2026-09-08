@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { GardenCommunity } from './CommunityCoordinator';
-import { createPlanterProgress, reducePlanterProgress, type PlanterEvent, type PlanterProgress } from './planterProgress';
+import { createPlanterProgress } from './planterProgress';
+import { createProjectsProgress, migrateLegacyPlanter, reduceProjectProgress, type ProjectEvent } from './projectProgress';
 import { RESIDENTS, type ResidentId } from './residents';
 import type { ResidentSnapshot } from './residentCoordination';
 import { stepProjectTravel, type ProjectTravel } from './projectActivity';
@@ -9,23 +10,13 @@ import { isSafeGardenPoint, isSafeGardenSegment } from './navigation';
 import { PIP_MOTION_CONFIG } from './locomotion';
 import { PLANTER_LAYOUT } from './planterLayout';
 import type { GardenPoint } from './navigation';
-import { createGardenSession, gardenSessionReducer, visiblePlanter, type GardenSession } from './gardenSession';
+import { createGardenSession, gardenSessionReducer, visibleProjects, type GardenSession } from './gardenSession';
 
 const DT = .05;
 
-/** Reserve the finished footprint for coordinator reachability, travel and safety checks alike. */
-class FinalFootprintCommunity extends GardenCommunity {
-  override obstacles(id: ResidentId | null) {
-    const obstacles = super.obstacles(id);
-    const final = { ...PLANTER_LAYOUT.planter, radius: PLANTER_LAYOUT.planterRadius };
-    return obstacles.some(o => o.x === final.x && o.z === final.z && o.radius === final.radius)
-      ? obstacles : [...obstacles, final];
-  }
-}
-
 /** Full loops use authored spawns; teaching fixtures declare their initial positions. */
-function garden(count: number, initial = createPlanterProgress(), fixtures: Partial<Record<ResidentId, GardenPoint>> = {}) {
-  const community = new FinalFootprintCommunity();
+function garden(count: number, initial = createProjectsProgress(), fixtures: Partial<Record<ResidentId, GardenPoint>> = {}) {
+  const community = new GardenCommunity();
   const actors: ResidentSnapshot[] = RESIDENTS.slice(0, count).map(r => ({
     id: r.id, available: true, position: { ...fixtures[r.id] ?? { x: r.spawn[0], z: r.spawn[2] } },
   }));
@@ -35,17 +26,17 @@ function garden(count: number, initial = createPlanterProgress(), fixtures: Part
   }]));
   let progress = initial;
   let activeSeconds = 0;
-  const events: PlanterEvent[] = [];
+  const events: ProjectEvent[] = [];
   const sim = {
     community, actors, travel, events, paused: false, epoch: 1, blockers: [] as ResidentSnapshot[],
     get progress() { return progress; },
     get activeSeconds() { return activeSeconds; },
-    apply(batch: PlanterEvent[]) { progress = batch.reduce(reducePlanterProgress, progress); },
+    apply(batch: ProjectEvent[]) { progress = batch.reduce(reduceProjectProgress, progress); },
     tick() {
       const previousClaims = sim.community.projectRuntime?.claims;
       const batch = community.advance({ now: activeSeconds, delta: DT, paused: sim.paused,
         actors: [...actors, ...sim.blockers].map(a => ({ ...a, position: { ...a.position } })), toyFree: false }, null,
-      { progress, epoch: sim.epoch, playerPosition: { x: 0, z: 17 } });
+      { progress, activated: ['planter'], epoch: sim.epoch, playerPosition: { x: 0, z: 17 } });
       for (const event of batch) if (event.type === 'learn') {
         const claim = previousClaims?.[event.resident];
         const actor = actors.find(a => a.id === event.resident)!;
@@ -94,7 +85,7 @@ function garden(count: number, initial = createPlanterProgress(), fixtures: Part
         // Keep Vitest worker messages responsive without changing active simulation time.
         if (n % 100 === 99) await new Promise<void>(resolve => setTimeout(resolve, 0));
       }
-      expect(done(), `timed out at ${activeSeconds.toFixed(2)} active seconds; stage=${progress.stage}`).toBe(true);
+      expect(done(), `timed out at ${activeSeconds.toFixed(2)} active seconds; stage=${progress.projects.planter.completedSteps}`).toBe(true);
     },
   };
   return sim;
@@ -102,7 +93,7 @@ function garden(count: number, initial = createPlanterProgress(), fixtures: Part
 
 describe('planter real-navigation lifecycle', () => {
   it.each(['empty', 'planted'] as const)('reserves the final footprint exactly once during %s-stage routing', stage => {
-    const sim = garden(1, { ...createPlanterProgress(), stage });
+    const sim = garden(1, migrateLegacyPlanter({ ...createPlanterProgress(), stage }));
     sim.tick();
     const obstacles = sim.community.obstacles('pip');
     expect(isSafeGardenPoint(PLANTER_LAYOUT.planter, obstacles)).toBe(false);
@@ -114,31 +105,31 @@ describe('planter real-navigation lifecycle', () => {
     it(`finishes ${order}, ${count} resident(s), within 240 active seconds using safe routes and bounded waypoint settling`, async () => {
       const sim = garden(count);
       if (order === 'materials-first') {
-        sim.apply([{ type: 'materials', id: 'supplies' }]);
+        sim.apply([{ type: 'materials', id: 'supplies', project: 'planter' }]);
         for (let n = 0; n < 20; n++) sim.tick();
-        expect(sim.progress.stage).toBe('empty');
-        expect(Object.values(sim.progress.knowledge).flat()).toEqual([]);
+        expect(sim.progress.projects.planter.completedSteps).toBe(0);
+        expect(Object.values(sim.progress.knowledge).flatMap(a => Object.keys(a))).toEqual([]);
       }
       sim.apply([{ type: 'book', id: 'nook' }]);
       if (order === 'knowledge-first') {
-        await sim.until(() => Object.values(sim.progress.knowledge).some(a => a.includes('assembly')), 100);
-        expect(sim.progress.supplies).toBe('absent');
-        expect(sim.progress.stage).toBe('empty');
-        sim.apply([{ type: 'materials', id: 'supplies' }]);
+        await sim.until(() => Object.values(sim.progress.knowledge).some(a => a.B1), 100);
+        expect(sim.progress.projects.planter.supplies).toBe('absent');
+        expect(sim.progress.projects.planter.completedSteps).toBe(0);
+        sim.apply([{ type: 'materials', id: 'supplies', project: 'planter' }]);
       }
-      await sim.until(() => sim.progress.stage === 'planted', 240 - sim.activeSeconds);
+      await sim.until(() => sim.progress.projects.planter.completedSteps === 6, 240 - sim.activeSeconds);
       expect(sim.activeSeconds).toBeLessThanOrEqual(240);
-      expect(sim.progress.stage).toBe('planted');
-      expect(sim.progress.supplies).toBe('used');
-      expect(Object.values(sim.progress.knowledge).some(a => a.includes('assembly'))).toBe(true);
+      expect(sim.progress.projects.planter.completedSteps).toBe(6);
+      expect(sim.progress.projects.planter.supplies).toBe('used');
+      expect(Object.values(sim.progress.knowledge).some(a => a.B1)).toBe(true);
       expect(new Set(sim.progress.processed).size).toBe(sim.progress.processed.length);
-      expect(sim.events.filter(e => e.type === 'build').map(e => e.stage)).toEqual(['base', 'frame', 'soil', 'planted']);
+      expect(sim.events.filter(e => e.type === 'complete').map(e => e.step)).toEqual([0, 1, 2, 3, 4, 5]);
     }, 60000);
   }
 
   it('recovers a ten-second carried participant, a blocked basket, pauses and a new epoch using real routes', async () => {
     const sim = garden(1);
-    sim.apply([{ type: 'book', id: 'nook' }, { type: 'materials', id: 'supplies' }]);
+    sim.apply([{ type: 'book', id: 'nook' }, { type: 'materials', id: 'supplies', project: 'planter' }]);
     await sim.until(() => sim.community.projectDirective('pip')?.tool === 'piece'
       && Math.hypot(sim.actors[0].position.x - PLANTER_LAYOUT.slots.pickup.x, sim.actors[0].position.z - PLANTER_LAYOUT.slots.pickup.z) > 1.1, 100);
     const oldKey = sim.community.projectDirective('pip')!.key;
@@ -168,60 +159,61 @@ describe('planter real-navigation lifecycle', () => {
     sim.paused = false;
     sim.epoch++;
     sim.tick();
-    expect(sim.community.projectDirective('pip')?.key).toMatch(/^planter:2:/);
-    await sim.until(() => sim.progress.stage === 'planted', 240 - sim.activeSeconds);
+    expect(sim.community.projectDirective('pip')?.key).toMatch(/^project:2:/);
+    await sim.until(() => sim.progress.projects.planter.completedSteps === 6, 240 - sim.activeSeconds);
     const completed = sim.progress;
-    sim.apply([{ type: 'materials', id: 'another-bundle' }, ...sim.events, ...sim.events]);
+    sim.apply([{ type: 'materials', id: 'another-bundle', project: 'planter' }, ...sim.events, ...sim.events]);
     expect(sim.progress).toBe(completed);
-    expect(sim.events.filter(e => e.type === 'build').map(e => e.stage)).toEqual(['base', 'frame', 'soil', 'planted']);
+    expect(sim.events.filter(e => e.type === 'complete').map(e => e.step)).toEqual([0, 1, 2, 3, 4, 5]);
     await sim.until(() => ['water', 'inspect'].includes(sim.community.projectDirective('pip')?.action ?? ''), 40);
     expect(sim.progress).toBe(completed);
   }, 60000);
 
   function lesson(stage: 'empty' | 'soil', distant = false) {
-    const progress: PlanterProgress = { ...createPlanterProgress(), book: true, supplies: 'committed', delivered: true, stage,
-      knowledge: { pip: ['assembly', 'planting'], moss: [], fern: [] } };
+    const progress = migrateLegacyPlanter({ ...createPlanterProgress(), book: false, supplies: 'committed', delivered: true, stage,
+      knowledge: { pip: ['assembly', 'planting'], moss: [], fern: [] } });
     // Isolated teaching fixture; subsequent movement still uses the real route adapter.
-    return garden(2, progress, { pip: PLANTER_LAYOUT.slots.work,
+    return garden(2, progress, { pip: PLANTER_LAYOUT.slots.pickup,
       ...(distant ? {} : { moss: { x: -13.65, z: .1 } }) });
   }
 
-  it.each([['empty', 'assembly'], ['soil', 'planting']] as const)(
+  it.each([['empty', 'B1'], ['soil', 'G2']] as const)(
     'learns %s by uninterrupted observation without reading the book', async (stage, ability) => {
       const sim = lesson(stage);
-      await sim.until(() => sim.progress.knowledge.moss.length > 0, 8);
-      expect(sim.progress.knowledge.moss).toEqual([ability]);
+      await sim.until(() => Object.keys(sim.progress.knowledge.moss).length > 0, 20);
+      expect(Object.keys(sim.progress.knowledge.moss)).toEqual([ability]);
+      expect(sim.progress.knowledge.moss[ability]?.source.kind).toBe('observation');
       expect(sim.events.filter(e => e.type === 'learn')).toEqual([
-        expect.objectContaining({ resident: 'moss', abilities: [ability] }),
+        expect.objectContaining({ resident: 'moss', ability }),
       ]);
     });
 
   it('does not grant observation knowledge from a distance or across interrupted attendance', async () => {
     const far = lesson('empty', true);
-    await far.until(() => far.progress.stage === 'base', 8);
-    expect(far.progress.knowledge.moss).toEqual([]);
+    await far.until(() => far.progress.projects.planter.completedSteps === 1, 20);
+    expect(far.progress.knowledge.moss).toEqual({});
     const sim = lesson('empty');
-    await sim.until(() => (sim.community.projectDirective('moss')?.elapsed ?? 0) >= 2, 6);
-    expect(sim.progress.knowledge.moss).toEqual([]);
+    await sim.until(() => (sim.community.projectDirective('moss')?.elapsed ?? 0) >= 2, 20);
+    expect(sim.progress.knowledge.moss).toEqual({});
     sim.actors[1].carried = true;
     sim.tick();
     sim.actors[1].carried = false;
-    await sim.until(() => sim.progress.stage === 'base', 6);
-    expect(sim.progress.knowledge.moss).toEqual([]);
+    await sim.until(() => sim.progress.projects.planter.completedSteps === 1, 20);
+    expect(sim.progress.knowledge.moss).toEqual({});
   });
 
   it('rejects real completion batches from comparison and previous epochs, preserving session snapshots', async () => {
     const sim = lesson('empty');
     const pending = sim.progress;
-    await sim.until(() => sim.progress.stage === 'base', 8);
+    await sim.until(() => sim.progress.projects.planter.completedSteps === 1, 20);
     const session: GardenSession = { ...createGardenSession(), project: pending,
       journey: { ...createGardenSession().journey, visit: 2, rewardStage: 2 as const }, view: 'now' as const, epoch: 1 };
     const before = session.project;
     const comparing = gardenSessionReducer(session, { type: 'view', view: 'before' });
-    expect(visiblePlanter(comparing)).toBe(session.previousProject);
+    expect(visibleProjects(comparing)).toBe(session.previousProject);
     expect(gardenSessionReducer(comparing, { type: 'project', epoch: comparing.epoch, events: sim.events })).toBe(comparing);
     const now = gardenSessionReducer(comparing, { type: 'view', view: 'now' });
-    expect(visiblePlanter(now)).toBe(before);
+    expect(visibleProjects(now)).toBe(before);
     const remounted = gardenSessionReducer(now, { type: 'remount' });
     expect(gardenSessionReducer(remounted, { type: 'project', epoch: 1, events: sim.events })).toBe(remounted);
     const accepted = gardenSessionReducer(remounted, { type: 'project', epoch: remounted.epoch, events: [...sim.events, ...sim.events] });
@@ -232,6 +224,6 @@ describe('planter real-navigation lifecycle', () => {
     expect(returned.project).toBe(accepted.project);
     expect(returned.previousProject).toBe(accepted.project);
     expect(returned.epoch).toBeGreaterThan(accepted.epoch);
-    expect(gardenSessionReducer(session, { type: 'journey', event: { type: 'reset' } }).project).toEqual(createPlanterProgress());
+    expect(gardenSessionReducer(session, { type: 'journey', event: { type: 'reset' } }).project).toEqual(createProjectsProgress());
   });
 });

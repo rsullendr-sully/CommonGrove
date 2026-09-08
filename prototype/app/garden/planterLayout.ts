@@ -1,6 +1,6 @@
 import type { GardenObstacle, GardenPoint } from './navigation';
 import { PAVILION_READING_POINT } from './pavilionLayout';
-import type { PlanterProgress } from './planterProgress';
+import type { PlanterProjection } from './planterProgress';
 
 export type PlanterSlot = 'read' | 'pickup' | 'carryDrop' | 'work' | 'observe' | 'water';
 
@@ -35,7 +35,7 @@ export const PLANTER_LAYOUT: PlanterLayout = {
   planterRadius: .85,
 };
 
-export function planterObstacles(progress: PlanterProgress): GardenObstacle[] {
+export function planterObstacles(progress: PlanterProjection): GardenObstacle[] {
   const obstacles: GardenObstacle[] = [];
   if (progress.book) obstacles.push({ ...PLANTER_LAYOUT.book, radius: BOOK_STAND_RADIUS });
   if (progress.supplies !== 'absent') obstacles.push({ ...PLANTER_LAYOUT.basket, radius: BASKET_RADIUS });

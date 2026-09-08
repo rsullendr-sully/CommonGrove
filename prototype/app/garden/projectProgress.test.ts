@@ -1,13 +1,45 @@
 import { describe, expect, it } from 'vitest';
 import { learnAbility } from './spiritKnowledge';
+import { createPlanterProgress } from './planterProgress';
 import {
   createProjectsProgress,
   nextRecipeStep,
   projectComplete,
   reduceProjectProgress,
+  migrateLegacyPlanter,
   type ProjectEvent,
   type ProjectsProgress,
 } from './projectProgress';
+
+describe('one-way legacy planter migration', () => {
+  it.each([['empty', 0], ['base', 2], ['frame', 4], ['soil', 5], ['planted', 6]] as const)(
+    'preserves completed %s without inventing practice', (stage, completedSteps) => {
+      const old = { ...createPlanterProgress(), book: true, stage, supplies: stage === 'planted' ? 'used' as const : 'committed' as const,
+        delivered: true, knowledge: { pip: ['assembly' as const], moss: ['planting' as const], fern: [] }, processed: ['old-event'] };
+      const next = migrateLegacyPlanter(old);
+      expect(next.projects.planter.completedSteps).toBe(completedSteps);
+      expect(next.projects.planter.supplies).toBe(old.supplies);
+      expect(next.active).toBe(stage === 'planted' ? null : 'planter');
+      expect(next.book).toBe(true);
+      expect(next.processed).toEqual(['old-event']);
+      expect(next.projects['tool-rack'].supplies).toBe('absent');
+      expect(next.knowledge.pip.B1).toMatchObject({ status: 'familiar', source: { kind: 'legacy' } });
+      expect(next.knowledge.pip.B2).toMatchObject({ status: 'familiar', source: { kind: 'legacy' } });
+      expect(next.knowledge.moss.G1).toMatchObject({ status: 'familiar', source: { kind: 'legacy' } });
+      expect(next.knowledge.moss.G2).toMatchObject({ status: 'familiar', source: { kind: 'legacy' } });
+      expect(next.knowledge.fern).toEqual({});
+      expect(next.projects.planter.deliveredForStep).toBe(stage === 'planted' ? null : completedSteps);
+      expect(old.knowledge.pip).toEqual(['assembly']);
+    });
+  it.each(['absent', 'available', 'committed', 'used'] as const)('preserves %s supplies and returns unallocated input without charging again', supplies => {
+    const old = { ...createPlanterProgress(), supplies, delivered: true };
+    const next = migrateLegacyPlanter(old);
+    expect(next.projects.planter.supplies).toBe(supplies);
+    expect(next.projects.planter.deliveredForStep).toBe(supplies === 'committed' ? 0 : null);
+    expect(next.knowledge).toEqual({ pip: {}, moss: {}, fern: {} });
+    expect(next.processed).toEqual([]);
+  });
+});
 
 function withBookAbilities(
   abilities: readonly ('B1' | 'B2' | 'G1' | 'G2')[],

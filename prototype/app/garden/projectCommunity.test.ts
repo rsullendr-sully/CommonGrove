@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GardenCommunity, type ProjectCommunityFrame } from './CommunityCoordinator';
-import { createPlanterProgress, reducePlanterProgress, type PlanterEvent } from './planterProgress';
+import { createPlanterProgress } from './planterProgress';
+import { createProjectsProgress, migrateLegacyPlanter, reduceProjectProgress, type ProjectEvent } from './projectProgress';
 import { PLANTER_LAYOUT } from './planterLayout';
 import { type CommunityInput } from './residentCoordination';
 import { nudgeToy, stepToy, stepCommunity, createCommunity, residentObstacles } from './residentCoordination';
@@ -10,7 +11,7 @@ import { RESIDENTS } from './residents';
 import { stepProjectTravel, type ProjectTravel } from './projectActivity';
 import * as THREE from 'three';
 
-const frame = (): ProjectCommunityFrame => ({ progress: { ...createPlanterProgress(), book: true }, epoch: 1, playerPosition: { x: 0, z: 17 } });
+const frame = (): ProjectCommunityFrame => ({ progress: { ...createProjectsProgress(), book: true }, epoch: 1, playerPosition: { x: 0, z: 17 } });
 const input = (): CommunityInput => ({ now: 0, delta: .05, toyFree: false, paused: false,
   actors: [{ id: 'pip', available: true, position: { ...PLANTER_LAYOUT.slots.read } }] });
 
@@ -23,13 +24,14 @@ describe('project and community arbitration', () => {
     c.advance(i, null, f);
     expect(c.projectDirective('pip')!.key).not.toBe(first);
     for (let n = 0; n < 125; n++) c.advance(i, null, f);
-    f.progress = { ...f.progress, supplies: 'available' };
+    f.progress = reduceProjectProgress(f.progress, { type: 'materials', id: 'bundle', project: 'planter' });
     c.advance(i, null, f);
+    for (let n = 0; n < 40; n++) c.advance(i, null, f);
     expect(c.projectDirective('pip')!.key).not.toBe(first);
   });
   it('builds from real spawn routes while preventing tool and ordinary-activity double ownership', () => {
     const c = new GardenCommunity(), i = input(), f = frame();
-    f.progress = { ...f.progress, supplies: 'available' };
+    f.progress = reduceProjectProgress(f.progress, { type: 'materials', id: 'bundle', project: 'planter' });
     const travel = new Map<string, ProjectTravel>();
     i.actors = RESIDENTS.map(r => {
       travel.set(r.id, { motion: { position: new THREE.Vector3(...r.spawn), facing: 0, speed: 0, distanceTravelled: 0, moving: false },
@@ -37,7 +39,7 @@ describe('project and community arbitration', () => {
       return { id: r.id, available: true, position: { x: r.spawn[0], z: r.spawn[2] } };
     });
     i.toyFree = true;
-    for (let n = 0; n < 7000 && f.progress.stage !== 'planted'; n++) {
+    for (let n = 0; n < 7000 && f.progress.projects.planter.completedSteps !== 6; n++) {
       i.now = n * .05;
       const events = c.advance(i, null, f);
       const tools = new Set<string>();
@@ -51,11 +53,11 @@ describe('project and community arbitration', () => {
         a.position = { x: next.motion.position.x, z: next.motion.position.z };
         c.recordPosition(a.id, a.position);
       }
-      f.progress = events.reduce(reducePlanterProgress, f.progress);
+      f.progress = events.reduce(reduceProjectProgress, f.progress);
     }
-    expect(f.progress.stage).toBe('planted');
-    expect(f.progress.supplies).toBe('used');
-  }, 30000);
+    expect(f.progress.projects.planter.completedSteps).toBe(6);
+    expect(f.progress.projects.planter.supplies).toBe('used');
+  }, 60000);
   it('shares project footprints with social approaches, toy sweeps, placement, and player motion', () => {
     const extra = [{ x: 1, z: 12, radius: .3 }];
     const actor = { id: 'pip' as const, available: true, position: { x: -1, z: 12 } };
@@ -75,21 +77,21 @@ describe('project and community arbitration', () => {
     const c = new GardenCommunity(), i = input(), f = frame();
     c.advance(i, null, { ...f, epoch: null });
     expect(c.projectDirective('pip')).toBeNull();
-    const events: PlanterEvent[] = [];
+    const events: ProjectEvent[] = [];
     for (let n = 0; n < 260; n++) events.push(...c.advance({ ...i, now: n * .05 }, null, f));
-    expect(events.filter(e => e.type === 'learn')).toHaveLength(1);
-    f.progress = events.reduce(reducePlanterProgress, f.progress);
+    expect(events.filter(e => e.type === 'learn')).toHaveLength(4);
+    f.progress = events.reduce(reduceProjectProgress, f.progress);
     expect(c.advance(i, null, f)).toEqual([]);
     expect(c.projectDirective('pip')).toBeNull();
     c.advance(i, null, { ...frame(), epoch: 2 });
-    expect(c.projectDirective('pip')?.key).toMatch(/^planter:2:/);
+    expect(c.projectDirective('pip')?.key).toMatch(/^project:2:/);
   });
   it('limits stationary passive attention to one four-second grace period per approach', () => {
     const c = new GardenCommunity(), i = input(), f = frame();
     f.playerPosition = { x: i.actors[0].position.x, z: i.actors[0].position.z + 2 };
-    const events: PlanterEvent[] = [];
+    const events: ProjectEvent[] = [];
     for (let n = 0; n < 600; n++) events.push(...c.advance({ ...i, now: n * .05 }, 'pip', f));
-    expect(events.filter(e => e.type === 'learn')).toHaveLength(1);
+    expect(events.filter(e => e.type === 'learn')).toHaveLength(4);
     expect(c.attention).toBeNull();
     c.advance(i, null, { ...f, playerPosition: { x: 0, z: 17 } });
     c.advance(i, 'pip', f);
@@ -110,21 +112,71 @@ describe('project and community arbitration', () => {
   });
   it('prevents growth around a player or unavailable resident, then celebrates participants once', () => {
     const c = new GardenCommunity(), i = input(), f = frame();
-    f.progress = { ...f.progress, stage: 'soil', supplies: 'committed', delivered: true,
-      knowledge: { pip: ['assembly', 'planting'], moss: [], fern: [] } };
-    i.actors = [{ ...i.actors[0], position: { ...PLANTER_LAYOUT.slots.work } }];
+    f.progress = migrateLegacyPlanter({ ...createPlanterProgress(), book: true, stage: 'soil', supplies: 'committed', delivered: true,
+      knowledge: { pip: ['assembly', 'planting'], moss: [], fern: [] } });
+    i.actors = [{ ...i.actors[0], position: { ...PLANTER_LAYOUT.slots.pickup } }];
+    const follow = () => {
+      const directive = c.projectDirective('pip');
+      if (directive) i.actors[0].position = { ...directive.target };
+    };
     f.playerPosition = { ...PLANTER_LAYOUT.planter };
-    for (let n = 0; n < 130; n++) expect(c.advance(i, null, f)).toEqual([]);
+    for (let n = 0; n < 130; n++) { follow(); expect(c.advance(i, null, f)).toEqual([]); }
     f.playerPosition = { x: 0, z: 17 };
     const blocked = { ...i, actors: [...i.actors, { id: 'moss' as const, position: { ...PLANTER_LAYOUT.planter }, available: false }] };
     expect(c.advance(blocked, null, f)).toEqual([]);
-    const events = c.advance(i, null, f);
+    const events: ProjectEvent[] = [];
+    for (let n = 0; n < 100 && !events.length; n++) { follow(); events.push(...c.advance(i, null, f)); }
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ type: 'build', stage: 'planted' });
-    f.progress = events.reduce(reducePlanterProgress, f.progress);
+    expect(events[0]).toMatchObject({ type: 'complete', project: 'planter', step: 5 });
+    f.progress = events.reduce(reduceProjectProgress, f.progress);
     c.advance(i, null, f);
     expect(c.celebration('pip')).not.toBeNull();
     for (let n = 0; n < 60; n++) c.advance(i, null, f);
     expect(c.celebration('pip')).toBeNull();
+  });
+});
+
+describe('shared-tool immediate release', () => {
+  function claimedTool() {
+    const c = new GardenCommunity(), i = input(), f = frame();
+    f.progress = migrateLegacyPlanter({ ...createPlanterProgress(), book: true, supplies: 'committed', knowledge: { pip: ['assembly'], moss: [], fern: [] } });
+    f.progress.projects.planter.completedSteps = 1;
+    c.advance(i, null, f);
+    expect(c.projectRuntime?.toolClaims.mallet?.actor).toBe('pip');
+    return { c, i, f };
+  }
+  it.each(['direct', 'pause', 'unavailable'] as const)('releases tool reservation immediately on %s without resetting anchors/serial', reason => {
+    const { c, i, f } = claimedTool();
+    const anchors = structuredClone(c.projectRuntime!.toolAnchors), serial = c.projectRuntime!.serial;
+    if (reason === 'direct') c.releaseProject('pip');
+    else c.advance({ ...i, paused: reason === 'pause', actors: i.actors.map(a => ({ ...a, available: false })) }, null, f);
+    expect(c.projectDirective('pip')).toBeNull();
+    expect(c.projectRuntime?.toolClaims).toEqual({});
+    expect(c.projectRuntime?.toolAnchors).toEqual(anchors);
+    expect(c.projectRuntime?.serial).toBeGreaterThanOrEqual(serial);
+  });
+  it('releases a tool and dependent observer when a pending delivery is rejected, then retries with a fresh claim', () => {
+    const { c, i, f } = claimedTool();
+    i.actors = [...i.actors, { id: 'moss', available: true, position: { ...PLANTER_LAYOUT.slots.observe } }];
+    const events: ProjectEvent[] = [];
+    for (let n = 0; n < 30 && !events.length; n++) {
+      const d = c.projectDirective('pip');
+      if (d) i.actors[0].position = { ...d.target };
+      events.push(...c.advance(i, null, f));
+    }
+    expect(events).toEqual([expect.objectContaining({ type: 'deliver', step: 1 })]);
+    const serial = c.projectRuntime!.serial, anchors = structuredClone(c.projectRuntime!.toolAnchors);
+    const original = c.projectRuntime!.claims.pip!.id;
+    expect(c.projectDirective('moss')?.action).toBe('observe');
+    f.progress = { ...f.progress, processed: [...f.progress.processed] }; // New authoritative state omits the pending batch.
+    expect(c.advance(i, null, f)).toEqual([]);
+    expect(c.projectDirective('pip')).toBeNull();
+    expect(c.projectDirective('moss')).toBeNull();
+    expect(c.projectRuntime!.toolClaims).toEqual({});
+    expect(c.projectRuntime!.toolAnchors).toEqual(anchors);
+    expect(c.projectRuntime!.serial).toBe(serial);
+    for (let n = 0; n < 40; n++) c.advance(i, null, f);
+    expect(c.projectRuntime!.claims.pip?.id).not.toBe(original);
+    expect(c.projectRuntime!.toolClaims.mallet?.actor).toBe('pip');
   });
 });

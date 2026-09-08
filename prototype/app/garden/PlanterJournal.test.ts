@@ -2,13 +2,14 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createPlanterProgress, type PlanterProgress } from './planterProgress';
+import { migrateLegacyPlanter } from './projectProgress';
 import PlanterJournal from './PlanterJournal';
 
 const renderJournal = (
   progress: PlanterProgress,
   options: { busy?: boolean; comparing?: boolean } = {},
 ) => renderToStaticMarkup(createElement(PlanterJournal, {
-  progress,
+  progress: migrateLegacyPlanter(progress),
   busy: options.busy ?? false,
   comparing: options.comparing ?? false,
   onMaterials: vi.fn(),
@@ -49,9 +50,11 @@ describe('planter journal', () => {
     const markup = renderJournal(progress);
 
     expect(markup).toContain('Their planter is part of the grove now.');
-    expect(markup).toContain('Pip learned simple assembly and planting.');
-    expect(markup).toContain('Moss learned planting.');
+    expect(markup).toContain('Pip: fit pieces (familiar), use a mallet (familiar), prepare soil (familiar), plant seeds (familiar).');
+    expect(markup).toContain('Moss: prepare soil (familiar), plant seeds (familiar).');
     expect(markup).not.toMatch(/level|rank|score/i);
+    expect(markup).toContain('Familiar means encountered. Practiced means successfully used.');
+    expect(markup).toContain('Legacy knowledge');
   });
 
   it.each([

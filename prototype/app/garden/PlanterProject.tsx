@@ -6,9 +6,10 @@ import * as THREE from 'three';
 import { CraftedWoodMaterial, SoftBoxGeometry } from './CraftedGeometry';
 import { groundGardenPosition } from './gardenElevation';
 import { GARDEN_TEXTURE_PATHS, prepareGardenTexture } from './gardenSurface';
-import type { ProjectDirective } from './planterCoordinator';
+import type { ProjectDirective } from './projectScheduler';
 import { type PlanterLayout } from './planterLayout';
-import type { BuildStage, PlanterProgress } from './planterProgress';
+import type { BuildStage, PlanterProjection } from './planterProgress';
+import type { GardenPoint } from './navigation';
 import type { ResidentId } from './residents';
 
 export type PlanterPart = 'base' | 'frame' | 'soil' | 'sprouts';
@@ -27,7 +28,7 @@ export function planterParts(stage: BuildStage): readonly PlanterPart[] {
 }
 
 export function basketItems(
-  progress: PlanterProgress,
+  progress: PlanterProjection,
   directives: Partial<Record<ResidentId, ProjectDirective>>,
 ): readonly BasketItem[] {
   if (progress.supplies === 'absent') return [];
@@ -39,7 +40,8 @@ export function basketItems(
         ? ['soil', 'seeds']
         : ['seeds'];
   const claimed = new Set(Object.values(directives).flatMap(directive => directive?.tool ? [directive.tool] : []));
-  return [...materials, 'mallet', 'can'].filter(item => !claimed.has(item));
+  const items: BasketItem[] = [...materials, 'mallet', 'can'];
+  return items.filter(item => !claimed.has(item));
 }
 
 export function ProjectTool({ kind }: { kind: BasketItem }): React.JSX.Element {
@@ -87,8 +89,8 @@ function PictureBook({ texture }: { texture: THREE.Texture }) {
   </group>;
 }
 
-function SupplyBasket({ progress, directives, texture }: { progress: PlanterProgress; directives: Partial<Record<ResidentId, ProjectDirective>>; texture: THREE.Texture }) {
-  const items = basketItems(progress, directives);
+function SupplyBasket({ progress, directives, texture, separateTools }: { progress: PlanterProjection; directives: Partial<Record<ResidentId, ProjectDirective>>; texture: THREE.Texture; separateTools: boolean }) {
+  const items = basketItems(progress, directives).filter(item => !separateTools || (item !== 'mallet' && item !== 'can'));
   const positions: Record<BasketItem, readonly [number, number, number]> = {
     piece: [-.19, .23, -.11], soil: [0, .22, .08], seeds: [.2, .23, .1],
     mallet: [.19, .2, -.12], can: [-.2, .22, .1],
@@ -119,9 +121,10 @@ function PlanterBed({ stage, texture }: { stage: BuildStage; texture: THREE.Text
   </group>;
 }
 
-export default function PlanterProject({ progress, layout, directives }: {
-  progress: PlanterProgress;
+export default function PlanterProject({ progress, layout, directives, toolAnchors }: {
+  progress: PlanterProjection;
   layout: PlanterLayout;
+  toolAnchors?: Record<'mallet' | 'can', GardenPoint>;
   directives: Partial<Record<ResidentId, ProjectDirective>>;
 }): React.JSX.Element {
   const source = useLoader(THREE.TextureLoader, GARDEN_TEXTURE_PATHS.wood);
@@ -130,8 +133,10 @@ export default function PlanterProject({ progress, layout, directives }: {
   return <group name="shared-planter-project">
     {progress.book && <group position={groundGardenPosition(layout.book.x, layout.book.z, .23)}><PictureBook texture={texture} /></group>}
     {progress.supplies !== 'absent' && <group position={groundGardenPosition(layout.basket.x, layout.basket.z, .01)} rotation={[0, -.18, 0]}>
-      <SupplyBasket progress={progress} directives={directives} texture={texture} />
+      <SupplyBasket progress={progress} directives={directives} texture={texture} separateTools={!!toolAnchors} />
     </group>}
+    {toolAnchors && (['mallet', 'can'] as const).filter(tool => !Object.values(directives).some(d => d.tool === tool)).map(tool =>
+      <group key={tool} position={groundGardenPosition(toolAnchors[tool].x, toolAnchors[tool].z, .23)}><ProjectTool kind={tool} /></group>)}
     {progress.stage !== 'empty' && <group position={groundGardenPosition(layout.planter.x, layout.planter.z, .01)} rotation={[0, .08, 0]}>
       <PlanterBed stage={progress.stage} texture={texture} />
     </group>}

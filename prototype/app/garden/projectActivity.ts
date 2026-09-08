@@ -1,4 +1,4 @@
-import type { ProjectAction, ProjectDirective } from './planterCoordinator';
+import type { ProjectAction, ProjectDirective } from './projectScheduler';
 import { createSafeGardenRoute, type GardenObstacle, type GardenPoint } from './navigation';
 import { PIP_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './locomotion';
 
@@ -8,9 +8,10 @@ export function projectVisual(d: ProjectDirective, reducedMotion: boolean): Proj
 }
 export function projectMotion(v: ProjectVisual): { lean: number; tap: number; tilt: number } {
   if (!v.performing) return { lean: 0, tap: 0, tilt: 0 };
-  const tap = v.action === 'assemble' && !v.reducedMotion ? Math.max(0, Math.sin(v.elapsed * Math.PI * 2)) * .16 : 0;
+  const assembling = v.action === 'fit' || v.action === 'tap';
+  const tap = assembling && !v.reducedMotion ? Math.max(0, Math.sin(v.elapsed * Math.PI * 2)) * .16 : 0;
   const dip = v.reducedMotion ? 0 : Math.sin(v.elapsed * Math.PI) * .025;
-  return { lean: v.action === 'fill' || v.action === 'plant' ? .1 + dip : v.action === 'assemble' ? .06 : .025,
+  return { lean: v.action === 'fill' || v.action === 'plant' ? .1 + dip : assembling ? .06 : .025,
     tap, tilt: v.action === 'water' ? .48 : v.action === 'read' || v.action === 'inspect' || v.action === 'observe' ? .1 : 0 };
 }
 

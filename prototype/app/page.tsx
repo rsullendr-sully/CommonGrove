@@ -3,21 +3,22 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import GardenWorld from './GardenWorld';
 import { type GardenChoice } from './garden/rewardState';
-import { projectJourneyScene, getPipJourneyProfile, getResidentJourneyProfile, RETURN_CHAPTERS, type JourneyEvent, type MemoryKind } from './garden/journey';
+import { createJourney, projectJourneyScene, getPipJourneyProfile, getResidentJourneyProfile, RETURN_CHAPTERS, type JourneyEvent, type MemoryKind } from './garden/journey';
 import type { ResidentId } from './garden/residents';
 import type { FindResidentRequest } from './garden/findResident';
-import { createGardenSession, gardenSessionReducer, visiblePlanter } from './garden/gardenSession';
-import type { PlanterEvent } from './garden/planterProgress';
+import { createGardenSession, gardenSessionReducer, visibleProjects } from './garden/gardenSession';
+import type { ProjectEvent } from './garden/projectProgress';
+import { demoProjects } from './garden/learningDemo';
 import JourneyJournal from './garden/JourneyJournal';
 import './garden/journey.css';
 import './garden/sanctuary.css';
 
 export default function Home() {
   const [session, dispatchSession] = useReducer(gardenSessionReducer, undefined, createGardenSession);
-  const { journey, project, view: gardenView, epoch } = session;
+  const { journey, demo, view: gardenView, epoch } = session;
   const dispatchJourney = useCallback((event: JourneyEvent) => dispatchSession({ type: 'journey', event }), []);
   const setGardenView = useCallback((view: typeof gardenView) => dispatchSession({ type: 'view', view }), []);
-  const onProjectEvents = useCallback((eventEpoch: number, events: PlanterEvent[]) => {
+  const onProjectEvents = useCallback((eventEpoch: number, events: ProjectEvent[]) => {
     dispatchSession({ type: 'project', epoch: eventEpoch, events });
   }, []);
   const onGardenRemount = useCallback(() => dispatchSession({ type: 'remount' }), []);
@@ -73,11 +74,15 @@ export default function Home() {
     setGardenView('now');
   };
 
-  const { visit: sceneVisit, ...scene } = projectJourneyScene(journey, gardenView);
-  const comparing = gardenView === 'before' && rewardStage > 0;
-  const worldJourney = useMemo(() => ({ visit: journey.visit, sceneVisit, comparing, profile: getPipJourneyProfile(journey),
-    profiles: { pip: getResidentJourneyProfile(journey, 'pip'), moss: getResidentJourneyProfile(journey, 'moss'), fern: getResidentJourneyProfile(journey, 'fern') } }), [journey, sceneVisit, comparing]);
-  const rememberInteraction = useCallback((interaction: MemoryKind, residentId: ResidentId) => dispatchJourney({ type: 'remember', interaction, residentId }), [dispatchJourney]);
+  // Demo scenery and roster are independent: an expanded nook does not add neighbors.
+  const sceneJourney = useMemo(() => demo ? { ...createJourney(), visit: 3 as const, rewardStage: 2 as const } : journey, [demo, journey]);
+  const { visit: sceneVisit, ...scene } = projectJourneyScene(sceneJourney, demo ? 'now' : gardenView);
+  const comparing = !demo && gardenView === 'before' && rewardStage > 0;
+  const worldJourney = useMemo(() => ({ visit: sceneJourney.visit, sceneVisit, comparing, profile: getPipJourneyProfile(sceneJourney),
+    profiles: { pip: getResidentJourneyProfile(sceneJourney, 'pip'), moss: getResidentJourneyProfile(sceneJourney, 'moss'), fern: getResidentJourneyProfile(sceneJourney, 'fern') } }), [sceneJourney, sceneVisit, comparing]);
+  const rememberInteraction = useCallback((interaction: MemoryKind, residentId: ResidentId) => {
+    if (!demo) dispatchJourney({ type: 'remember', interaction, residentId });
+  }, [demo, dispatchJourney]);
   const previewCommunity = () => {
     if (interactionBusy || comparing) return;
     dispatchJourney({ type: 'preview-community' });
@@ -107,7 +112,7 @@ export default function Home() {
     setSessionKey((current) => current + 1);
   };
 
-  const visibleProject = visiblePlanter(session);
+  const visibleProject = visibleProjects(session);
   return (
     <main className="garden-app immersive-app sanctuary-app">
       <header className="topbar immersive-topbar">
@@ -125,12 +130,14 @@ export default function Home() {
       <section className="world-panel immersive-world" id="garden" tabIndex={-1} aria-label="Explore your first-person Common Grove garden">
         <GardenWorld
           key={`${sessionKey}-${journey.visit}`}
-          rewardStage={rewardStage}
+          rewardStage={sceneJourney.rewardStage}
           {...scene}
           gardenChoice={gardenChoice}
           journey={worldJourney}
-          project={project}
+          project={demo?.progress ?? session.project}
           projection={visibleProject}
+          demoResidents={demo?.scenario.residents}
+          activated={demo ? demoProjects(demo.scenario) : undefined}
           epoch={epoch}
           onProjectEvents={onProjectEvents}
           onRemount={onGardenRemount}
@@ -140,7 +147,7 @@ export default function Home() {
         />
       </section>
 
-      <JourneyJournal state={journey} view={gardenView} busy={interactionBusy} project={visibleProject} onMaterials={simulateMaterials} onSimulate={simulateAchievement} onPreviewCommunity={previewCommunity}
+      <JourneyJournal state={journey} view={gardenView} demoResidents={demo?.scenario.residents} busy={interactionBusy} project={visibleProject} onMaterials={simulateMaterials} onSimulate={simulateAchievement} onPreviewCommunity={previewCommunity}
         onFindResident={(id) => {
           setFindRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1, scope: findScope }));
           document.getElementById('garden')?.focus({ preventScroll: true });

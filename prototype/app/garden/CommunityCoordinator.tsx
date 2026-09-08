@@ -1,18 +1,19 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
-import type { MutableRefObject } from 'react';
+import { useRef, type MutableRefObject } from 'react';
 import type * as THREE from 'three';
 import { communityDirectives, createCommunity, nudgeToy, residentObstacles, reservePlacements, selectVisitorAttention, stepCommunity, type CommunityInput, type ResidentSnapshot } from './residentCoordination';
 import { GARDEN_TOY_AUTHORED_POSITION } from './GardenObjects';
 import { createSafeGardenRoute, GARDEN_OBSTACLES, isSafeGardenPoint, nearestSafePoint, type GardenObstacle, type GardenPoint } from './navigation';
 import type { ResidentDefinition, ResidentId, ResidentTarget } from './residents';
 import { residentPhase, type ResidentInteractionState } from './residentInteraction';
-import { createProjectRuntime, stepProject, type ProjectRuntime } from './planterCoordinator';
-import { createPlanterProgress, nextBuildStage, reducePlanterProgress, type PlanterEvent, type PlanterProgress } from './planterProgress';
-import { planterObstacles, PLANTER_LAYOUT } from './planterLayout';
+import { createProjectRuntime, stepProject, type ProjectRuntime } from './projectScheduler';
+import { createProjectsProgress, projectComplete, reduceProjectProgress, type ProjectEvent, type ProjectsProgress } from './projectProgress';
+import type { ProjectId } from './projectDefinitions';
+import { projectObstacles, PROJECT_LAYOUTS } from './projectLayout';
 
-export type ProjectCommunityFrame = { progress: PlanterProgress; projection?: PlanterProgress; epoch: number | null; playerPosition: GardenPoint };
+export type ProjectCommunityFrame = { progress: ProjectsProgress; projection?: ProjectsProgress; epoch: number | null; activated?: readonly ProjectId[]; playerPosition: GardenPoint };
 
 // This instance owns transient frame data. React only receives discrete interaction events.
 export class GardenCommunity {
@@ -22,15 +23,15 @@ export class GardenCommunity {
   attention: ResidentId | null = null;
   reducedMotion = false;
   projectRuntime: ProjectRuntime | null = null;
-  projectProgress = createPlanterProgress();
+  projectProgress = createProjectsProgress();
   extraObstacles: readonly GardenObstacle[] = [];
-  private pendingEvents: PlanterEvent[] = [];
-  private authoritative: PlanterProgress | null = null;
+  private pendingEvents: ProjectEvent[] = [];
+  private authoritative: ProjectsProgress | null = null;
   private passiveEpisodes: Partial<Record<ResidentId, number>> = {};
   private participants = new Set<ResidentId>();
   private celebrations: Partial<Record<ResidentId, number>> = {};
   private activeTime = 0;
-  advance(input: CommunityInput, attention: ResidentId | null, project?: ProjectCommunityFrame): PlanterEvent[] {
+  advance(input: CommunityInput, attention: ResidentId | null, project?: ProjectCommunityFrame): ProjectEvent[] {
     const applied = Object.keys(this.pendingPlacements).filter(id => {
       const actor = input.actors.find(snapshot => snapshot.id === id);
       const point = this.pendingPlacements[id as ResidentId];
@@ -55,8 +56,9 @@ export class GardenCommunity {
         && !this.projectDirective(a.id) && this.celebration(a.id) === null })) });
     return events;
   }
-  private advanceProject(input: CommunityInput, frame?: ProjectCommunityFrame): PlanterEvent[] {
-    this.extraObstacles = frame ? planterObstacles(frame.projection ?? frame.progress) : [];
+  private advanceProject(input: CommunityInput, frame?: ProjectCommunityFrame): ProjectEvent[] {
+    if (frame?.epoch !== null && frame?.epoch !== undefined && this.projectRuntime && frame.epoch < this.projectRuntime.epoch) return [];
+    this.extraObstacles = frame ? projectObstacles(frame.projection ?? frame.progress, frame.activated) : [];
     if (!frame || frame.epoch === null) {
       this.projectRuntime = null;
       this.pendingEvents = [];
@@ -73,7 +75,7 @@ export class GardenCommunity {
     }
     if (input.paused) {
       // Keep the epoch's serial namespace through hidden-tab and comparison pauses.
-      this.projectRuntime = { ...this.projectRuntime, claims: {} };
+      this.projectRuntime = { ...this.projectRuntime, claims: {}, toolClaims: {} };
       this.celebrations = {};
       return [];
     }
@@ -84,28 +86,33 @@ export class GardenCommunity {
     }
     if (this.pendingEvents.length) {
       if (this.pendingEvents.every(e => frame.progress.processed.includes(e.id))) {
-        if (this.pendingEvents.some(e => e.type === 'build' && e.stage === 'planted')) {
+        if (this.pendingEvents.some(e => e.type === 'complete' && projectComplete(frame.progress, e.project))) {
           for (const id of this.participants) if (actors.some(a => a.id === id && a.available && !a.carried)) this.celebrations[id] = this.activeTime;
         }
         this.pendingEvents = [];
       } else if (frame.progress === this.authoritative) {
-        this.extraObstacles = planterObstacles(this.pendingEvents.reduce(reducePlanterProgress, frame.progress));
+        this.extraObstacles = projectObstacles(this.pendingEvents.reduce(reduceProjectProgress, frame.progress), frame.activated);
         return [];
       }
       else {
         // A changed authoritative projection that omitted the batch rejected it.
-        this.projectRuntime = { ...this.projectRuntime, claims: {} };
+        for (const claim of Object.values(this.projectRuntime.claims)) this.releaseProject(claim.directive.actor);
+        this.projectRuntime = { ...this.projectRuntime, claims: {}, toolClaims: {} };
         this.pendingEvents = [];
         this.participants.clear();
       }
     }
     this.authoritative = frame.progress;
     this.projectProgress = frame.progress;
-    const footprintClear = !nextBuildStage(frame.progress.stage) || (
-      this.snapshots.every(a => a.carried || Math.hypot(a.position.x - PLANTER_LAYOUT.planter.x, a.position.z - PLANTER_LAYOUT.planter.z) >= PLANTER_LAYOUT.planterRadius + .35)
-      && Math.hypot(frame.playerPosition.x - PLANTER_LAYOUT.planter.x, frame.playerPosition.z - PLANTER_LAYOUT.planter.z) >= PLANTER_LAYOUT.planterRadius + .35);
+    const footprintClear = Object.fromEntries((['planter', 'tool-rack'] as const).map(id => {
+      const layout = PROJECT_LAYOUTS[id];
+      const clear = projectComplete(frame.progress, id) || (
+        this.snapshots.every(a => a.carried || Math.hypot(a.position.x - layout.center.x, a.position.z - layout.center.z) >= layout.radius + .35)
+        && Math.hypot(frame.playerPosition.x - layout.center.x, frame.playerPosition.z - layout.center.z) >= layout.radius + .35);
+      return [id, clear];
+    })) as Record<ProjectId, boolean>;
     const step = stepProject(this.projectRuntime, { delta: input.delta, paused: false, epoch: frame.epoch,
-      progress: frame.progress, actors: actors.map(a => ({ ...a, available: a.available && this.celebration(a.id) === null })), footprintClear,
+      progress: frame.progress, activated: frame.activated, actors: actors.map(a => ({ ...a, available: a.available && this.celebration(a.id) === null })), footprintClear,
       reachable: (id, target) => {
         const actor = this.snapshots.find(a => a.id === id);
         if (!actor) return false;
@@ -117,14 +124,18 @@ export class GardenCommunity {
     }
     this.pendingEvents = step.events;
     // Reserve newly accepted geometry during the parent-render gap as well.
-    if (step.events.length) this.extraObstacles = planterObstacles(step.events.reduce(reducePlanterProgress, frame.progress));
+    if (step.events.length) this.extraObstacles = projectObstacles(step.events.reduce(reduceProjectProgress, frame.progress), frame.activated);
     return step.events;
   }
   projectDirective(id: ResidentId) { return this.projectRuntime?.claims[id]?.directive ?? null; }
   releaseProject(id: ResidentId) {
     if (this.projectRuntime) {
-      delete this.projectRuntime.claims[id];
-      for (const claim of Object.values(this.projectRuntime.claims)) if (claim.teacher === id) delete this.projectRuntime.claims[claim.directive.actor];
+      for (const claim of Object.values(this.projectRuntime.claims)) {
+        if (claim.directive.actor !== id && claim.teacher !== id) continue;
+        if (claim.resource && this.projectRuntime.toolClaims[claim.resource]?.key === claim.id) delete this.projectRuntime.toolClaims[claim.resource];
+        this.projectRuntime.cooldowns[claim.directive.actor] = this.projectRuntime.elapsed + 2;
+        delete this.projectRuntime.claims[claim.directive.actor];
+      }
     }
     delete this.celebrations[id];
   }
@@ -158,13 +169,16 @@ export class GardenCommunity {
   }
 }
 
-export default function CommunityCoordinator({ community, roster, actors, player, focused, priorities, comparing, reducedMotion, project, projection, epoch, onProjectEvents }: {
+export default function CommunityCoordinator({ community, roster, actors, player, focused, priorities, comparing, reducedMotion, project, projection, activated, epoch, onProjectEvents, onActivities }: {
   community: GardenCommunity; roster: readonly ResidentDefinition[];
   actors: Record<ResidentId, MutableRefObject<THREE.Group | null>>;
   player: ResidentInteractionState; focused: ResidentTarget | null; priorities: Record<ResidentId, boolean>;
   comparing: boolean; reducedMotion: boolean;
-  project: PlanterProgress; projection: PlanterProgress; epoch: number | null; onProjectEvents: (events: PlanterEvent[]) => void;
+  activated?: readonly ProjectId[];
+  onActivities?: (activities: Partial<Record<ResidentId, string>>) => void;
+  project: ProjectsProgress; projection: ProjectsProgress; epoch: number | null; onProjectEvents: (events: ProjectEvent[]) => void;
 }) {
+  const activityKey = useRef('');
   useFrame(({ clock, camera }, delta) => {
     const snapshots: ResidentSnapshot[] = roster.flatMap(resident => {
       const node = actors[resident.id].current;
@@ -176,8 +190,16 @@ export default function CommunityCoordinator({ community, roster, actors, player
     const events = community.advance({ now: clock.elapsedTime, delta, paused: comparing || document.hidden, reducedMotion,
       actors: snapshots,
       toyFree: player.scene.interaction.held !== 'toy' && player.scene.phase !== 'playing' }, attention,
-    { progress: project, projection, epoch, playerPosition: camera.position });
+    { progress: project, projection, activated, epoch, playerPosition: camera.position });
     if (events.length) onProjectEvents(events);
+    if (onActivities) {
+      const activities = Object.fromEntries(roster.map(({ id }) => {
+        const d = community.projectDirective(id);
+        return [id, d ? `${d.action} · ${d.phase}` : 'Exploring at their own pace'];
+      }));
+      const key = JSON.stringify(activities);
+      if (key !== activityKey.current) { activityKey.current = key; onActivities(activities); }
+    }
   }, -.5);
   return null;
 }
