@@ -176,15 +176,37 @@ describe('recipe scheduler', () => {
     expect(sim.input.progress.projects['tool-rack'].completedSteps).toBe(6);
   });
 
-  it('observes only the witnessed action for three continuous seconds without needing a book', () => {
-    // A four-second soil action gives the nearby learner time to witness three seconds.
-    const sim = simulation(prepared('planter', 4), ['pip', 'moss'], [
+  it.each([{ step: 0, ability: 'B1' }, { step: 1, ability: 'B2' }, { step: 4, ability: 'G1' }, { step: 5, ability: 'G2' }] as const)(
+    'learns $ability only when its witnessed teacher claim completes successfully', ({ step, ability }) => {
+    const sim = simulation(prepared('planter', step), ['pip', 'moss'], [
       PROJECT_LAYOUTS.planter.slots.pickup, PROJECT_LAYOUTS.planter.slots.observe,
     ]);
-    for (let i = 0; i < 1600 && !sim.input.progress.knowledge.moss.G1; i++) sim.tick(1, true);
+    for (let i = 0; i < 1600 && !sim.input.progress.knowledge.moss[ability]; i++) sim.tick(1, true);
     expect(sim.input.progress.book).toBe(false);
-    expect(sim.input.progress.knowledge.moss).toEqual({ G1: { status: 'familiar', source: { kind: 'observation', id: expect.any(String) } } });
-    expect(sim.input.progress.knowledge.pip.G1?.status).toBe('familiar');
+    expect(sim.input.progress.knowledge.moss).toEqual({ [ability]: { status: 'familiar', source: { kind: 'observation', id: expect.any(String) } } });
+    expect(sim.input.progress.knowledge.pip[ability]?.status).toBe('practiced');
+    expect(sim.input.progress.projects.planter.completedSteps).toBe(step + 1);
+    const completionIndex = sim.events.findIndex(e => e.type === 'complete' && e.step === step);
+    const observationIndex = sim.events.findIndex(e => e.type === 'learn' && e.resident === 'moss');
+    expect(completionIndex).toBeGreaterThanOrEqual(0);
+    expect(observationIndex).toBeGreaterThan(completionIndex);
+  });
+
+  it.each(['teacher unavailable', 'observer leaves', 'footprint blocked', 'delivery invalid'] as const)(
+    'withholds observation after three seconds when %s before the four-second completion', interruption => {
+    const sim = simulation(prepared('planter', 4), ['pip', 'moss'], [PROJECT_LAYOUTS.planter.slots.pickup, PROJECT_LAYOUTS.planter.slots.observe]);
+    for (let i = 0; i < 1200 && (sim.runtime.claims.pip?.elapsed ?? 0) < 3.2; i++) sim.tick(1, true);
+    expect(sim.runtime.claims.pip?.directive.action).toBe('fill');
+    expect(sim.input.progress.knowledge.moss).toEqual({});
+    expect(sim.runtime.claims.moss?.elapsed).toBeGreaterThanOrEqual(3);
+    if (interruption === 'teacher unavailable') sim.input.actors[0].available = false;
+    if (interruption === 'observer leaves') sim.input.actors[1].position = { ...PLANTER_LAYOUT.slots.read };
+    if (interruption === 'footprint blocked') sim.input.footprintClear.planter = false;
+    if (interruption === 'delivery invalid') sim.input.progress.projects.planter.deliveredForStep = null;
+    sim.tick(20);
+    expect(sim.input.progress.knowledge.moss).toEqual({});
+    expect(sim.events.filter(e => e.type === 'learn' && e.source.kind === 'observation')).toEqual([]);
+    expect(sim.input.progress.projects.planter.completedSteps).toBe(interruption === 'observer leaves' ? 5 : 4);
   });
 
   it('does not combine observation time across a teacher interruption', () => {

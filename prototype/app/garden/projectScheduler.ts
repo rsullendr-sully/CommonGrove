@@ -73,8 +73,11 @@ export function stepProject(runtime: ProjectRuntime, input: ProjectInput): Proje
   const key = () => `project:${r.epoch}:${++r.serial}`;
   const emit = (event: ProjectEvent) => {
     const next = reduceProjectProgress(progress, event);
-    if (next !== progress) { events.push(event); progress = next; }
+    if (next === progress) return false;
+    events.push(event); progress = next;
+    return true;
   };
+  const completedClaims = new Set<string>();
   const actors = input.actors.filter(a => a.available && !a.carried);
   const release = (claim: ProjectClaim) => {
     delete r.claims[claim.directive.actor];
@@ -154,9 +157,6 @@ export function stepProject(runtime: ProjectRuntime, input: ProjectInput): Proje
       const source = { kind: 'book' as const, id: c.id };
       for (const ability of ['B1', 'B2', 'G1', 'G2'] as const) emit({ type: 'learn', id: key(), resident: d.actor, ability, source });
       release(c);
-    } else if (d.action === 'observe' && d.ability && c.elapsed + 1e-9 >= 3) {
-      emit({ type: 'learn', id: key(), resident: d.actor, ability: d.ability, source: { kind: 'observation', id: c.teacherKey! } });
-      release(c);
     } else if (c.leg === 'pickup' && c.elapsed + 1e-9 >= .6) {
       if (isConstruction(c) && d.project) {
         c.directive.tool = nextRecipeStep(progress, d.project)!.tool;
@@ -177,16 +177,24 @@ export function stepProject(runtime: ProjectRuntime, input: ProjectInput): Proje
         const tool = c.resource; release(c); r.toolAnchors[tool] = toolRestAnchor(progress, tool, null);
       }
     } else if (isWork(d) && d.project && d.step !== null && c.elapsed + 1e-9 >= nextRecipeStep(progress, d.project)!.seconds) {
-      emit({ type: 'complete', id: key(), project: d.project, step: d.step, resident: d.actor });
+      if (emit({ type: 'complete', id: key(), project: d.project, step: d.step, resident: d.actor })) completedClaims.add(c.id);
       release(c);
       if (projectComplete(progress, d.project)) r.nextTaskAt = r.elapsed + 15;
     } else if ((d.action === 'water' || d.action === 'inspect') && c.elapsed + 1e-9 >= 3) release(c);
     d = c.directive;
     d.elapsed = c.elapsed;
   }
-  // Completion invalidates observers in this frame as well as on the next input frame.
-  for (const c of Object.values(r.claims)) if (c.directive.action === 'observe'
-    && (!valid(c) || !c.teacher || !r.claims[c.teacher] || r.claims[c.teacher]!.id !== c.teacherKey)) release(c);
+  // Three continuous witnessed seconds qualify an observer, but only this exact claim's
+  // accepted completion awards learning. Invalidated/blocked work cannot award by elapsed time.
+  for (const c of Object.values(r.claims)) if (c.directive.action === 'observe') {
+    const d = c.directive;
+    const actor = actors.find(a => a.id === d.actor);
+    if (c.teacherKey && completedClaims.has(c.teacherKey) && c.elapsed + 1e-9 >= 3
+      && d.ability && actor && at(actor.position, d.target)) {
+      emit({ type: 'learn', id: key(), resident: d.actor, ability: d.ability, source: { kind: 'observation', id: c.teacherKey } });
+    }
+    if (!valid(c) || !c.teacher || !r.claims[c.teacher] || r.claims[c.teacher]!.id !== c.teacherKey) release(c);
+  }
 
   const choose = (target: GardenPoint, eligible: (actor: ResidentSnapshot) => boolean) => {
     if (Object.values(r.claims).some(c => distance(c.directive.target, target) < .85)) return undefined;
