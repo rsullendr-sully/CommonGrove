@@ -14,6 +14,13 @@ import type { ProjectId } from './projectDefinitions';
 import { projectObstacles, PROJECT_LAYOUTS } from './projectLayout';
 
 export type ProjectCommunityFrame = { progress: ProjectsProgress; projection?: ProjectsProgress; epoch: number | null; activated?: readonly ProjectId[]; playerPosition: GardenPoint };
+export type DemoAvailability = { readonly unavailable: readonly ResidentId[]; readonly tools: Readonly<Partial<Record<'mallet' | 'can', ResidentId>>> };
+export function demoAvailability(community: GardenCommunity): DemoAvailability {
+  return {
+    unavailable: community.snapshots.filter(a => !a.available || a.carried || a.id === community.attention || community.celebration(a.id) !== null).map(a => a.id),
+    tools: Object.fromEntries(Object.entries(community.projectRuntime?.toolClaims ?? {}).map(([tool, claim]) => [tool, claim.actor])),
+  };
+}
 
 // This instance owns transient frame data. React only receives discrete interaction events.
 export class GardenCommunity {
@@ -169,16 +176,18 @@ export class GardenCommunity {
   }
 }
 
-export default function CommunityCoordinator({ community, roster, actors, player, focused, priorities, comparing, reducedMotion, project, projection, activated, epoch, onProjectEvents, onActivities }: {
+export default function CommunityCoordinator({ community, roster, actors, player, focused, priorities, comparing, reducedMotion, project, projection, activated, epoch, onProjectEvents, onActivities, onAvailability }: {
   community: GardenCommunity; roster: readonly ResidentDefinition[];
   actors: Record<ResidentId, MutableRefObject<THREE.Group | null>>;
   player: ResidentInteractionState; focused: ResidentTarget | null; priorities: Record<ResidentId, boolean>;
   comparing: boolean; reducedMotion: boolean;
   activated?: readonly ProjectId[];
   onActivities?: (activities: Partial<Record<ResidentId, string>>) => void;
+  onAvailability?: (availability: DemoAvailability) => void;
   project: ProjectsProgress; projection: ProjectsProgress; epoch: number | null; onProjectEvents: (events: ProjectEvent[]) => void;
 }) {
   const activityKey = useRef('');
+  const availabilityKey = useRef('');
   useFrame(({ clock, camera }, delta) => {
     const snapshots: ResidentSnapshot[] = roster.flatMap(resident => {
       const node = actors[resident.id].current;
@@ -192,6 +201,11 @@ export default function CommunityCoordinator({ community, roster, actors, player
       toyFree: player.scene.interaction.held !== 'toy' && player.scene.phase !== 'playing' }, attention,
     { progress: project, projection, activated, epoch, playerPosition: camera.position });
     if (events.length) onProjectEvents(events);
+    if (onAvailability) {
+      const availability = demoAvailability(community);
+      const key = JSON.stringify(availability);
+      if (key !== availabilityKey.current) { availabilityKey.current = key; onAvailability(availability); }
+    }
     if (onActivities) {
       const activities = Object.fromEntries(roster.map(({ id }) => {
         const d = community.projectDirective(id);

@@ -2,6 +2,16 @@ import { createProjectsProgress, projectComplete, reduceProjectProgress, type Pr
 import type { ProjectId } from './projectDefinitions';
 import { RESIDENTS } from './residents';
 import { learnAbility } from './spiritKnowledge';
+import type { GardenSession } from './gardenSession';
+export function requiresDemoConfirmation(session: GardenSession): boolean {
+  const j = session.journey;
+  return !!session.demo || j.visit !== 1 || j.rewardStage !== 0 || j.choice !== null
+    || j.previousChoice !== null || j.lastInteraction !== null || j.returnMemory !== null
+    || Object.keys(j.residentMemories ?? {}).length > 0 || Object.keys(j.residentReturnMemories ?? {}).length > 0
+    || [session.project, session.previousProject].some(p => p.book || p.active !== null || p.processed.length > 0
+      || Object.values(p.knowledge).some(k => Object.keys(k).length > 0)
+      || Object.values(p.projects).some(s => s.supplies !== 'absent' || s.completedSteps !== 0 || s.deliveredForStep !== null));
+}
 export type DemoScenarioId = 'planter-materials-first' | 'planter-knowledge-first' | 'rack-from-scratch' | 'rack-preview' | 'planter-to-rack';
 export type DemoScenario = { id: DemoScenarioId; residents: 1 | 3 };
 export type DemoSession = { scenario: DemoScenario; progress: ProjectsProgress };

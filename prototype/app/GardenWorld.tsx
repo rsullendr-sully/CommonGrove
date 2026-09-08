@@ -8,7 +8,7 @@ import InteractionPrompt, { interactionReticleClassName } from './garden/Interac
 import { GardenSnack, GardenToy, projectGardenObjectOffer, resolveGardenObjectPlacement, type GardenObjectId } from './garden/GardenObjects';
 import StorybookGardenEnvironment from './garden/StorybookGardenEnvironment';
 import ResidentActor, { type ResidentJourney } from './garden/ResidentActor';
-import CommunityCoordinator, { GardenCommunity } from './garden/CommunityCoordinator';
+import CommunityCoordinator, { GardenCommunity, type DemoAvailability } from './garden/CommunityCoordinator';
 import { isResidentId, RESIDENTS, residentsForVisit, residentDefinition, type ResidentId, type ResidentTarget, type ResidentDefinition } from './garden/residents';
 import { canonicalTarget, createResidentInteraction, residentInteractionReducer, residentActionLabel, residentPhase, type ResidentInteractionState } from './garden/residentInteraction';
 import { actionEventForLiveTarget } from './garden/interaction';
@@ -28,6 +28,7 @@ import type { ProjectEvent, ProjectsProgress } from './garden/projectProgress';
 import type { ProjectId } from './garden/projectDefinitions';
 import LearningProjects from './garden/LearningProjects';
 import type { ProjectDirective } from './garden/projectScheduler';
+import { consumeProjectWatch, type WatchProjectRequest } from './garden/watchProject';
 
 type WorldJourney = ResidentJourney & { profiles: Record<ResidentId, PipJourneyProfile> };
 type ResidentRefs = Record<ResidentId, MutableRefObject<THREE.Group | null>>;
@@ -80,7 +81,7 @@ function useGrassTexture() {
   return texture;
 }
 
-function FirstPersonControls({ movement, speed, onCameraMount, findRequest, residents, community }: { movement: MovementInput; speed: number; onCameraMount: (camera: THREE.Camera | null) => void; findRequest: FindResidentRequest | null; residents: ResidentRefs; community: GardenCommunity }) {
+function FirstPersonControls({ movement, speed, onCameraMount, findRequest, watchRequest, controlsBlocked, watchBusy, residents, community }: { movement: MovementInput; speed: number; onCameraMount: (camera: THREE.Camera | null) => void; findRequest: FindResidentRequest | null; watchRequest: WatchProjectRequest | null; controlsBlocked: boolean; watchBusy: boolean; residents: ResidentRefs; community: GardenCommunity }) {
   const { camera, gl } = useThree();
   const yaw = useRef(0);
   const pitch = useRef(-0.2);
@@ -89,6 +90,18 @@ function FirstPersonControls({ movement, speed, onCameraMount, findRequest, resi
   const nextPosition = useRef(new THREE.Vector3());
   const lastFind = useRef<number | null>(null);
   const findPosition = useRef(new THREE.Vector3());
+  const lastWatch = useRef<number | null>(null);
+  const blocked = useRef(controlsBlocked);
+  const capturedPointer = useRef<number | null>(null);
+  useEffect(() => {
+    blocked.current = controlsBlocked;
+    if (controlsBlocked) {
+      movement.current.clear();
+      dragging.current = false;
+      if (capturedPointer.current !== null && gl.domElement.hasPointerCapture(capturedPointer.current)) gl.domElement.releasePointerCapture(capturedPointer.current);
+      capturedPointer.current = null;
+    }
+  }, [controlsBlocked, gl, movement]);
 
   useEffect(() => {
     camera.position.set(0, 1.7, 17);
@@ -96,7 +109,7 @@ function FirstPersonControls({ movement, speed, onCameraMount, findRequest, resi
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.matches('input, select, textarea, button, summary')) return;
+      if (blocked.current || target?.closest('input, select, textarea, button, summary, [role="dialog"], [contenteditable="true"]')) return;
       const key = event.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) {
         event.preventDefault();
@@ -105,12 +118,14 @@ function FirstPersonControls({ movement, speed, onCameraMount, findRequest, resi
     };
     const onKeyUp = (event: KeyboardEvent) => movement.current.delete(event.key.toLowerCase());
     const onPointerDown = (event: PointerEvent) => {
+      if (blocked.current) return;
       dragging.current = true;
       previousPointer.current = { x: event.clientX, y: event.clientY };
       gl.domElement.setPointerCapture(event.pointerId);
+      capturedPointer.current = event.pointerId;
     };
     const onPointerMove = (event: PointerEvent) => {
-      if (!dragging.current) return;
+      if (blocked.current || !dragging.current) return;
       yaw.current -= (event.clientX - previousPointer.current.x) * 0.004;
       pitch.current = THREE.MathUtils.clamp(
         pitch.current - (event.clientY - previousPointer.current.y) * 0.003,
@@ -121,11 +136,14 @@ function FirstPersonControls({ movement, speed, onCameraMount, findRequest, resi
     };
     const onPointerUp = (event: PointerEvent) => {
       dragging.current = false;
+      capturedPointer.current = null;
       if (gl.domElement.hasPointerCapture(event.pointerId)) gl.domElement.releasePointerCapture(event.pointerId);
     };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    const clearInput = () => { movement.current.clear(); dragging.current = false; };
+    window.addEventListener('blur', clearInput);
     gl.domElement.addEventListener('pointerdown', onPointerDown);
     gl.domElement.addEventListener('pointermove', onPointerMove);
     gl.domElement.addEventListener('pointerup', onPointerUp);
@@ -135,6 +153,7 @@ function FirstPersonControls({ movement, speed, onCameraMount, findRequest, resi
       onCameraMount(null);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', clearInput);
       gl.domElement.removeEventListener('pointerdown', onPointerDown);
       gl.domElement.removeEventListener('pointermove', onPointerMove);
       gl.domElement.removeEventListener('pointerup', onPointerUp);
@@ -143,7 +162,15 @@ function FirstPersonControls({ movement, speed, onCameraMount, findRequest, resi
   }, [camera, gl, movement, onCameraMount]);
 
   useFrame((_, delta) => {
-    if (findRequest && lastFind.current !== findRequest.sequence) {
+    if (controlsBlocked) { movement.current.clear(); dragging.current = false; return; }
+    const watch = consumeProjectWatch(watchRequest, lastWatch.current, watchBusy, camera.position, yaw.current);
+    if (watch) {
+      yaw.current = watch.yaw; pitch.current = watch.pitch; lastWatch.current = watch.sequence;
+      movement.current.clear(); dragging.current = false;
+      camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
+      return;
+    }
+    if (!watchBusy && findRequest && lastFind.current !== findRequest.sequence) {
       const resident = residents[findRequest.id].current;
       if (resident) {
         resident.getWorldPosition(findPosition.current);
@@ -255,16 +282,19 @@ function ResidentSlot({ resident, journey, onMount, player, onMessage, onPriorit
     interactionEngaged={props.focused === id} placedPosition={player.placements[id] ?? null} resumeSequence={player.resumes[id]} />;
 }
 
-export default function GardenWorld({ journey, project, projection, demoResidents, activated, onActivities, epoch: projectEpoch, onProjectEvents, onRemount, onMemory, onBusyChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, findRequest = null }: {
+export default function GardenWorld({ journey, project, projection, demoResidents, activated, onActivities, onAvailability, epoch: projectEpoch, onProjectEvents, onRemount, onMemory, onBusyChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, findRequest = null, watchRequest = null, controlsBlocked = false }: {
   journey: WorldJourney; onMemory: (kind: MemoryKind, id: ResidentId) => void; onBusyChange: (busy: boolean) => void;
   demoResidents?: 1 | 3;
   activated?: readonly ProjectId[];
   onActivities?: (activities: Partial<Record<ResidentId, string>>) => void;
+  onAvailability?: (availability: DemoAvailability) => void;
   project: ProjectsProgress; projection: ProjectsProgress; epoch: number;
   onProjectEvents: (epoch: number, events: ProjectEvent[]) => void; onRemount: () => void;
   rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean;
   destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null;
   findRequest?: FindResidentRequest | null;
+  watchRequest?: WatchProjectRequest | null;
+  controlsBlocked?: boolean;
 }) {
   const [projectMount] = useState(() => createGardenMountHandshake(projectEpoch));
   const onRemountRef = useRef(onRemount);
@@ -301,7 +331,7 @@ export default function GardenWorld({ journey, project, projection, demoResident
   const { interaction, phase, placementMessage, objectPositions, toyNudged, greetingArrived } = scene;
   const eligibleTarget = isResidentId(liveTarget) && priorities[liveTarget] ? null : liveTarget;
   const unavailableOffer = interaction.mode === 'carrying' && interaction.held !== 'pip' && isResidentId(liveTarget) && priorities[liveTarget];
-  const label = journey.comparing || unavailableOffer ? null : residentActionLabel(player, eligibleTarget);
+  const label = controlsBlocked || journey.comparing || unavailableOffer ? null : residentActionLabel(player, eligibleTarget);
   const speakerId = phase !== 'none' || placementMessage ? activeId : priorities.pip ? 'pip' : lastSpeaker;
   const speaker = residentDefinition(speakerId);
   const visibleMessage = pipInteractionStatusText(phase, placementMessage, messages[speakerId] ?? null)?.replace(/Pip/g, speaker.name) ?? null;
@@ -350,7 +380,7 @@ export default function GardenWorld({ journey, project, projection, demoResident
     else if (interaction.held) placeObject(interaction.held);
   }, [interaction.held, placeObject, placeResident]);
   const activate = useCallback(() => {
-    if (journey.comparing) return;
+    if (controlsBlocked || journey.comparing) return;
     if (interaction.mode === 'carrying') {
       if (interaction.held === 'pip') return placeResident();
       if (isResidentId(liveTarget)) {
@@ -369,7 +399,7 @@ export default function GardenWorld({ journey, project, projection, demoResident
     const position = safePoint && object ? captureGardenLocalPosition(object.position, safePoint) : null;
     const event = actionEventForLiveTarget(interaction, canonicalTarget(eligibleTarget), position);
     if (event) dispatch({ type: 'activate', event });
-  }, [journey.comparing, interaction, liveTarget, eligibleTarget, player.focus, refs, priorities, placeObject, placeResident, community]);
+  }, [controlsBlocked, journey.comparing, interaction, liveTarget, eligibleTarget, player.focus, refs, priorities, placeObject, placeResident, community]);
 
   useEffect(() => {
     if (phase !== 'greet-approach' && !(phase === 'playing' && !toyNudged)) return;
@@ -388,10 +418,10 @@ export default function GardenWorld({ journey, project, projection, demoResident
     return schedulePipSceneEvent(dispatchScene, { type }, delay, window.setTimeout, window.clearTimeout);
   }, [phase, greetingArrived, toyNudged, dispatchScene]);
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => { handleHeldInteractionEscape(event, interaction.held, placeHeld); };
+    const escape = (event: KeyboardEvent) => { if (!controlsBlocked) handleHeldInteractionEscape(event, interaction.held, placeHeld); };
     window.addEventListener('keydown', escape, true);
     return () => window.removeEventListener('keydown', escape, true);
-  }, [interaction.held, placeHeld]);
+  }, [controlsBlocked, interaction.held, placeHeld]);
 
   const registrations = useMemo<readonly InteractionTargetRegistration[]>(() => [
     ...roster.filter(r => !(interaction.held === 'pip' && r.id === activeId)).map(r => ({ target: r.id, ref: refs[r.id], maxDistance: 3.2 })),
@@ -407,7 +437,7 @@ export default function GardenWorld({ journey, project, projection, demoResident
       <FrameCadence />
       <CommunityCoordinator community={community} roster={roster} actors={refs} player={player} focused={eligibleTarget}
         priorities={priorities} comparing={journey.comparing} reducedMotion={reducedMotion}
-        project={project} projection={projection} activated={activated} onActivities={onActivities} epoch={projectMount.acknowledgedEpoch(projectEpoch)} onProjectEvents={emitProjectEvents} />
+        project={project} projection={projection} activated={activated} onActivities={onActivities} onAvailability={onAvailability} epoch={projectMount.acknowledgedEpoch(projectEpoch)} onProjectEvents={emitProjectEvents} />
       <LearningProjectsScene community={community} progress={projection} />
       <GardenEnvironment journey={journey} rewardStage={rewardStage} starflowersVisible={starflowersVisible} pavilionImproved={pavilionImproved}
         seedVisible={seedVisible} destinationVisible={destinationVisible} reducedMotion={reducedMotion} />
@@ -416,7 +446,7 @@ export default function GardenWorld({ journey, project, projection, demoResident
       {roster.map(resident => <ResidentSlot key={resident.id} resident={resident} journey={journey} onMount={onResidentMount} player={player}
         rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion}
         focused={eligibleTarget} community={community} onMessage={onMessage} onPriority={onPriority} onEvent={onActorEvent} />)}
-      <FirstPersonControls movement={movement} speed={employeeWalkSpeedWhileHolding(interaction.held)} onCameraMount={onCameraMount} findRequest={findRequest} residents={refs} community={community} />
+      <FirstPersonControls movement={movement} speed={employeeWalkSpeedWhileHolding(interaction.held)} onCameraMount={onCameraMount} findRequest={findRequest} watchRequest={watchRequest} controlsBlocked={controlsBlocked} watchBusy={interaction.mode !== 'idle' || phase !== 'none' || journey.comparing} residents={refs} community={community} />
       <InteractionTargetTracker registrations={registrations} onTargetChange={onTargetChange} republishSequence={scene.focusRepublishSequence} />
     </Canvas>
     <div className={interactionReticleClassName(label)} aria-hidden="true" />
@@ -428,8 +458,8 @@ export default function GardenWorld({ journey, project, projection, demoResident
     <div className="world-instructions"><strong>Walk the grove</strong><span>WASD or arrow keys · drag to look</span></div>
     <div className="world-pad" aria-label="First-person movement controls">
       {[['arrowup', '↑', 'Walk forward'], ['arrowleft', '←', 'Step left'], ['arrowdown', '↓', 'Step backward'], ['arrowright', '→', 'Step right']].map(([key, text, ariaLabel]) =>
-        <button key={key} type="button" className={'world-' + key} aria-label={ariaLabel}
-          onPointerDown={() => movement.current.add(key)} onPointerUp={() => movement.current.delete(key)}
+        <button key={key} type="button" className={'world-' + key} aria-label={ariaLabel} disabled={controlsBlocked}
+          onPointerDown={() => { if (!controlsBlocked) movement.current.add(key); }} onPointerUp={() => movement.current.delete(key)}
           onPointerLeave={() => movement.current.delete(key)} onPointerCancel={() => movement.current.delete(key)}>{text}</button>)}
     </div>
   </div>;

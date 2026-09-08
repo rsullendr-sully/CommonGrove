@@ -8,10 +8,14 @@ import type { ResidentId } from './garden/residents';
 import type { FindResidentRequest } from './garden/findResident';
 import { createGardenSession, gardenSessionReducer, visibleProjects } from './garden/gardenSession';
 import type { ProjectEvent } from './garden/projectProgress';
-import { demoProjects } from './garden/learningDemo';
+import { demoProjects, type DemoScenario } from './garden/learningDemo';
+import LearningDemoPanel from './garden/LearningDemoPanel';
+import { projectWatchDestination, type WatchProjectRequest } from './garden/watchProject';
+import type { DemoAvailability } from './garden/CommunityCoordinator';
 import JourneyJournal from './garden/JourneyJournal';
 import './garden/journey.css';
 import './garden/sanctuary.css';
+import './garden/learningDemo.css';
 
 export default function Home() {
   const [session, dispatchSession] = useReducer(gardenSessionReducer, undefined, createGardenSession);
@@ -30,10 +34,28 @@ export default function Home() {
   const [visitPreviewOpen, setVisitPreviewOpen] = useState(false);
   const [comfortResponse, setComfortResponse] = useState<'comfortable' | 'unsure' | 'invasive' | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [activities, setActivities] = useState<Partial<Record<ResidentId, string>>>({});
+  const [availability, setAvailability] = useState<DemoAvailability>({ unavailable: [], tools: {} });
+  const [watchRequest, setWatchRequest] = useState<(WatchProjectRequest & { scope: string }) | null>(null);
   const [findRequest, setFindRequest] = useState<(FindResidentRequest & { scope: string }) | null>(null);
+  const viewRequestSequence = useRef(0);
   const findScope = `${sessionKey}-${journey.visit}-${gardenView}`;
   const firstChoiceRef = useRef<HTMLButtonElement>(null);
   const visitDoneRef = useRef<HTMLButtonElement>(null);
+  const resetSceneInputs = () => {
+    setSessionKey(current => current + 1);
+    setActivities({}); setAvailability({ unavailable: [], tools: {} });
+    setWatchRequest(null); setFindRequest(null); setInteractionBusy(false);
+  };
+  const startDemo = (scenario: DemoScenario) => {
+    dispatchSession({ type: 'start-demo', scenario });
+    resetSceneInputs();
+  };
+  const exitDemo = () => {
+    dispatchSession({ type: 'exit-demo' });
+    resetSceneInputs();
+  };
 
   useEffect(() => {
     const dialogOpen = choiceOpen || visitPreviewOpen;
@@ -115,19 +137,19 @@ export default function Home() {
   const visibleProject = visibleProjects(session);
   return (
     <main className="garden-app immersive-app sanctuary-app">
-      <header className="topbar immersive-topbar">
+      <header className="topbar immersive-topbar" inert={demoOpen}>
         <a className="brand" href="#garden" aria-label="Common Grove home">
           <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
           <span>Common Grove</span>
         </a>
-        <div className="day-label"><span aria-hidden="true">●</span> {RETURN_CHAPTERS[journey.visit].time} · simulated</div>
+        <div className="day-label"><span aria-hidden="true">●</span> {demo ? 'Learning demo · local simulation' : `${RETURN_CHAPTERS[journey.visit].time} · simulated`}</div>
         <div className="profile-button" aria-label="Your private garden">
           <span className="profile-dot">R</span>
           <span className="profile-copy"><strong>Your garden</strong><small>Private · growing</small></span>
         </div>
       </header>
 
-      <section className="world-panel immersive-world" id="garden" tabIndex={-1} aria-label="Explore your first-person Common Grove garden">
+      <section className="world-panel immersive-world" id="garden" tabIndex={-1} inert={demoOpen || choiceOpen || visitPreviewOpen} aria-label="Explore your first-person Common Grove garden">
         <GardenWorld
           key={`${sessionKey}-${journey.visit}`}
           rewardStage={sceneJourney.rewardStage}
@@ -143,17 +165,32 @@ export default function Home() {
           onRemount={onGardenRemount}
           onMemory={rememberInteraction}
           onBusyChange={setInteractionBusy}
+          onActivities={setActivities}
+          onAvailability={setAvailability}
+          controlsBlocked={demoOpen || choiceOpen || visitPreviewOpen}
+          watchRequest={watchRequest?.scope === findScope ? watchRequest : null}
           findRequest={findRequest?.scope === findScope ? findRequest : null}
         />
       </section>
 
-      <JourneyJournal state={journey} view={gardenView} demoResidents={demo?.scenario.residents} busy={interactionBusy} project={visibleProject} onMaterials={simulateMaterials} onSimulate={simulateAchievement} onPreviewCommunity={previewCommunity}
+      <div inert={demoOpen} style={{ display: 'contents' }}><JourneyJournal state={journey} view={gardenView} demoResidents={demo?.scenario.residents} busy={interactionBusy || demoOpen} project={visibleProject} onMaterials={simulateMaterials} onSimulate={simulateAchievement} onPreviewCommunity={previewCommunity}
         onFindResident={(id) => {
-          setFindRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1, scope: findScope }));
+          setWatchRequest(null);
+          setFindRequest({ id, sequence: ++viewRequestSequence.current, scope: findScope });
           document.getElementById('garden')?.focus({ preventScroll: true });
         }}
         onView={(view) => { if (view === 'now' || !interactionBusy) setGardenView(view); }} onReturn={returnLater} onChoice={() => { setPendingChoice(null); setChoiceOpen(true); }}
-        onPrivacy={() => setVisitPreviewOpen(true)} onRestart={restartPrototype} />
+        onPrivacy={() => setVisitPreviewOpen(true)} onRestart={restartPrototype} /></div>
+
+      <LearningDemoPanel session={session} busy={interactionBusy || choiceOpen || visitPreviewOpen} activities={activities} availability={availability}
+        onStart={startDemo} onExit={exitDemo} onOpenChange={setDemoOpen}
+        onBook={() => dispatchSession({ type: 'demo-book', id: `demo-book:${epoch}` })}
+        onMaterials={project => dispatchSession({ type: 'demo-materials', project, id: `demo-materials:${epoch}:${project}` })}
+        onWatch={project => {
+          setFindRequest(null);
+          setWatchRequest({ project, sequence: ++viewRequestSequence.current, scope: findScope });
+        }} />
+      {watchRequest?.scope === findScope && <p className="learning-watch-notice">Watch: {projectWatchDestination(watchRequest.project).name} · west garden. Terrain may block your view.</p>}
 
       {choiceOpen && (
         <section className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="choice-title">
