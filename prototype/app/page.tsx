@@ -10,6 +10,7 @@ import { createGardenSession, gardenSessionReducer, visibleProjects } from './ga
 import type { ProjectEvent } from './garden/projectProgress';
 import { demoProjects, type DemoScenario } from './garden/learningDemo';
 import LearningDemoPanel from './garden/LearningDemoPanel';
+import { trapDialogTab } from './garden/dialogFocus';
 import { projectWatchDestination, type WatchProjectRequest } from './garden/watchProject';
 import type { DemoAvailability } from './garden/CommunityCoordinator';
 import JourneyJournal from './garden/JourneyJournal';
@@ -43,6 +44,8 @@ export default function Home() {
   const findScope = `${sessionKey}-${journey.visit}-${gardenView}`;
   const firstChoiceRef = useRef<HTMLButtonElement>(null);
   const visitDoneRef = useRef<HTMLButtonElement>(null);
+  const choiceDialogRef = useRef<HTMLElement>(null);
+  const visitPreviewDialogRef = useRef<HTMLElement>(null);
   const resetSceneInputs = () => {
     setSessionKey(current => current + 1);
     setActivities({}); setAvailability({ unavailable: [], tools: {} });
@@ -70,19 +73,8 @@ export default function Home() {
         setVisitPreviewOpen(false);
         return;
       }
-      if (event.key !== 'Tab') return;
-      const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
-      const controls = Array.from(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], [tabindex]:not([tabindex="-1"])') ?? []);
-      if (controls.length === 0) return;
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      const dialog = choiceOpen ? choiceDialogRef.current : visitPreviewDialogRef.current;
+      trapDialogTab(event, dialog, document.activeElement);
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => {
@@ -193,7 +185,7 @@ export default function Home() {
       {watchRequest?.scope === findScope && <p className="learning-watch-notice">Watch: {projectWatchDestination(watchRequest.project).name} · west garden. Terrain may block your view.</p>}
 
       {choiceOpen && (
-        <section className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="choice-title">
+        <section ref={choiceDialogRef} className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="choice-title">
           <div className="choice-card">
             <button type="button" className="choice-close" onClick={() => setChoiceOpen(false)} aria-label="Close garden choice">×</button>
             <p className="overline">A discovery for whenever you’re ready</p>
@@ -220,7 +212,7 @@ export default function Home() {
       )}
 
       {visitPreviewOpen && (
-        <section className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="visit-title">
+        <section ref={visitPreviewDialogRef} className="choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="visit-title">
           <div className="choice-card visit-card">
             <button type="button" className="choice-close" onClick={() => setVisitPreviewOpen(false)} aria-label="Close visit preview">×</button>
             <p className="overline">Static privacy preview · no visit is occurring</p>
