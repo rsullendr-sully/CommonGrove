@@ -34,13 +34,19 @@ const interests: readonly GardenInterest[] = [
 ];
 
 describe('direct Pip interactions', () => {
+  it('resumes exploring after a passive nearby pause but waits when actively targeted', () => {
+    expect(shouldHoldPipForInteraction(false, 2.5, 'wander', 'ordinary', 'none', 3)).toBe(true);
+    expect(shouldHoldPipForInteraction(false, 2.5, 'wander', 'ordinary', 'none', 4)).toBe(false);
+    expect(shouldHoldPipForInteraction(true, 2.5, 'wander', 'ordinary', 'none', 20)).toBe(true);
+    expect(shouldHoldPipForInteraction(true, 2.5, 'greet', 'ordinary', 'none', 20)).toBe(false);
+  });
   it('keeps the approved direct greeting readable for exactly 1.4 seconds', () => {
-    expect(PIP_DIRECT_GREET_MESSAGE).toBe('Pip steps closer, listening ear lifted in hello.');
+    expect(PIP_DIRECT_GREET_MESSAGE).toBe('Pip steps closer and gives a little stretch in hello.');
     expect(PIP_DIRECT_GREET_REACTION_SECONDS).toBe(1.4);
   });
 
   it('keeps the approved pet reaction visible for exactly 1.8 seconds', () => {
-    expect(PIP_PET_MESSAGE).toBe('Pip leans into your hand, listening ear tipped toward you.');
+    expect(PIP_PET_MESSAGE).toBe('Pip tips gently to one side, eyes closed in contentment.');
     expect(PIP_PET_REACTION_SECONDS).toBe(1.8);
     expect(hasPetReactionCompleted(10, 11.799)).toBe(false);
     expect(hasPetReactionCompleted(10, 11.8)).toBe(true);

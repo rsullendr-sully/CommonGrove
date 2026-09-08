@@ -7,9 +7,9 @@ describe('Pip interaction presentation', () => {
   });
 
   it.each([
-    ['greet', 'Pip steps closer, listening ear lifted in hello.'],
-    ['pet', 'Pip leans into your hand, listening ear tipped toward you.'],
-    ['eating', 'Pip takes a few pleased bites, listening ear bobbing.'],
+    ['greet', 'Pip steps closer and gives a little stretch in hello.'],
+    ['pet', 'Pip tips gently to one side, eyes closed in contentment.'],
+    ['eating', 'Pip takes a few pleased bites, dipping toward the snack.'],
     ['playing', 'Pip trots over and gives the wooden rings one careful nudge.'],
   ] as const)('narrates the %s result without relying on animation', (phase, expected) => {
     expect(pipInteractionStatusText(phase, null, 'ordinary activity')).toBe(expected);

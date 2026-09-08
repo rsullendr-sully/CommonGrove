@@ -15,9 +15,9 @@ export const PIP_EATING_REACTION_SECONDS = 3;
 export const PIP_PLAYING_REACTION_SECONDS = 4;
 
 export const PIP_PET_REACTION_SECONDS = 1.8;
-export const PIP_PET_MESSAGE = 'Pip leans into your hand, listening ear tipped toward you.';
+export const PIP_PET_MESSAGE = 'Pip tips gently to one side, eyes closed in contentment.';
 export const PIP_DIRECT_GREET_REACTION_SECONDS = 1.4;
-export const PIP_DIRECT_GREET_MESSAGE = 'Pip steps closer, listening ear lifted in hello.';
+export const PIP_DIRECT_GREET_MESSAGE = 'Pip steps closer and gives a little stretch in hello.';
 export const PIP_PLACEMENT_FALLBACK_MESSAGE = "There wasn't a safe spot there, so Pip returned to the path.";
 export const PIP_CARRY_ANCHOR = [0.48, -0.42, -1.35] as const;
 export const PIP_PLACEMENT_DISTANCE = 1.4;
@@ -52,10 +52,11 @@ export function shouldHoldPipForInteraction(
   activityKind: PipActivityKind | null,
   mode: 'ordinary' | 'priority',
   phase: PipInteractionPhase,
+  nearbySeconds = 0,
 ): boolean {
   if (phase !== 'none' || !canDirectlyInteractWithPip(mode) || activityKind === 'greet') return false;
 
-  return interactionEngaged || visitorDistance <= PIP_INTERACTION_INVITATION_DISTANCE;
+  return interactionEngaged || (visitorDistance <= PIP_INTERACTION_INVITATION_DISTANCE && nearbySeconds < 4);
 }
 
 export function handleHeldPipEscape(

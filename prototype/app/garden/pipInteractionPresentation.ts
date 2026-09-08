@@ -8,7 +8,7 @@ export function pipInteractionStatusText(
   if (phase === 'greet-approach') return null;
   if (phase === 'greet') return PIP_DIRECT_GREET_MESSAGE;
   if (phase === 'pet') return PIP_PET_MESSAGE;
-  if (phase === 'eating') return 'Pip takes a few pleased bites, listening ear bobbing.';
+  if (phase === 'eating') return 'Pip takes a few pleased bites, dipping toward the snack.';
   if (phase === 'playing') return 'Pip trots over and gives the wooden rings one careful nudge.';
   return placementMessage ?? pipMessage;
 }

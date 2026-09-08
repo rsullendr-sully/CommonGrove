@@ -6,6 +6,12 @@ import {
 } from './useInteractionTarget';
 
 describe('interaction target selection', () => {
+  it('keeps the actual resident identifier when neighbors are in reach', () => {
+    expect(selectNearestInteractionTarget([
+      { target: 'moss', distance: 1.5, aimOffset: 0 },
+      { target: 'fern', distance: 1.1, aimOffset: .075 },
+    ], 3.2)).toEqual({ target: 'moss', distance: 1.5 });
+  });
   it('selects the nearest registered interactable hit', () => {
     expect(
       selectNearestInteractionTarget(

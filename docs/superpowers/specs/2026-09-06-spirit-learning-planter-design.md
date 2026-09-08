@@ -1,7 +1,7 @@
 # Spirit learning and the first shared planter
 
 Date: 2026-09-06
-Status: Owner approved the planter concept; this written specification awaits review before implementation planning.
+Status: Written specification approved by the owner on 2026-09-06. Local gameplay implementation is present and real-navigation integration tests cover both prerequisite orders with solo/three-resident completion within 240 active simulated seconds. Final browser walkthrough evidence and remaining verification limits are tracked in STATUS.md; owner acceptance is not implied.
 
 ## Direction
 
@@ -54,7 +54,9 @@ Use seeded selection and explicit delta input for repeatable tests, not wall-clo
 
 Picking up a participant releases their task and tool reservation. An unfinished carried piece returns to the project supply area; completed stages and committed materials remain intact. Placement allows the coordinator to offer a task again. Other available spirits can continue eligible work.
 
-A blocked route triggers a bounded retry or releases the task for reassignment. It never teleports a spirit, completes an unreachable task, spends another bundle, or advances learning from a distance. A stationary observer must be nearby throughout the observation action to learn. Repeated completion callbacks are idempotent.
+A blocked route triggers a bounded retry or releases the task for reassignment. Recovery never places a spirit directly at a target, completes an unreachable task, spends another bundle, or advances learning from a distance. A stationary observer must be nearby throughout the observation action to learn. Repeated completion callbacks are idempotent.
+
+Task 7 verification amendment (2026-09-06): retain the established safe-route arrival correction. Ordinary moving frames stay within `maxSpeed × delta`; a stopped frame with zero speed may settle by at most `.16` units exactly onto a planned waypoint, only across a safe segment and with the displacement included in distance travelled. This bounded arrival artifact is an explicit exception to a strict per-frame speed/no-teleport claim; arbitrary target placement and recovery repositioning remain prohibited. Further arrival smoothing is future locomotion work. Integration tests reserve the final planter footprint from their first frame, including the empty stage, for reachability, movement and stationary checks, deduplicating it once production geometry contains that obstacle.
 
 Construction creates collision geometry only at its defined stage boundaries. Work slots remain outside the final footprint so assembly cannot trap a spirit or the player. If all spirits are unavailable, progress simply waits. Passive visitor attention must expire so merely watching does not indefinitely starve the project; explicit interaction can pause the affected participant.
 

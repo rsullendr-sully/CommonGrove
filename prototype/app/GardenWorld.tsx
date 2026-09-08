@@ -1,66 +1,36 @@
 'use client';
 
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import Image from 'next/image';
 import { MutableRefObject, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { captureGardenLocalPosition, groundGardenPosition } from './garden/gardenElevation';
 import InteractionPrompt, { interactionReticleClassName } from './garden/InteractionPrompt';
-import {
-  GardenSnack,
-  GardenToy,
-  createToyPlayApproach,
-  projectGardenObjectOffer,
-  resolveToyPlayFrame,
-  resolveGardenObjectPlacement,
-  type GardenObjectId,
-} from './garden/GardenObjects';
-import PipCharacter from './garden/PipCharacter';
+import { GardenSnack, GardenToy, projectGardenObjectOffer, resolveGardenObjectPlacement, type GardenObjectId } from './garden/GardenObjects';
 import StorybookGardenEnvironment from './garden/StorybookGardenEnvironment';
-import { actionEventForLiveTarget, actionLabelForLiveTarget, type InteractableId } from './garden/interaction';
+import ResidentActor, { type ResidentJourney } from './garden/ResidentActor';
+import CommunityCoordinator, { GardenCommunity } from './garden/CommunityCoordinator';
+import { isResidentId, RESIDENTS, residentsForVisit, residentDefinition, type ResidentId, type ResidentTarget, type ResidentDefinition } from './garden/residents';
+import { canonicalTarget, createResidentInteraction, residentInteractionReducer, residentActionLabel, residentPhase, type ResidentInteractionState } from './garden/residentInteraction';
+import { actionEventForLiveTarget } from './garden/interaction';
 import { getFirstPersonMovementVector, resolveFirstPersonGardenMove } from './garden/firstPersonMovement';
-import {
-  GARDEN_RENDER_QUALITY,
-  GARDEN_TEXTURE_PATHS,
-  prepareGardenTexture,
-} from './garden/gardenSurface';
-import { PIP_MOTION_CONFIG, PIP_REWARD_MOTION_CONFIG, stepSafeRouteLocomotion, type LocomotionState } from './garden/locomotion';
-import { createSafeGardenRoute, createSafeGreetingApproach, GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest, type GardenPoint } from './garden/navigation';
+import { GARDEN_RENDER_QUALITY, GARDEN_TEXTURE_PATHS, prepareGardenTexture } from './garden/gardenSurface';
+import { GARDEN_OBSTACLES, nearestSafePoint, selectCurrentGardenInterests, type GardenInterest } from './garden/navigation';
 import { PAVILION_READING_POINT } from './garden/pavilionLayout';
-import {
-  PIP_PET_REACTION_SECONDS,
-  CAMERA_CONTROLS_FRAME_PRIORITY,
-  PIP_INTERACTION_FRAME_PRIORITY,
-  canDirectlyInteractWithPip,
-  employeeWalkSpeedWhileHolding,
-  handleHeldInteractionEscape,
-  projectPipPlacement,
-  resolvePipPlacement,
-  shouldHoldPipForInteraction,
-  shouldSuspendPipMotion,
-  updateCarriedPipTransform,
-  updatePlacedPipTransform,
-  yawTowardEmployee,
-  type PipInteractionPhase,
-} from './garden/pipInteraction';
-import { pipInteractionStatusText, pipLiveRegionLabel } from './garden/pipInteractionPresentation';
-import {
-  consumePipResumeSequence,
-  createPipInteractionSceneState,
-  eligibleInteractionTarget,
-  pipInteractionSceneReducer,
-  scheduleDirectGreetingCompletion,
-  scheduleObjectReactionCompletion,
-  schedulePipSceneEvent,
-} from './garden/pipInteractionScene';
-import { getPipPose, type PipPose } from './garden/pipPose';
-import { type GardenChoice } from './garden/rewardState';
+import { CAMERA_CONTROLS_FRAME_PRIORITY, PIP_PET_REACTION_SECONDS, PIP_DIRECT_GREET_REACTION_SECONDS, PIP_EATING_REACTION_SECONDS, PIP_PLAYING_REACTION_SECONDS, employeeWalkSpeedWhileHolding, handleHeldInteractionEscape, projectPipPlacement, resolvePipPlacement } from './garden/pipInteraction';
+import { pipInteractionStatusText } from './garden/pipInteractionPresentation';
+import { schedulePipSceneEvent, type PipInteractionSceneEvent } from './garden/pipInteractionScene';
 import { useInteractionTarget, type InteractionTargetRegistration } from './garden/useInteractionTarget';
-import { usePipBehavior, type PipPriorityMission } from './garden/usePipBehavior';
-import type { MemoryKind, PipJourneyProfile, Visit } from './garden/journey';
-import { PIP_RETURN_POSITION } from './garden/journeyLayout';
+import type { MemoryKind, PipJourneyProfile } from './garden/journey';
+import type { GardenChoice } from './garden/rewardState';
+import { residentLookAngles, type FindResidentRequest } from './garden/findResident';
+import { createGardenMountHandshake } from './garden/gardenSession';
+import type { PlanterEvent, PlanterProgress } from './garden/planterProgress';
+import PlanterProject from './garden/PlanterProject';
+import { PLANTER_LAYOUT } from './garden/planterLayout';
+import type { ProjectDirective } from './garden/planterCoordinator';
 
-type WorldJourney = { visit: Visit; sceneVisit: Visit; comparing: boolean; profile: PipJourneyProfile };
-
+type WorldJourney = ResidentJourney & { profiles: Record<ResidentId, PipJourneyProfile> };
+type ResidentRefs = Record<ResidentId, MutableRefObject<THREE.Group | null>>;
 const GARDEN_HALF_SIZE = 20;
 const PLAYER_MARGIN = 1;
 
@@ -110,13 +80,15 @@ function useGrassTexture() {
   return texture;
 }
 
-function FirstPersonControls({ movement, speed, onCameraMount }: { movement: MovementInput; speed: number; onCameraMount: (camera: THREE.Camera | null) => void }) {
+function FirstPersonControls({ movement, speed, onCameraMount, findRequest, residents, community }: { movement: MovementInput; speed: number; onCameraMount: (camera: THREE.Camera | null) => void; findRequest: FindResidentRequest | null; residents: ResidentRefs; community: GardenCommunity }) {
   const { camera, gl } = useThree();
   const yaw = useRef(0);
   const pitch = useRef(-0.2);
   const dragging = useRef(false);
   const previousPointer = useRef({ x: 0, y: 0 });
   const nextPosition = useRef(new THREE.Vector3());
+  const lastFind = useRef<number | null>(null);
+  const findPosition = useRef(new THREE.Vector3());
 
   useEffect(() => {
     camera.position.set(0, 1.7, 17);
@@ -142,7 +114,7 @@ function FirstPersonControls({ movement, speed, onCameraMount }: { movement: Mov
       yaw.current -= (event.clientX - previousPointer.current.x) * 0.004;
       pitch.current = THREE.MathUtils.clamp(
         pitch.current - (event.clientY - previousPointer.current.y) * 0.003,
-        -0.62,
+        -1.25,
         0.5,
       );
       previousPointer.current = { x: event.clientX, y: event.clientY };
@@ -171,6 +143,18 @@ function FirstPersonControls({ movement, speed, onCameraMount }: { movement: Mov
   }, [camera, gl, movement, onCameraMount]);
 
   useFrame((_, delta) => {
+    if (findRequest && lastFind.current !== findRequest.sequence) {
+      const resident = residents[findRequest.id].current;
+      if (resident) {
+        resident.getWorldPosition(findPosition.current);
+        findPosition.current.y += .3;
+        const look = residentLookAngles(camera.position, findPosition.current, yaw.current);
+        yaw.current = look.yaw;
+        pitch.current = look.pitch;
+        movement.current.clear();
+        lastFind.current = findRequest.sequence;
+      }
+    }
     const candidatePosition = nextPosition.current;
     const pressed = movement.current;
     const forwardAmount = Number(pressed.has('w') || pressed.has('arrowup')) - Number(pressed.has('s') || pressed.has('arrowdown'));
@@ -186,12 +170,12 @@ function FirstPersonControls({ movement, speed, onCameraMount }: { movement: Mov
     const resolvedPosition = resolveFirstPersonGardenMove(
       { x: camera.position.x, z: camera.position.z },
       { x: candidatePosition.x - camera.position.x, z: candidatePosition.z - camera.position.z },
-      GARDEN_OBSTACLES,
+      community.playerObstacles(),
     );
     candidatePosition.x = resolvedPosition.x;
     candidatePosition.z = resolvedPosition.z;
 
-    camera.position.set(candidatePosition.x, 1.7, candidatePosition.z);
+    camera.position.set(...groundGardenPosition(candidatePosition.x, candidatePosition.z, 1.7));
     camera.rotation.set(pitch.current, yaw.current, 0, 'YXZ');
   }, CAMERA_CONTROLS_FRAME_PRIORITY);
 
@@ -209,679 +193,245 @@ const gardenInterestDefinitions: readonly GardenInterest[] = [
   { id: 'wander-west', position: { x: -6.3, z: 7.1 } },
 ];
 
-function Pip({ journey, onPipMount, onMessage, onPriorityModeChange, onGreetingArrived, onToyNudged, rewardStage, gardenChoice, interests, reducedMotion, interactionPhase, interactionTarget, interactionEngaged, placedPosition, resumeSequence }: { journey: WorldJourney; onPipMount: (pip: THREE.Group | null) => void; onMessage: (message: string | null) => void; onPriorityModeChange: (priority: boolean) => void; onGreetingArrived: () => void; onToyNudged: () => void; rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean; interactionPhase: PipInteractionPhase; interactionTarget: GardenPoint | null; interactionEngaged: boolean; placedPosition: GardenPoint | null; resumeSequence: number }) {
-  const pip = useRef<THREE.Group>(null);
-  const setPipRef = useCallback((node: THREE.Group | null) => {
-    pip.current = node;
-    onPipMount(node);
-  }, [onPipMount]);
-  const pipMotion = useRef<LocomotionState>({
-    position: new THREE.Vector3(...PIP_RETURN_POSITION),
-    facing: 0,
-    speed: 0,
-    distanceTravelled: 0,
-    moving: false,
-  });
-  const [pose, setPose] = useState<PipPose>(() => getPipPose({
-    poseKind: 'idle',
-    speed: 0,
-    distanceTravelled: 0,
-    attentive: false,
-    reducedMotion,
-  }));
-  const routeTargetKey = useRef<string | null>(null);
-  const routeWaypoints = useRef<readonly GardenPoint[]>([]);
-  const routeIndex = useRef(0);
-  const consumedResumeSequence = useRef(0);
-  const interactionStartedAt = useRef<number | null>(null);
-  const toyNudgeSent = useRef(false);
-  const directGreetingRecorded = useRef(false);
-  const greetingArrivalSent = useRef(false);
-  const [initialChoice] = useState(gardenChoice);
-  const rewardMission = useMemo<PipPriorityMission | null>(() => {
-    if (journey.visit > 1) return null;
-    if (rewardStage === 1) return {
-      id: 'reward-1',
-      target: { x: 8.2, z: 6.6 },
-      startMessage: 'One ear lifts. Pip noticed something change near the pond.',
-      completionMessage: 'It bloomed! Something kind reached the garden.',
-    };
-    if (rewardStage === 2) return {
-      id: 'reward-2',
-      target: { ...PAVILION_READING_POINT },
-      startMessage: 'A warm chime carries from the reading pavilion. Pip turns toward it.',
-      completionMessage: 'The nook is ready. Pip settles beside the new books for a moment.',
-    };
-    if (rewardStage === 3) return {
-      id: 'reward-3',
-      target: { x: -8.5, z: 7.4 },
-      startMessage: 'A tiny golden light appears by the unopened path. Pip hurries to see.',
-      completionMessage: 'A curious seed! Pip leaves it safely waiting for your choice.',
-    };
-    return null;
-  }, [rewardStage, journey.visit]);
-  const choiceMission = useMemo<PipPriorityMission | null>(() => gardenChoice && !(journey.visit > 1 && gardenChoice === initialChoice) ? {
-    id: `choice-${gardenChoice}`,
-    target: { x: -10.6, z: 9.2 },
-    startMessage: gardenChoice === 'orchard'
-      ? 'Soft lanterns flicker to life. Pip trots toward the new orchard path.'
-      : 'A cheerful little tap echoes across the lawn. Pip heads for the workshop path.',
-    completionMessage: gardenChoice === 'orchard'
-      ? 'The lantern saplings are taking root. Pip curls up in their warm glow.'
-      : 'The workshop foundation is ready. Pip listens for the next useful idea.',
-  } : null, [gardenChoice, initialChoice, journey.visit]);
-  const behavior = usePipBehavior(interests, Math.random, journey.profile);
 
-  useEffect(() => onMessage(behavior.message), [behavior.message, onMessage]);
-  useEffect(
-    () => onPriorityModeChange(!canDirectlyInteractWithPip(behavior.mode)),
-    [behavior.mode, onPriorityModeChange],
-  );
-
-  useFrame(({ clock, camera }, delta) => {
-    if (pip.current) {
-      if (journey.comparing) {
-        pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
-        setPose(getPipPose({ poseKind: 'idle', speed: 0, distanceTravelled: pipMotion.current.distanceTravelled, attentive: false, reducedMotion: true }));
-        return;
-      }
-      const distanceToVisitor = Math.hypot(
-        pip.current.position.x - camera.position.x,
-        pip.current.position.z - camera.position.z,
-      );
-      if (interactionPhase === 'greet-approach') {
-        if (!directGreetingRecorded.current) {
-          behavior.recordDirectGreeting(clock.elapsedTime);
-          directGreetingRecorded.current = true;
-        }
-        const targetKey = 'interaction-greet';
-        if (routeTargetKey.current !== targetKey) {
-          routeTargetKey.current = targetKey;
-          const approach = createSafeGreetingApproach(
-            { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
-            { x: camera.position.x, z: camera.position.z },
-            GARDEN_OBSTACLES,
-          );
-          routeWaypoints.current = approach.route;
-          routeIndex.current = 0;
-        }
-        const routeProgress = stepSafeRouteLocomotion(
-          { motion: pipMotion.current, waypointIndex: routeIndex.current, complete: false },
-          routeWaypoints.current,
-          delta,
-          PIP_MOTION_CONFIG,
-          GARDEN_OBSTACLES,
-        );
-        pipMotion.current = routeProgress.motion;
-        routeIndex.current = routeProgress.waypointIndex;
-        pip.current.position.copy(pipMotion.current.position);
-        pip.current.rotation.y = yawTowardEmployee(
-          { x: pip.current.position.x, z: pip.current.position.z },
-          { x: camera.position.x, z: camera.position.z },
-        );
-        if (routeProgress.complete && !greetingArrivalSent.current) {
-          greetingArrivalSent.current = true;
-          onGreetingArrived();
-        }
-        setPose(getPipPose({
-          poseKind: 'walk',
-          speed: pipMotion.current.speed,
-          distanceTravelled: pipMotion.current.distanceTravelled,
-          attentive: true,
-          reducedMotion,
-        }));
-        return;
-      }
-
-      if (interactionPhase !== 'greet') {
-        directGreetingRecorded.current = false;
-        greetingArrivalSent.current = false;
-      }
-      if (interactionPhase === 'eating' || interactionPhase === 'playing') {
-        const startedAt = interactionStartedAt.current ?? clock.elapsedTime;
-        interactionStartedAt.current = startedAt;
-        const reactionElapsed = clock.elapsedTime - startedAt;
-        const target = interactionTarget;
-        if (target) {
-          pip.current.rotation.y = Math.atan2(
-            target.x - pip.current.position.x,
-            target.z - pip.current.position.z,
-          );
-        }
-
-        if (interactionPhase === 'playing' && target) {
-          const targetKey = `interaction-toy:${target.x},${target.z}`;
-          if (routeTargetKey.current !== targetKey) {
-            routeTargetKey.current = targetKey;
-            const approach = createToyPlayApproach(
-              { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
-              target,
-              GARDEN_OBSTACLES,
-            );
-            routeWaypoints.current = approach.route;
-            routeIndex.current = 0;
-          }
-          const routeProgress = stepSafeRouteLocomotion(
-            { motion: pipMotion.current, waypointIndex: routeIndex.current, complete: false },
-            routeWaypoints.current,
-            delta,
-            PIP_MOTION_CONFIG,
-            GARDEN_OBSTACLES,
-          );
-          pipMotion.current = routeProgress.motion;
-          routeIndex.current = routeProgress.waypointIndex;
-          pip.current.position.copy(pipMotion.current.position);
-          const playFrame = resolveToyPlayFrame(
-            { x: pip.current.position.x, z: pip.current.position.z },
-            target,
-            pipMotion.current.facing,
-            routeProgress.complete,
-            toyNudgeSent.current,
-          );
-          pip.current.rotation.y = playFrame.facing;
-          toyNudgeSent.current = playFrame.nudgeSent;
-          if (playFrame.shouldNudge) {
-            onToyNudged();
-          }
-          setPose(getPipPose({
-            poseKind: routeProgress.complete ? 'playing' : 'walk',
-            reactionElapsed,
-            speed: pipMotion.current.speed,
-            distanceTravelled: pipMotion.current.distanceTravelled,
-            attentive: true,
-            reducedMotion,
-          }));
-          return;
-        }
-
-        pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
-        routeTargetKey.current = null;
-        routeWaypoints.current = [];
-        routeIndex.current = 0;
-        setPose(getPipPose({
-          poseKind: interactionPhase,
-          reactionElapsed,
-          speed: 0,
-          distanceTravelled: pipMotion.current.distanceTravelled,
-          attentive: true,
-          reducedMotion,
-        }));
-        return;
-      }
-
-      interactionStartedAt.current = null;
-      toyNudgeSent.current = false;
-      if (shouldSuspendPipMotion(interactionPhase)) {
-        pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
-        routeTargetKey.current = null;
-        routeWaypoints.current = [];
-        routeIndex.current = 0;
-
-        if (interactionPhase === 'carried') {
-          updateCarriedPipTransform(camera, pip.current);
-        } else if (interactionPhase === 'greet' || interactionPhase === 'pet') {
-          pip.current.rotation.y = yawTowardEmployee(
-            { x: pip.current.position.x, z: pip.current.position.z },
-            { x: camera.position.x, z: camera.position.z },
-          );
-        } else if (interactionPhase === 'placed' && placedPosition) {
-          pipMotion.current = {
-            ...pipMotion.current,
-            position: new THREE.Vector3(placedPosition.x, 0, placedPosition.z),
-          };
-          updatePlacedPipTransform(pip.current, placedPosition, GARDEN_OBSTACLES);
-        }
-
-        setPose(getPipPose({
-          poseKind: interactionPhase,
-          speed: 0,
-          distanceTravelled: pipMotion.current.distanceTravelled,
-          attentive: true,
-          reducedMotion,
-        }));
-        return;
-      }
-
-      const nextConsumedResumeSequence = consumePipResumeSequence(
-        consumedResumeSequence.current,
-        resumeSequence,
-        () => behavior.resumeAfterInteraction({
-          now: clock.elapsedTime,
-          employeeDistance: distanceToVisitor,
-          employeePosition: { x: camera.position.x, z: camera.position.z },
-          pipPosition: { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
-          locomotionComplete: false,
-          rewardMission,
-          choiceMission,
-        }),
-      );
-      if (nextConsumedResumeSequence !== consumedResumeSequence.current) {
-        consumedResumeSequence.current = nextConsumedResumeSequence;
-        setPose(getPipPose({
-          poseKind: 'idle',
-          speed: 0,
-          distanceTravelled: pipMotion.current.distanceTravelled,
-          attentive: distanceToVisitor < 3.15,
-          reducedMotion,
-        }));
-        return;
-      }
-
-      if (shouldHoldPipForInteraction(
-        interactionEngaged,
-        distanceToVisitor,
-        behavior.activity?.kind ?? null,
-        behavior.mode,
-        interactionPhase,
-      )) {
-        // Attention pauses his feet, not his lifecycle. New return greetings and
-        // queued rewards must still be noticed while the visitor stands nearby.
-        behavior.advance({
-          now: clock.elapsedTime,
-          employeeDistance: distanceToVisitor,
-          employeePosition: { x: camera.position.x, z: camera.position.z },
-          pipPosition: { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
-          locomotionComplete: false,
-          rewardMission,
-          choiceMission,
-        });
-        pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
-        pip.current.rotation.y = yawTowardEmployee(
-          { x: pip.current.position.x, z: pip.current.position.z },
-          { x: camera.position.x, z: camera.position.z },
-        );
-        setPose(getPipPose({
-          poseKind: 'idle',
-          speed: 0,
-          distanceTravelled: pipMotion.current.distanceTravelled,
-          attentive: true,
-          reducedMotion,
-        }));
-        return;
-      }
-
-      let locomotionComplete = false;
-      if (behavior.target) {
-        const targetKey = `${behavior.target.x},${behavior.target.z}`;
-        if (routeTargetKey.current !== targetKey) {
-          routeTargetKey.current = targetKey;
-          routeWaypoints.current = createSafeGardenRoute(
-            { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
-            behavior.target,
-            GARDEN_OBSTACLES,
-          );
-          routeIndex.current = 0;
-        }
-        const routeProgress = stepSafeRouteLocomotion(
-          { motion: pipMotion.current, waypointIndex: routeIndex.current, complete: false },
-          routeWaypoints.current,
-          delta,
-          behavior.mode === 'priority' ? PIP_REWARD_MOTION_CONFIG : PIP_MOTION_CONFIG,
-          GARDEN_OBSTACLES,
-        );
-        pipMotion.current = routeProgress.motion;
-        routeIndex.current = routeProgress.waypointIndex;
-        pip.current.position.copy(pipMotion.current.position);
-        pip.current.rotation.y = pipMotion.current.facing;
-        locomotionComplete = routeProgress.complete;
-      } else if (pipMotion.current.moving || pipMotion.current.speed > 0) {
-        pipMotion.current = { ...pipMotion.current, speed: 0, moving: false };
-        routeTargetKey.current = null;
-        routeWaypoints.current = [];
-        routeIndex.current = 0;
-      } else if (routeTargetKey.current !== null) {
-        routeTargetKey.current = null;
-        routeWaypoints.current = [];
-        routeIndex.current = 0;
-      }
-
-      if (behavior.activity?.kind === 'greet' && (behavior.phase === 'performing' || locomotionComplete)) {
-        pip.current.rotation.y = yawTowardEmployee(
-          { x: pip.current.position.x, z: pip.current.position.z },
-          { x: camera.position.x, z: camera.position.z },
-        );
-      }
-
-      behavior.advance({
-        now: clock.elapsedTime,
-        employeeDistance: distanceToVisitor,
-        employeePosition: { x: camera.position.x, z: camera.position.z },
-        pipPosition: { x: pipMotion.current.position.x, z: pipMotion.current.position.z },
-        locomotionComplete,
-        rewardMission,
-        choiceMission,
-      });
-
-      const currentLocomotion = pipMotion.current;
-      setPose(getPipPose({
-        poseKind: behavior.poseKind,
-        speed: currentLocomotion.moving ? currentLocomotion.speed : 0,
-        distanceTravelled: currentLocomotion.distanceTravelled,
-        attentive: distanceToVisitor < 3.15,
-        reducedMotion,
-      }));
-    }
-  }, PIP_INTERACTION_FRAME_PRIORITY);
-
-  return (
-    <group ref={setPipRef} position={[...PIP_RETURN_POSITION]} rotation={[0, 0, 0]} userData={{ interactableId: 'pip' }}>
-      <mesh visible={interactionPhase !== 'carried'} name="blobShadow" position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.48, 0.31, 1]}>
-        <circleGeometry args={[0.9, 24]} />
-        <meshBasicMaterial color="#405445" transparent opacity={0.2} />
-      </mesh>
-      <pointLight position={[0, 1.05, 0.35]} color="#ffe7b2" intensity={0.34} distance={2.8} decay={2} />
-      <PipCharacter pose={pose} />
-    </group>
-  );
-}
-
-function InteractionTargetTracker({ registrations, onTargetChange, republishSequence }: { registrations: readonly InteractionTargetRegistration[]; onTargetChange: (target: InteractableId | null) => void; republishSequence: number }) {
-  const interactionTarget = useInteractionTarget(registrations, 2.4);
-  const target = interactionTarget?.target ?? null;
-
+function InteractionTargetTracker({ registrations, onTargetChange, republishSequence }: { registrations: readonly InteractionTargetRegistration[]; onTargetChange: (target: ResidentTarget | null) => void; republishSequence: number }) {
+  const result = useInteractionTarget(registrations, 2.4);
+  const target = result?.target ?? null;
   useEffect(() => onTargetChange(target), [onTargetChange, republishSequence, target]);
   return null;
 }
 
-function GardenWorldScene({ journey, movement, movementSpeed, pip, food, toy, onPipMount, onPipMessage, onPipPriorityModeChange, onGreetingArrived, onToyNudged, onInteractionTargetChange, onCameraMount, interactionPhase, interactionTarget, interactionEngaged, heldTarget, objectPositions, toyNudged, placedPosition, resumeSequence, focusRepublishSequence, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, reducedMotion }: { journey: WorldJourney; movement: MovementInput; movementSpeed: number; pip: MutableRefObject<THREE.Group | null>; food: MutableRefObject<THREE.Group | null>; toy: MutableRefObject<THREE.Group | null>; onPipMount: (pip: THREE.Group | null) => void; onPipMessage: (message: string | null) => void; onPipPriorityModeChange: (priority: boolean) => void; onGreetingArrived: () => void; onToyNudged: () => void; onInteractionTargetChange: (target: InteractableId | null) => void; onCameraMount: (camera: THREE.Camera | null) => void; interactionPhase: PipInteractionPhase; interactionTarget: GardenPoint | null; interactionEngaged: boolean; heldTarget: InteractableId | null; objectPositions: Record<GardenObjectId, readonly [number, number, number]>; toyNudged: boolean; placedPosition: GardenPoint | null; resumeSequence: number; focusRepublishSequence: number; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null; reducedMotion: boolean }) {
-  const grassTexture = useGrassTexture();
-  const interactionTargets = useMemo<readonly InteractionTargetRegistration[]>(
-    () => [
-      ...(heldTarget === 'pip' ? [] : [{ target: 'pip' as const, ref: pip, maxDistance: 3.2 }]),
-      ...(heldTarget === 'food' ? [] : [{ target: 'food' as const, ref: food }]),
-      ...(heldTarget === 'toy' ? [] : [{ target: 'toy' as const, ref: toy }]),
-    ],
-    [food, heldTarget, pip, toy],
-  );
-  const interests = useMemo(
-    () => selectCurrentGardenInterests(gardenInterestDefinitions, {
-      seedVisible,
-      destinationVisible: destinationVisible !== null,
-    }),
-    [destinationVisible, seedVisible],
-  );
-  return (
-    <>
-      <FrameCadence />
-      <StorybookGardenEnvironment
-        visit={journey.sceneVisit}
-        settledRewards={journey.visit > 1 || journey.comparing}
-        grassTexture={grassTexture}
-        rewardStage={rewardStage}
-        starflowersVisible={starflowersVisible}
-        pavilionImproved={pavilionImproved}
-        seedVisible={seedVisible}
-        destinationVisible={destinationVisible}
-        reducedMotion={reducedMotion}
-      />
-      <GardenSnack ref={food} position={objectPositions.food} carried={heldTarget === 'food'} />
-      <GardenToy ref={toy} position={objectPositions.toy} carried={heldTarget === 'toy'} nudged={toyNudged} />
-      <Pip journey={journey} onPipMount={onPipMount} onMessage={onPipMessage} onPriorityModeChange={onPipPriorityModeChange} onGreetingArrived={onGreetingArrived} onToyNudged={onToyNudged} rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion} interactionPhase={interactionPhase} interactionTarget={interactionTarget} interactionEngaged={interactionEngaged} placedPosition={placedPosition} resumeSequence={resumeSequence} />
-
-      <FirstPersonControls movement={movement} speed={movementSpeed} onCameraMount={onCameraMount} />
-      <InteractionTargetTracker registrations={interactionTargets} onTargetChange={onInteractionTargetChange} republishSequence={focusRepublishSequence} />
-    </>
-  );
+function PlanterProjectScene({ community, progress }: { community: GardenCommunity; progress: PlanterProgress }) {
+  const [directives, setDirectives] = useState<Partial<Record<ResidentId, ProjectDirective>>>({});
+  const presentationKey = useRef('');
+  useFrame(() => {
+    const next = Object.fromEntries(RESIDENTS.flatMap(({ id }) => {
+      const directive = community.projectDirective(id);
+      return directive ? [[id, { ...directive }]] : [];
+    })) as Partial<Record<ResidentId, ProjectDirective>>;
+    const key = RESIDENTS.map(({ id }) => {
+      const directive = next[id];
+      return directive ? `${id}:${directive.key}:${directive.action}:${directive.phase}:${directive.tool ?? ''}` : `${id}:`;
+    }).join('|');
+    if (key !== presentationKey.current) {
+      presentationKey.current = key;
+      setDirectives(next);
+    }
+  }, -.4);
+  return <PlanterProject progress={progress} layout={PLANTER_LAYOUT} directives={directives} />;
 }
 
-export default function GardenWorld({ journey, onMemory, onBusyChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice }: { journey: WorldJourney; onMemory: (kind: MemoryKind) => void; onBusyChange: (busy: boolean) => void; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean; destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null }) {
+type ResidentSlotProps = {
+  resident: ResidentDefinition; journey: WorldJourney; player: ResidentInteractionState;
+  onMount: (id: ResidentId, node: THREE.Group | null) => void;
+  rewardStage: number; gardenChoice: GardenChoice | null; interests: readonly GardenInterest[]; reducedMotion: boolean;
+  focused: ResidentTarget | null;
+  community: GardenCommunity;
+  onMessage: (id: ResidentId, message: string | null) => void;
+  onPriority: (id: ResidentId, active: boolean) => void;
+  onEvent: (id: ResidentId, event: PipInteractionSceneEvent) => void;
+};
+function ResidentSlot({ resident, journey, onMount, player, onMessage, onPriority, onEvent, ...props }: ResidentSlotProps) {
+  const id = resident.id;
+  const mount = useCallback((node: THREE.Group | null) => onMount(id, node), [id, onMount]);
+  const message = useCallback((text: string | null) => onMessage(id, text), [id, onMessage]);
+  const priority = useCallback((active: boolean) => onPriority(id, active), [id, onPriority]);
+  const greet = useCallback(() => onEvent(id, { type: 'greet-arrived' }), [id, onEvent]);
+  const community = props.community;
+  const nudge = useCallback(() => { community.nudge(id); onEvent(id, { type: 'toy-nudged' }); }, [community, id, onEvent]);
+  const localJourney = useMemo(() => ({ ...journey, profile: journey.profiles[id] }), [journey, id]);
+  const phase = residentPhase(player, id);
+  const offered = player.scene.interaction.mode === 'reacting' ? player.scene.interaction.offered : null;
+  const position = player.scene.objectPositions[offered ?? 'food'];
+  const spawn = useMemo(() => community.spawnPoint(id, resident.spawn), [community, id, resident.spawn]);
+  return <ResidentActor resident={resident} journey={localJourney} community={community} spawn={spawn}
+    onPipMount={mount} onMessage={message} onPriorityModeChange={priority}
+    onGreetingArrived={greet} onToyNudged={nudge}
+    rewardStage={props.rewardStage} gardenChoice={props.gardenChoice} interests={props.interests} reducedMotion={props.reducedMotion}
+    interactionPhase={phase} interactionTarget={phase === 'eating' || phase === 'playing' ? { x: position[0], z: position[2] } : null}
+    interactionEngaged={props.focused === id} placedPosition={player.placements[id] ?? null} resumeSequence={player.resumes[id]} />;
+}
+
+export default function GardenWorld({ journey, project, projection, epoch: projectEpoch, onProjectEvents, onRemount, onMemory, onBusyChange, rewardStage, starflowersVisible, pavilionImproved, seedVisible, destinationVisible, gardenChoice, findRequest = null }: {
+  journey: WorldJourney; onMemory: (kind: MemoryKind, id: ResidentId) => void; onBusyChange: (busy: boolean) => void;
+  project: PlanterProgress; projection: PlanterProgress; epoch: number;
+  onProjectEvents: (epoch: number, events: PlanterEvent[]) => void; onRemount: () => void;
+  rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean; seedVisible: boolean;
+  destinationVisible: GardenChoice | null; gardenChoice: GardenChoice | null;
+  findRequest?: FindResidentRequest | null;
+}) {
+  const [projectMount] = useState(() => createGardenMountHandshake(projectEpoch));
+  const onRemountRef = useRef(onRemount);
+  useEffect(() => {
+    if (projectMount.mount()) onRemountRef.current();
+    return () => projectMount.unmount();
+  }, [projectMount]);
+  const emitProjectEvents = useCallback((events: PlanterEvent[]) => {
+    const acknowledgedEpoch = projectMount.acknowledgedEpoch(projectEpoch);
+    if (acknowledgedEpoch !== null && events.length > 0) onProjectEvents(acknowledgedEpoch, events);
+  }, [onProjectEvents, projectEpoch, projectMount]);
   const movement = useRef(new Set<string>());
-  const pip = useRef<THREE.Group>(null);
+  const [community] = useState(() => new GardenCommunity());
+  const pipRef = useRef<THREE.Group | null>(null);
+  const mossRef = useRef<THREE.Group | null>(null);
+  const fernRef = useRef<THREE.Group | null>(null);
+  const refs = useMemo<ResidentRefs>(() => ({ pip: pipRef, moss: mossRef, fern: fernRef }), []);
   const food = useRef<THREE.Group>(null);
   const toy = useRef<THREE.Group>(null);
   const camera = useRef<THREE.Camera | null>(null);
-  const [pipMessage, setPipMessage] = useState<string | null>(null);
-  const [pipPriorityMissionActive, setPipPriorityMissionActive] = useState(false);
-  const [pipInteractionScene, dispatchPipInteractionScene] = useReducer(
-    pipInteractionSceneReducer,
-    undefined,
-    createPipInteractionSceneState,
-  );
-  const { interaction, phase: pipInteractionPhase, placedPosition, placementMessage, objectPositions, toyNudged, focusRepublishSequence } = pipInteractionScene;
+  const onResidentMount = useCallback((id: ResidentId, node: THREE.Group | null) => {
+    if (id === 'pip') pipRef.current = node;
+    else if (id === 'moss') mossRef.current = node;
+    else fernRef.current = node;
+  }, []);
+  const [player, dispatch] = useReducer(residentInteractionReducer, undefined, createResidentInteraction);
+  const [liveTarget, setLiveTarget] = useState<ResidentTarget | null>(null);
+  const [messages, setMessages] = useState<Partial<Record<ResidentId, string | null>>>({});
+  const [lastSpeaker, setLastSpeaker] = useState<ResidentId>('pip');
+  const [priorities, setPriorities] = useState<Record<ResidentId, boolean>>({ pip: false, moss: false, fern: false });
+  const reducedMotion = useReducedMotion();
+  const roster = useMemo(() => residentsForVisit(journey.sceneVisit), [journey.sceneVisit]);
+  const { scene, activeId, epoch } = player;
+  const { interaction, phase, placementMessage, objectPositions, toyNudged, greetingArrived } = scene;
+  const eligibleTarget = isResidentId(liveTarget) && priorities[liveTarget] ? null : liveTarget;
+  const unavailableOffer = interaction.mode === 'carrying' && interaction.held !== 'pip' && isResidentId(liveTarget) && priorities[liveTarget];
+  const label = journey.comparing || unavailableOffer ? null : residentActionLabel(player, eligibleTarget);
+  const speakerId = phase !== 'none' || placementMessage ? activeId : priorities.pip ? 'pip' : lastSpeaker;
+  const speaker = residentDefinition(speakerId);
+  const visibleMessage = pipInteractionStatusText(phase, placementMessage, messages[speakerId] ?? null)?.replace(/Pip/g, speaker.name) ?? null;
   const publishedMemory = useRef(0);
   useEffect(() => {
-    const completed = pipInteractionScene.completedMemory;
-    if (completed && completed.sequence > publishedMemory.current) {
-      publishedMemory.current = completed.sequence;
-      onMemory(completed.kind);
+    const memory = player.completedMemory;
+    if (memory && memory.sequence > publishedMemory.current) {
+      publishedMemory.current = memory.sequence;
+      onMemory(memory.kind, memory.id);
     }
-    onBusyChange(interaction.mode === 'carrying' || interaction.mode === 'reacting' || pipInteractionPhase !== 'none');
-  }, [pipInteractionScene.completedMemory, interaction.mode, pipInteractionPhase, onMemory, onBusyChange]);
-  const [liveInteractionTarget, setLiveInteractionTarget] = useState<InteractableId | null>(null);
-  const reducedMotion = useReducedMotion();
-  const eligibleLiveTarget = eligibleInteractionTarget(liveInteractionTarget, pipPriorityMissionActive);
-  const pipInteractionEngaged = eligibleLiveTarget === 'pip';
-  const unavailableOffer = interaction.mode === 'carrying' && interaction.held !== 'pip' && liveInteractionTarget === 'pip' && pipPriorityMissionActive;
-  const interactionLabel = unavailableOffer || journey.comparing ? null : actionLabelForLiveTarget(interaction, eligibleLiveTarget);
-  const offeredObject = interaction.mode === 'reacting' ? interaction.offered : null;
-  const movementSpeed = employeeWalkSpeedWhileHolding(interaction.held);
-  const visiblePipMessage = pipInteractionStatusText(
-    pipInteractionPhase,
-    placementMessage,
-    pipMessage,
-  );
-  const pipLiveLabel = pipLiveRegionLabel(visiblePipMessage);
-  const onInteractionTargetChange = useCallback((target: InteractableId | null) => {
-    setLiveInteractionTarget(target);
-    dispatchPipInteractionScene({ type: 'focus', target });
+    onBusyChange(interaction.mode !== 'idle' || phase !== 'none');
+  }, [player.completedMemory, interaction.mode, phase, onMemory, onBusyChange]);
+  const onMessage = useCallback((id: ResidentId, message: string | null) => {
+    setMessages(previous => previous[id] === message ? previous : { ...previous, [id]: message });
+    if (message) setLastSpeaker(id);
   }, []);
-  const onPipMount = useCallback((node: THREE.Group | null) => {
-    pip.current = node;
+  const onPriority = useCallback((id: ResidentId, active: boolean) => {
+    setPriorities(previous => previous[id] === active ? previous : { ...previous, [id]: active });
   }, []);
-  const onCameraMount = useCallback((node: THREE.Camera | null) => {
-    camera.current = node;
+  const dispatchScene = useCallback((event: PipInteractionSceneEvent) => dispatch({ type: 'scene', id: activeId, epoch, event }), [activeId, epoch]);
+  const onActorEvent = useCallback((id: ResidentId, event: PipInteractionSceneEvent) => dispatch({ type: 'scene', id, epoch, event }), [epoch]);
+  const onTargetChange = useCallback((target: ResidentTarget | null) => {
+    setLiveTarget(target);
+    dispatch({ type: 'focus', target });
   }, []);
-  const placePip = useCallback(() => {
-    if (interaction.mode !== 'carrying' || interaction.held !== 'pip' || !camera.current || !pip.current) return;
-    const recordedPosition = interaction.lastSafePosition;
-    if (!recordedPosition) return;
-
-    const forward = camera.current.getWorldDirection(new THREE.Vector3());
-    const requested = projectPipPlacement(camera.current.position, forward);
-    const result = resolvePipPlacement(
-      requested,
-      { x: recordedPosition[0], z: recordedPosition[2] },
-      GARDEN_OBSTACLES,
-    );
-    dispatchPipInteractionScene({ type: 'place-pip', point: result.point, message: result.message });
-  }, [interaction]);
+  const onCameraMount = useCallback((node: THREE.Camera | null) => { camera.current = node; }, []);
+  const placeResident = useCallback(() => {
+    if (interaction.mode !== 'carrying' || interaction.held !== 'pip' || !camera.current) return;
+    const recorded = interaction.lastSafePosition;
+    if (!recorded) return;
+    const requested = projectPipPlacement(camera.current.position, camera.current.getWorldDirection(new THREE.Vector3()));
+    const result = resolvePipPlacement(requested, { x: recorded[0], z: recorded[2] }, community.obstacles(activeId));
+    community.reservePlacement(activeId, result.point);
+    dispatchScene({ type: 'place-pip', point: result.point, message: result.message });
+  }, [interaction, dispatchScene, community, activeId]);
   const placeObject = useCallback((target: GardenObjectId) => {
-    if (interaction.mode !== 'carrying' || interaction.held !== target || !camera.current) return;
-    const recordedPosition = interaction.lastSafePosition;
-    if (!recordedPosition) return;
-    const forward = camera.current.getWorldDirection(new THREE.Vector3());
-    const requested = projectPipPlacement(camera.current.position, forward);
-    const result = resolveGardenObjectPlacement(
-      target,
-      requested,
-      { x: recordedPosition[0], z: recordedPosition[2] },
-      GARDEN_OBSTACLES,
-    );
-    dispatchPipInteractionScene({ type: 'place-object', target, point: result.point, message: result.message });
-  }, [interaction]);
+    if (interaction.mode !== 'carrying' || interaction.held !== target || !camera.current || !interaction.lastSafePosition) return;
+    const recorded = interaction.lastSafePosition;
+    const requested = projectPipPlacement(camera.current.position, camera.current.getWorldDirection(new THREE.Vector3()));
+    const result = resolveGardenObjectPlacement(target, requested, { x: recorded[0], z: recorded[2] }, community.obstacles(null));
+    if (target === 'toy') community.placeToy(result.point);
+    dispatchScene({ type: 'place-object', target, point: result.point, message: result.message });
+  }, [interaction, dispatchScene, community]);
   const placeHeld = useCallback(() => {
-    if (interaction.held === 'pip') placePip();
-    else if (interaction.held === 'food' || interaction.held === 'toy') placeObject(interaction.held);
-  }, [interaction.held, placeObject, placePip]);
-  const activateInteraction = useCallback(() => {
+    if (interaction.held === 'pip') placeResident();
+    else if (interaction.held) placeObject(interaction.held);
+  }, [interaction.held, placeObject, placeResident]);
+  const activate = useCallback(() => {
     if (journey.comparing) return;
-    const activationTarget = eligibleInteractionTarget(
-      liveInteractionTarget,
-      pipPriorityMissionActive,
-    );
     if (interaction.mode === 'carrying') {
-      if (interaction.held === 'pip') {
-        placePip();
+      if (interaction.held === 'pip') return placeResident();
+      if (isResidentId(liveTarget)) {
+        if (!camera.current || !refs[liveTarget].current || priorities[liveTarget]) return;
+        const point = projectGardenObjectOffer(camera.current.position, camera.current.getWorldDirection(new THREE.Vector3()), community.obstacles(null));
+        if (interaction.held === 'toy') community.placeToy(point);
+        dispatch({ type: 'offer', id: liveTarget, target: interaction.held, point, available: true });
         return;
       }
-      if (liveInteractionTarget === 'pip') {
-        if (!pip.current || !camera.current) return;
-        const reactionPoint = projectGardenObjectOffer(
-          camera.current.position,
-          camera.current.getWorldDirection(new THREE.Vector3()),
-          GARDEN_OBSTACLES,
-        );
-        dispatchPipInteractionScene({
-          type: 'offer-object',
-          target: interaction.held,
-          reactionPoint,
-          pipAvailable: !pipPriorityMissionActive,
-        });
-        return;
-      }
-      placeObject(interaction.held);
-      return;
+      return placeObject(interaction.held);
     }
-    const targetObject = activationTarget === 'pip'
-      ? pip.current
-      : activationTarget === 'food'
-        ? food.current
-        : activationTarget === 'toy'
-          ? toy.current
-          : null;
-    const safePoint = targetObject
-      ? nearestSafePoint({ x: targetObject.position.x, z: targetObject.position.z }, GARDEN_OBSTACLES)
-      : null;
-    const safePosition = safePoint
-      ? [safePoint.x, targetObject?.position.y ?? 0, safePoint.z] as const
-      : null;
-    const event = actionEventForLiveTarget(interaction, activationTarget, safePosition);
-    if (!event) return;
-
-    dispatchPipInteractionScene({ type: 'activate', event });
-  }, [interaction, liveInteractionTarget, pipPriorityMissionActive, placeObject, placePip, journey.comparing]);
+    if (player.focus !== eligibleTarget) return;
+    const object = isResidentId(eligibleTarget) ? refs[eligibleTarget].current
+      : eligibleTarget === 'food' ? food.current : eligibleTarget === 'toy' ? toy.current : null;
+    const safePoint = object ? nearestSafePoint({ x: object.position.x, z: object.position.z }, GARDEN_OBSTACLES) : null;
+    const position = safePoint && object ? captureGardenLocalPosition(object.position, safePoint) : null;
+    const event = actionEventForLiveTarget(interaction, canonicalTarget(eligibleTarget), position);
+    if (event) dispatch({ type: 'activate', event });
+  }, [journey.comparing, interaction, liveTarget, eligibleTarget, player.focus, refs, priorities, placeObject, placeResident, community]);
 
   useEffect(() => {
-    if (pipInteractionPhase !== 'greet') return;
-    return scheduleDirectGreetingCompletion(
-      pipInteractionScene,
-      dispatchPipInteractionScene,
-      window.setTimeout,
-      window.clearTimeout,
-    );
-  }, [pipInteractionPhase, pipInteractionScene]);
-
+    if (phase !== 'greet-approach' && !(phase === 'playing' && !toyNudged)) return;
+    const timer = window.setTimeout(() => dispatch({ type: 'cancel', id: activeId, epoch }), 12000);
+    return () => window.clearTimeout(timer);
+  }, [phase, activeId, epoch, toyNudged]);
   useEffect(() => {
-    if (pipInteractionPhase !== 'pet') return;
-    return schedulePipSceneEvent(
-      dispatchPipInteractionScene,
-      { type: 'pet-complete' },
-      PIP_PET_REACTION_SECONDS * 1000,
-      window.setTimeout,
-      window.clearTimeout,
-    );
-  }, [pipInteractionPhase]);
-
+    const delay = phase === 'greet' && greetingArrived ? PIP_DIRECT_GREET_REACTION_SECONDS * 1000
+      : phase === 'pet' ? PIP_PET_REACTION_SECONDS * 1000
+      : phase === 'placed' ? 350
+      : phase === 'eating' ? PIP_EATING_REACTION_SECONDS * 1000
+      : phase === 'playing' && toyNudged ? PIP_PLAYING_REACTION_SECONDS * 1000 : null;
+    if (delay === null) return;
+    const type = phase === 'greet' ? 'greet-complete' : phase === 'pet' ? 'pet-complete'
+      : phase === 'placed' ? 'placed-complete' : 'object-reaction-complete';
+    return schedulePipSceneEvent(dispatchScene, { type }, delay, window.setTimeout, window.clearTimeout);
+  }, [phase, greetingArrived, toyNudged, dispatchScene]);
   useEffect(() => {
-    if (pipInteractionPhase !== 'eating' && pipInteractionPhase !== 'playing') return;
-    return scheduleObjectReactionCompletion(
-      pipInteractionScene,
-      dispatchPipInteractionScene,
-      window.setTimeout,
-      window.clearTimeout,
-    );
-  }, [pipInteractionPhase, pipInteractionScene, toyNudged]);
-
-  useEffect(() => {
-    if (pipInteractionPhase !== 'placed') return;
-    return schedulePipSceneEvent(
-      dispatchPipInteractionScene,
-      { type: 'placed-complete' },
-      350,
-      window.setTimeout,
-      window.clearTimeout,
-    );
-  }, [pipInteractionPhase]);
-
-  useEffect(() => {
-    const onEscape = (event: KeyboardEvent) => {
-      handleHeldInteractionEscape(event, interaction.held, placeHeld);
-    };
-    window.addEventListener('keydown', onEscape, true);
-    return () => window.removeEventListener('keydown', onEscape, true);
+    const escape = (event: KeyboardEvent) => { handleHeldInteractionEscape(event, interaction.held, placeHeld); };
+    window.addEventListener('keydown', escape, true);
+    return () => window.removeEventListener('keydown', escape, true);
   }, [interaction.held, placeHeld]);
-  const startMoving = (key: string) => movement.current.add(key);
-  const stopMoving = (key: string) => movement.current.delete(key);
 
-  return (
-    <div className="world-wrap">
-      <Canvas
-        frameloop="demand"
-        shadows="percentage"
-        camera={{ fov: 68, near: 0.1, far: 120 }}
-        dpr={[GARDEN_RENDER_QUALITY.minimumDpr, GARDEN_RENDER_QUALITY.maximumDpr]}
-        gl={{ antialias: GARDEN_RENDER_QUALITY.antialias, powerPreference: 'high-performance' }}
-        onCreated={({ gl }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 0.98;
-          gl.outputColorSpace = THREE.SRGBColorSpace;
-        }}
-      >
-        <GardenWorldScene
-          journey={journey}
-          movement={movement}
-          movementSpeed={movementSpeed}
-          pip={pip}
-          food={food}
-          toy={toy}
-          onPipMount={onPipMount}
-          onPipMessage={setPipMessage}
-          onPipPriorityModeChange={setPipPriorityMissionActive}
-          onGreetingArrived={() => dispatchPipInteractionScene({ type: 'greet-arrived' })}
-          onToyNudged={() => dispatchPipInteractionScene({ type: 'toy-nudged' })}
-          onInteractionTargetChange={onInteractionTargetChange}
-          onCameraMount={onCameraMount}
-          interactionPhase={pipInteractionPhase}
-          interactionTarget={pipInteractionPhase === 'eating' || pipInteractionPhase === 'playing'
-            ? { x: objectPositions[offeredObject ?? 'food'][0], z: objectPositions[offeredObject ?? 'food'][2] }
-            : null}
-          interactionEngaged={pipInteractionEngaged}
-          heldTarget={interaction.held}
-          objectPositions={objectPositions}
-          toyNudged={toyNudged}
-          placedPosition={placedPosition}
-          resumeSequence={pipInteractionScene.resumeSequence}
-          focusRepublishSequence={focusRepublishSequence}
-          rewardStage={rewardStage}
-          starflowersVisible={starflowersVisible}
-          pavilionImproved={pavilionImproved}
-          seedVisible={seedVisible}
-          destinationVisible={destinationVisible}
-          gardenChoice={gardenChoice}
-          reducedMotion={reducedMotion}
-        />
-      </Canvas>
-      <div className={interactionReticleClassName(interactionLabel)} aria-hidden="true" />
-      <InteractionPrompt label={interactionLabel} onActivate={activateInteraction} />
-      {!journey.comparing && visiblePipMessage && pipLiveLabel ? (
-        <div className="pip-presence visible" role="status" aria-live="polite" aria-label={pipLiveLabel}>
-          <Image src="/pip-detailed-v2.png" width={43} height={43} alt="" aria-hidden="true" />
-          <span aria-hidden="true"><strong>Pip</strong>{' '}{visiblePipMessage}</span>
-        </div>
-      ) : null}
-      <div className="world-instructions">
-        <strong>Walk the grove</strong>
-        <span>WASD or arrow keys · drag to look</span>
-      </div>
-      <div className="world-pad" aria-label="First-person movement controls">
-        {[
-          ['arrowup', '↑', 'Walk forward'],
-          ['arrowleft', '←', 'Step left'],
-          ['arrowdown', '↓', 'Step backward'],
-          ['arrowright', '→', 'Step right'],
-        ].map(([key, label, ariaLabel]) => (
-          <button
-            key={key}
-            type="button"
-            className={`world-${key}`}
-            aria-label={ariaLabel}
-            onPointerDown={() => startMoving(key)}
-            onPointerUp={() => stopMoving(key)}
-            onPointerLeave={() => stopMoving(key)}
-            onPointerCancel={() => stopMoving(key)}
-          >{label}</button>
-        ))}
-      </div>
+  const registrations = useMemo<readonly InteractionTargetRegistration[]>(() => [
+    ...roster.filter(r => !(interaction.held === 'pip' && r.id === activeId)).map(r => ({ target: r.id, ref: refs[r.id], maxDistance: 3.2 })),
+    ...(interaction.held === 'food' ? [] : [{ target: 'food' as const, ref: food }]),
+    ...(interaction.held === 'toy' ? [] : [{ target: 'toy' as const, ref: toy }]),
+  ], [roster, interaction.held, activeId, refs]);
+  const interests = useMemo(() => selectCurrentGardenInterests(gardenInterestDefinitions, { seedVisible, destinationVisible: destinationVisible !== null }), [seedVisible, destinationVisible]);
+  return <div className="world-wrap">
+    <Canvas frameloop="demand" shadows="percentage" camera={{ fov: 68, near: .1, far: 120 }}
+      dpr={[GARDEN_RENDER_QUALITY.minimumDpr, GARDEN_RENDER_QUALITY.maximumDpr]}
+      gl={{ antialias: GARDEN_RENDER_QUALITY.antialias, powerPreference: 'high-performance' }}
+      onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = .98; gl.outputColorSpace = THREE.SRGBColorSpace; }}>
+      <FrameCadence />
+      <CommunityCoordinator community={community} roster={roster} actors={refs} player={player} focused={eligibleTarget}
+        priorities={priorities} comparing={journey.comparing} reducedMotion={reducedMotion}
+        project={project} projection={projection} epoch={projectMount.acknowledgedEpoch(projectEpoch)} onProjectEvents={emitProjectEvents} />
+      <PlanterProjectScene community={community} progress={projection} />
+      <GardenEnvironment journey={journey} rewardStage={rewardStage} starflowersVisible={starflowersVisible} pavilionImproved={pavilionImproved}
+        seedVisible={seedVisible} destinationVisible={destinationVisible} reducedMotion={reducedMotion} />
+      <GardenSnack ref={food} position={objectPositions.food} carried={interaction.held === 'food'} />
+      <GardenToy ref={toy} position={objectPositions.toy} carried={interaction.held === 'toy'} nudged={toyNudged} community={community} />
+      {roster.map(resident => <ResidentSlot key={resident.id} resident={resident} journey={journey} onMount={onResidentMount} player={player}
+        rewardStage={rewardStage} gardenChoice={gardenChoice} interests={interests} reducedMotion={reducedMotion}
+        focused={eligibleTarget} community={community} onMessage={onMessage} onPriority={onPriority} onEvent={onActorEvent} />)}
+      <FirstPersonControls movement={movement} speed={employeeWalkSpeedWhileHolding(interaction.held)} onCameraMount={onCameraMount} findRequest={findRequest} residents={refs} community={community} />
+      <InteractionTargetTracker registrations={registrations} onTargetChange={onTargetChange} republishSequence={scene.focusRepublishSequence} />
+    </Canvas>
+    <div className={interactionReticleClassName(label)} aria-hidden="true" />
+    <InteractionPrompt label={label} onActivate={activate} />
+    {!journey.comparing && visibleMessage && <div className="pip-presence visible" role="status" aria-live="polite" aria-label={speaker.name + ': ' + visibleMessage}>
+      <span aria-hidden="true" className="resident-initial" style={{ backgroundColor: speaker.appearance.body }}>{speaker.name[0]}</span>
+      <span aria-hidden="true"><strong>{speaker.name}</strong>{' '}{visibleMessage}</span>
+    </div>}
+    <div className="world-instructions"><strong>Walk the grove</strong><span>WASD or arrow keys · drag to look</span></div>
+    <div className="world-pad" aria-label="First-person movement controls">
+      {[['arrowup', '↑', 'Walk forward'], ['arrowleft', '←', 'Step left'], ['arrowdown', '↓', 'Step backward'], ['arrowright', '→', 'Step right']].map(([key, text, ariaLabel]) =>
+        <button key={key} type="button" className={'world-' + key} aria-label={ariaLabel}
+          onPointerDown={() => movement.current.add(key)} onPointerUp={() => movement.current.delete(key)}
+          onPointerLeave={() => movement.current.delete(key)} onPointerCancel={() => movement.current.delete(key)}>{text}</button>)}
     </div>
-  );
+  </div>;
+}
+
+function GardenEnvironment(props: { journey: WorldJourney; rewardStage: number; starflowersVisible: boolean; pavilionImproved: boolean;
+  seedVisible: boolean; destinationVisible: GardenChoice | null; reducedMotion: boolean }) {
+  const grassTexture = useGrassTexture();
+  const { journey, ...environment } = props;
+  return <StorybookGardenEnvironment {...environment} visit={journey.sceneVisit} settledRewards={journey.visit > 1 || journey.comparing} grassTexture={grassTexture} />;
 }

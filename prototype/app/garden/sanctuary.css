@@ -1,0 +1,43 @@
+/* The scene leads; controls stay reachable without covering the main landmarks. */
+.sanctuary-app .immersive-world { inset: 0; }
+.sanctuary-app .immersive-topbar { height: 66px; background: linear-gradient(180deg, rgba(247,250,236,.9), rgba(247,250,236,.62)); box-shadow: none; }
+.sanctuary-app .journey-journal { top: 84px; background: linear-gradient(145deg, #f5eed9, #e8ddbf); border: 2px solid #fbf4df; box-shadow: inset 0 -3px 0 #d7cbaa, 0 9px 24px #37432928; }
+.sanctuary-app .journey-journal:not([open]) { width: 226px; }
+.sanctuary-app .garden-guide > summary { min-height: 48px; font-size: 14px; letter-spacing: .04em; }
+.sanctuary-app .garden-guide-content { border-top-color: #d5c8a8; }
+.sanctuary-app .garden-guide summary b { background: #d9ddba; color: #485b37; }
+.sanctuary-app .garden-moments span { font-size: 14px; }
+.sanctuary-app .world-instructions { font-size: 12px; background: rgba(35,64,44,.82); }
+.sanctuary-app .world-instructions strong { font-size: 12px; }
+.sanctuary-app .world-instructions span { font-size: 12px; }
+.sanctuary-app .pip-presence { font-size: 14px; }
+.sanctuary-app .pip-presence { background: #f5eedb; border: 2px solid #fff7e5; box-shadow: inset 0 -2px 0 #dfd3b7, 0 9px 25px #35452b26; }
+.sanctuary-app .pip-presence span { font-size: 14px; color: #515b43; }
+.sanctuary-app .pip-presence strong { font-size: 12px; }
+.sanctuary-app .world-pad button { border: 2px solid #fff4d7; background: #e8dfc0; box-shadow: inset 0 -2px 0 #c9ba93, 0 4px 9px #36482b25; }
+@media (max-width: 520px) {
+  .sanctuary-app .journey-journal { top: 78px; }
+  .sanctuary-app .journey-journal:not([open]) { width: 212px; }
+}
+.resident-roster { padding: .7rem .8rem; border-radius: .85rem; background: #e1e1bd; margin: .8rem 0; }
+.resident-roster-list { display: grid; gap: .55rem; margin-top: .55rem; }
+.planter-journal { display: grid; gap: .45rem; margin: .75rem 0; padding: .75rem; border: 1px solid rgba(92, 105, 70, .24); border-radius: .75rem; background: rgba(236, 231, 195, .62); }
+.planter-journal p, .planter-journal ul { margin: 0; font-size: .85rem; line-height: 1.45; }
+.planter-journal ul { padding-left: 1.15rem; color: #52604b; }
+.planter-journal .simulate-material-delivery { justify-self: start; margin-top: .15rem; }
+.planter-journal small { margin-top: -.1rem; }
+.resident-card { display: flex; align-items: flex-start; gap: .55rem; padding: .55rem .6rem; border-radius: .7rem; background: rgba(250, 246, 226, .62); }
+.resident-card-copy { min-width: 0; display: grid; gap: .12rem; }
+.resident-card-copy strong { color: #2e4836; font-size: .9rem; }
+.resident-card-note { color: #5d685a; font-size: .76rem; line-height: 1.35; }
+.resident-card p { color: #495c48; font-size: .8rem; line-height: 1.4; margin: .12rem 0 0; }
+.resident-find { justify-self: start; min-height: 36px; margin-top: .3rem; padding: .35rem .65rem; border: 1px solid #a6b08a; border-radius: .55rem; background: #f7f0dc; color: #344d36; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.resident-find:hover:not(:disabled) { background: #fff8e5; border-color: #657c50; }
+.resident-find:focus-visible { outline: 2px solid #476d48; outline-offset: 3px; }
+.resident-find:disabled { opacity: .5; cursor: default; }
+.resident-find-help { margin: .6rem 0 0; color: #526149; font-size: .75rem; line-height: 1.4; }
+.resident-initial { display: grid; place-items: center; width: 43px; height: 43px; flex: 0 0 43px; border-radius: 50%; color: #3c4c36; font-size: 1.2rem; font-weight: 700; }
+@media (max-width: 600px) {
+  .resident-card { padding: .5rem; }
+  .resident-initial { width: 36px; height: 36px; flex-basis: 36px; font-size: 1rem; }
+}

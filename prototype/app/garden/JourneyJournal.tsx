@@ -3,6 +3,10 @@
 import { useEffect, useRef } from 'react';
 import { getDestinationStory, MEMORY_STORIES, RETURN_CHAPTERS, type JourneyState, type Visit } from './journey';
 import type { GardenView } from './rewardState';
+import { residentsForVisit, type ResidentId } from './residents';
+import { getResidentJourneyProfile } from './journey';
+import type { PlanterProgress } from './planterProgress';
+import PlanterJournal from './PlanterJournal';
 
 type Props = {
   state: JourneyState;
@@ -14,6 +18,10 @@ type Props = {
   onChoice: () => void;
   onPrivacy: () => void;
   onRestart: () => void;
+  onPreviewCommunity: () => void;
+  onFindResident: (id: ResidentId) => void;
+  project: PlanterProgress;
+  onMaterials: () => void;
 };
 
 const FIRST_REWARDS = [
@@ -23,7 +31,7 @@ const FIRST_REWARDS = [
   { title: 'The garden found a possibility.', story: 'An improvement shared with the team revealed a curious seed. Choose a destination now or leave it safely waiting for another visit.' },
 ];
 
-export default function JourneyJournal({ state, view, busy, onSimulate, onView, onReturn, onChoice, onPrivacy, onRestart }: Props) {
+export default function JourneyJournal({ state, view, busy, project, onMaterials, onSimulate, onView, onReturn, onChoice, onPrivacy, onRestart, onPreviewCommunity, onFindResident }: Props) {
   const chapter = RETURN_CHAPTERS[state.visit];
   const heading = useRef<HTMLHeadingElement>(null);
   const panel = useRef<HTMLDetailsElement>(null);
@@ -39,7 +47,7 @@ export default function JourneyJournal({ state, view, busy, onSimulate, onView, 
   }, [state.visit]);
   const firstReward = FIRST_REWARDS[state.rewardStage];
   return (
-    <details ref={panel} className="garden-guide journey-journal" open>
+    <details ref={panel} className="garden-guide journey-journal">
       <summary><span>Garden journal</span><b aria-hidden="true">+</b></summary>
       <div className="garden-guide-content">
         <ol className="return-trail" aria-label="Your four-return journey">
@@ -52,6 +60,30 @@ export default function JourneyJournal({ state, view, busy, onSimulate, onView, 
         <p className="overline">Return {state.visit} of 4 · {chapter.time}</p>
         <h1 ref={heading} tabIndex={-1}>{state.visit === 1 ? firstReward.title : chapter.title}</h1>
         <p>{state.visit === 1 ? firstReward.story : chapter.summary}</p>
+        <section className="resident-roster" aria-label="Garden residents">
+          <span className="overline">At home in the grove</span>
+          <div className="resident-roster-list">
+            {residentsForVisit(view === 'before' && state.visit > 1 ? state.visit - 1 : state.visit).map(resident => {
+              const memory = view === 'now' ? getResidentJourneyProfile(state, resident.id).memory : null;
+              const relationship = state.visit === resident.firstVisit && view === 'now' && resident.id !== 'pip'
+                ? 'A new little neighbor is finding their favorite spots.'
+                : memory ? `Remembers ${memory === 'pet' ? 'your gentle pet' : memory === 'snack' ? 'the snack you shared' : 'playing with you'}.` : 'Exploring at their own pace.';
+              return <article key={resident.id} className="resident-card">
+                <span aria-hidden="true" className="resident-initial" style={{ backgroundColor: resident.appearance.body }}>{resident.name[0]}</span>
+                <div className="resident-card-copy">
+                  <strong>{resident.name}</strong>
+                  <span className="resident-card-note">{resident.journalNote}</span>
+                  <p>{relationship}</p>
+                  <button type="button" className="resident-find" aria-label={`Find ${resident.name}`} disabled={busy || (view === 'before' && state.rewardStage > 0)} onClick={() => {
+                    if (panel.current) panel.current.open = false;
+                    onFindResident(resident.id);
+                  }}>Find {resident.name} →</button>
+                </div>
+              </article>;
+            })}
+          </div>
+          <p className="resident-find-help">Find turns your view toward a resident without moving you. Scenery may still be in the way.</p>
+        </section>
         {view === 'before' && state.rewardStage > 0 && <p className="comparison-notice" role="status">Viewing {state.visit === 1 ? 'the garden before its latest change' : `the garden on return ${state.visit - 1}`}. Pip is paused while you compare. Choose Now to rejoin him.</p>}
 
         {state.rewardStage > 0 && (
@@ -109,6 +141,8 @@ export default function JourneyJournal({ state, view, busy, onSimulate, onView, 
         <details className="journey-simulation" open={state.visit === 1 && state.rewardStage < 3}>
           <summary>Simulation controls</summary>
           <p>Four fictional visits compressed into one session. The timing is illustrative; nothing is connected to workplace systems. Refresh starts over.</p>
+          <PlanterJournal progress={project} busy={busy} comparing={view === 'before' && state.rewardStage > 0} onMaterials={onMaterials} />
+          {state.visit < 3 && <><button type="button" onClick={onPreviewCommunity} disabled={busy || (view === 'before' && state.rewardStage > 0)}>Preview three residents</button><small>Skip to the third fictional return to meet Pip, Moss and Fern. No destination or care is selected for you.</small></>}
           {state.visit === 1 && <button type="button" className="simulate-return-reward" onClick={onSimulate} disabled={state.rewardStage === 3}>{state.rewardStage === 3 ? 'Three accomplishments received' : state.rewardStage === 0 ? 'Simulate accomplishment' : 'Simulate next accomplishment'}</button>}
           {state.rewardStage === 3 && <button type="button" className="restart-prototype" onClick={onPrivacy}>Preview visit privacy</button>}
           <button type="button" className="restart-prototype" onClick={onRestart}>Restart journey</button>

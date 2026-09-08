@@ -9,6 +9,7 @@ import type {
 } from './environmentLayout';
 import { getAtmosphereMotionFrame } from './environmentMotion';
 import { GARDEN_RENDER_QUALITY } from './gardenSurface';
+import SanctuarySky from './SanctuarySky';
 
 export type MagicalAtmosphereProps = Readonly<{
   layout: StorybookEnvironmentLayout;
@@ -16,26 +17,24 @@ export type MagicalAtmosphereProps = Readonly<{
 }>;
 
 const MAX_MOTE_COUNT = 96;
-const CLOUD_PUFF_GEOMETRY = new THREE.SphereGeometry(1, 12, 8);
-const CLOUD_PUFF_MATERIAL = new THREE.MeshBasicMaterial({
-  color: '#f6f3dc',
-  transparent: true,
-  opacity: 0.54,
-  depthWrite: false,
+const CLOUD_PUFF_GEOMETRY = new THREE.SphereGeometry(1, 24, 16);
+const CLOUD_PUFF_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#fff0db', roughness: 1,
+  emissive: '#d2b9a1', emissiveIntensity: .15,
   fog: false,
 });
 
 const CLOUD_LAYERS = [
-  { position: [-16, 12, -34], scale: 1.3 },
-  { position: [21, 15, -42], scale: 1.8 },
-  { position: [-30, 17, 5], scale: 1.5 },
+  { position: [-23, 18, -36], scale: 2.6 },
+  { position: [24, 24, -44], scale: 3.2 },
+  { position: [-34, 25, 5], scale: 2.8 },
 ] as const;
 
 const CLOUD_PUFFS = [
-  { position: [-1.5, 0, 0], scale: [1.9, 0.75, 0.7] },
-  { position: [0, 0.35, 0], scale: [2.15, 0.9, 0.78] },
-  { position: [1.5, 0, 0], scale: [1.9, 0.75, 0.7] },
-  { position: [0.7, -0.15, 0], scale: [1.75, 0.68, 0.65] },
+  { position: [-1.8, 0, 0], scale: [1.7, 1.05, 1.3] },
+  { position: [-.65, .7, -.15], scale: [1.55, 1.8, 1.3] },
+  { position: [.9, 0, .1], scale: [2.1, .85, 1.4] },
+  { position: [.35, .7, -.25], scale: [1.4, 1.3, 1.1] },
 ] as const;
 
 export default function MagicalAtmosphere({
@@ -89,13 +88,14 @@ export default function MagicalAtmosphere({
 
   return (
     <>
-      <color attach="background" args={['#b7d9d5']} />
-      <fog attach="fog" args={['#c4d8cb', 30, 72]} />
-      <hemisphereLight args={['#f2f7e9', '#526a50', 1.08]} />
+      <SanctuarySky />
+      <color attach="background" args={['#91cfe1']} />
+      <fog attach="fog" args={['#d1e3d6', 45, 110]} />
+      <hemisphereLight args={['#f4f8ed', '#7c8760', 1.65]} />
       <directionalLight
         position={[15, 25, 11]}
         color="#ffe7bd"
-        intensity={2.3}
+        intensity={2.1}
         castShadow
         shadow-mapSize-width={GARDEN_RENDER_QUALITY.shadowMapSize}
         shadow-mapSize-height={GARDEN_RENDER_QUALITY.shadowMapSize}
@@ -110,7 +110,7 @@ export default function MagicalAtmosphere({
       <directionalLight
         position={[-14, 10, -8]}
         color="#b7dcd7"
-        intensity={0.28}
+        intensity={0.5}
       />
 
       <group ref={clouds}>

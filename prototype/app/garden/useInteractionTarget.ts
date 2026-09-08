@@ -1,12 +1,12 @@
 import { useFrame } from '@react-three/fiber';
 import { type RefObject, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { type InteractableId } from './interaction';
+import { isResidentId, type ResidentTarget } from './residents';
 
 const CENTER_OF_VIEW = new THREE.Vector2(0, 0);
 
 export type InteractionTargetResult = {
-  target: InteractableId;
+  target: ResidentTarget;
   distance: number;
 };
 
@@ -18,7 +18,7 @@ export type InteractionTargetCandidate = {
 };
 
 export type InteractionTargetRegistration = {
-  target: InteractableId;
+  target: ResidentTarget;
   ref: RefObject<THREE.Object3D | null>;
   maxDistance?: number;
 };
@@ -45,8 +45,8 @@ export function createInteractionAimSamples(): readonly InteractionAimSample[] {
   ];
 }
 
-function isInteractableId(target: unknown): target is InteractableId {
-  return target === 'pip' || target === 'food' || target === 'toy';
+function isResidentTarget(target: unknown): target is ResidentTarget {
+  return isResidentId(target) || target === 'food' || target === 'toy';
 }
 
 export function selectNearestInteractionTarget(
@@ -60,7 +60,7 @@ export function selectNearestInteractionTarget(
     const candidateMaxDistance = candidate.maxDistance ?? maxDistance;
     const candidateAimOffset = candidate.aimOffset ?? 0;
     if (
-      !isInteractableId(candidate.target) ||
+      !isResidentTarget(candidate.target) ||
       !Number.isFinite(candidate.distance) ||
       !Number.isFinite(candidateMaxDistance) ||
       !Number.isFinite(candidateAimOffset) ||

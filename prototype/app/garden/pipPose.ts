@@ -8,6 +8,9 @@ export type PipPoseInput = {
 };
 
 export type PipPose = {
+  walkDistance?: number;
+  activity?: PipPoseInput['poseKind'];
+  expression?: 'content' | 'happy' | 'curious' | 'sleepy' | 'loved' | 'playful';
   leftLeg: number;
   rightLeg: number;
   leftArm: number;
@@ -31,6 +34,11 @@ export function getPipPose(input: PipPoseInput): PipPose {
   const eatingCycle = Math.sin((input.reactionElapsed ?? 0) * Math.PI * 2);
 
   return {
+    walkDistance: input.poseKind === 'walk' && input.speed > 0 ? input.distanceTravelled : undefined,
+    activity: input.poseKind,
+    expression: petting ? 'loved' : input.poseKind === 'rest' ? 'sleepy'
+      : playing ? 'playful' : input.poseKind === 'greet' || eating ? 'happy'
+      : input.poseKind === 'inspect' ? 'curious' : 'content',
     leftLeg: carried ? -0.42 : weight ? stride * 0.48 * weight : 0,
     rightLeg: carried ? -0.42 : weight ? -stride * 0.48 * weight : 0,
     leftArm: weight ? -stride * 0.2 * weight : 0,

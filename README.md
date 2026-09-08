@@ -1,6 +1,6 @@
 # Common Grove
 
-Common Grove is an internal employee experience where accomplishments from existing workplace systems quietly grow a personal garden and an autonomous companion.
+Common Grove is an internal employee experience where accomplishments from existing workplace systems quietly grow a personal garden and a community of autonomous companions. The current local prototype includes Pip, Moss and Fern as a first shared-garden milestone.
 
 ## Project control
 
@@ -27,7 +27,7 @@ cd prototype
 .\node_modules\.bin\vinext.cmd dev --hostname 127.0.0.1 --port 3001
 ```
 
-Open [the local garden](http://127.0.0.1:3001/). In Garden journal, expand Simulation controls and simulate three accomplishments. Choose the Lantern Orchard or Tinker Workshop now or later, then use the return buttons to preview a week, several weeks, and a season of development. Last return compares the preceding garden; Now resumes Pip. A completed pet, snack, or toy interaction can influence his next greeting and preferred activity.
+Open [the local garden](http://127.0.0.1:3001/). In Garden journal, expand Simulation controls and choose “Preview three residents” to jump to return 3 for Pip, Moss and Fern, or simulate the authored returns normally. Choose the Lantern Orchard or Tinker Workshop now or later, then use the return buttons to preview a week, several weeks, and a season of development. Last return compares the preceding garden; Now resumes the shared community. A completed pet, snack, or toy interaction is remembered by the resident who received it.
 
 Nothing is connected to workplace systems. Refresh or Restart journey clears all progress and memories. Both choice and care are optional. No hosting, source upload, or staff distribution is authorized.
 

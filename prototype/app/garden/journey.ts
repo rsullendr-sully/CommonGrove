@@ -1,4 +1,5 @@
 import type { PipActivityKind } from './behavior';
+import { residentDefinition, residentsForVisit, type ResidentId } from './residents';
 import { deriveGardenVisibility, type GardenChoice, type GardenView } from './rewardState';
 
 export type Visit = 1 | 2 | 3 | 4;
@@ -10,11 +11,14 @@ export type JourneyState = {
   previousChoice: GardenChoice | null;
   lastInteraction: MemoryKind | null;
   returnMemory: MemoryKind | null;
+  residentMemories?: Partial<Record<ResidentId, MemoryKind>>;
+  residentReturnMemories?: Partial<Record<ResidentId, MemoryKind>>;
 };
 export type JourneyEvent =
   | { type: 'accomplishment' }
   | { type: 'choose'; choice: GardenChoice }
-  | { type: 'remember'; interaction: MemoryKind }
+  | { type: 'remember'; interaction: MemoryKind; residentId?: ResidentId }
+  | { type: 'preview-community' }
   | { type: 'return' }
   | { type: 'reset' };
 
@@ -29,12 +33,24 @@ export function journeyReducer(state: JourneyState, event: JourneyEvent): Journe
         ? { ...state, rewardStage: (state.rewardStage + 1) as JourneyState['rewardStage'] } : state;
     case 'choose':
       return state.rewardStage === 3 && !state.choice ? { ...state, choice: event.choice } : state;
-    case 'remember':
-      return state.lastInteraction === event.interaction ? state : { ...state, lastInteraction: event.interaction };
+    case 'remember': {
+      const id = event.residentId ?? 'pip';
+      if (!residentsForVisit(state.visit).some(r => r.id === id)) return state;
+      if (id === 'pip') return state.lastInteraction === event.interaction ? state : { ...state, lastInteraction: event.interaction };
+      if (state.residentMemories?.[id] === event.interaction) return state;
+      return { ...state, residentMemories: { ...state.residentMemories, [id]: event.interaction } };
+    }
     case 'return':
       return state.rewardStage === 3 && state.visit < 4 ? {
         ...state, visit: (state.visit + 1) as Visit, previousChoice: state.choice, returnMemory: state.lastInteraction,
+        ...(state.residentMemories ? { residentReturnMemories: { ...state.residentMemories } } : {}),
       } : state;
+    case 'preview-community': {
+      if (state.visit >= 3) return state;
+      let next = { ...state, rewardStage: 3 as const };
+      while (next.visit < 3) next = journeyReducer(next, { type: 'return' }) as typeof next;
+      return next;
+    }
     case 'reset': return createJourney();
   }
 }
@@ -56,7 +72,7 @@ export function projectJourneyScene(state: JourneyState, view: GardenView) {
 export const RETURN_CHAPTERS = {
   1: { title: 'A new beginning', time: 'Your first return', next: 'Return one week later', summary: 'Small contributions are finding their way here. Meet Pip, explore the grove, and see the first changes take root.' },
   2: { title: 'Taking root', time: 'One week later', next: 'Return several weeks later', summary: 'The flower beds have spread, and the reading pavilion has become a place Pip uses. New contributions helped the garden settle in while you were away.' },
-  3: { title: 'Becoming yours', time: 'Several weeks later', next: 'Return one season later', summary: 'The little changes now belong together. Pip has a familiar route through the grove, with time for the flowers, the books, and whatever catches his listening ear.' },
+  3: { title: 'Becoming yours', time: 'Several weeks later', next: 'Return one season later', summary: 'The little changes now belong together. Pip has a familiar route through the grove, with time for the flowers, the books, and whatever sparks a little curiosity.' },
   4: { title: 'An established grove', time: 'One season later', next: null, summary: 'A place that once held possibilities now holds little traditions. Pip knows his way around, the landmarks have grown, and there is always room for another discovery.' },
 } as const;
 
@@ -103,4 +119,22 @@ export function getDestinationStory(visit: Visit, choice: GardenChoice | null): 
   if (visit === 2) return orchard ? 'The saplings have fuller crowns. Pip has found a spot among their first lanterns.' : 'The workshop has its first outdoor work shelf, with a small wind spinner taking shape.';
   if (visit === 3) return orchard ? 'The crowns have opened into a sheltered grove, with lanterns tucked among the branches.' : 'A finished wind sculpture turns beside the workshop. Pip stops to inspect it on his rounds.';
   return orchard ? 'The Lantern Orchard is now a warm canopy of leaves and light—a familiar destination in your garden.' : 'The Tinker Workshop is now a cheerful corner of finished inventions, warm windows, and things to discover.';
+}
+
+export function getResidentJourneyProfile(state: JourneyState, id: ResidentId): PipJourneyProfile {
+  if (id === 'pip') return getPipJourneyProfile(state);
+  const resident = residentDefinition(id);
+  const memory = state.residentReturnMemories?.[id] ?? null;
+  const preferredKind = memory === 'pet' ? 'visit-pavilion' : memory === 'snack' ? 'inspect-flowers' : resident.preferredKind;
+  return {
+    memory,
+    preferredKind,
+    greeting: memory ? MEMORY_STORIES[memory].greeting
+      : state.visit === resident.firstVisit ? `Hello! I’m ${resident.name}. I’m finding my favorite spots here.`
+      : `Hello again. It’s ${resident.name}—there’s room for a quiet moment together.`,
+    routineMessage: preferredKind === 'watch-pond' ? `${resident.name} watches the ripples settle.`
+      : preferredKind === 'visit-pavilion' ? `${resident.name} settles beside the familiar books.`
+      : preferredKind === 'inspect-flowers' ? `${resident.name} inspects a little patch of flowers.`
+      : `${resident.name} perks up, looking for something to play with.`,
+  };
 }

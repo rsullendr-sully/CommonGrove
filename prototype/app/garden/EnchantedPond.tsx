@@ -1,7 +1,6 @@
 'use client';
 
-import { useFrame } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { Texture } from 'three';
 import {
@@ -10,7 +9,7 @@ import {
   type EnvironmentPresentation,
   type StorybookEnvironmentLayout,
 } from './environmentLayout';
-import { getPondMotionFrame } from './environmentMotion';
+import SanctuaryWater from './SanctuaryWater';
 import { createPondOutline, type PondOutlinePoint } from './pondShape';
 
 export type EnchantedPondProps = Readonly<{
@@ -20,17 +19,14 @@ export type EnchantedPondProps = Readonly<{
   limestoneTexture: Texture;
 }>;
 
-const SHORE_STONE_GEOMETRY = new THREE.DodecahedronGeometry(
-  STORYBOOK_POND_DRESSING_RADII.pondStones,
-  0,
-);
+const SHORE_STONE_GEOMETRY = new THREE.SphereGeometry(STORYBOOK_POND_DRESSING_RADII.pondStones, 16, 10);
 const REED_STALK_GEOMETRY = new THREE.CylinderGeometry(0.035, 0.055, 0.9, 7).translate(0, 0.45, 0);
 const REED_TIP_GEOMETRY = new THREE.CylinderGeometry(0.075, 0.065, 0.28, 7).translate(0, 0.98, 0);
 const REED_LEAF_GEOMETRY = new THREE.SphereGeometry(0.5, 8, 5).scale(0.55, 0.1, 0.2);
 const BANK_FLOWER_STEM_GEOMETRY = new THREE.CylinderGeometry(0.018, 0.026, 0.34, 6).translate(0, 0.17, 0);
-const BANK_FLOWER_HEAD_GEOMETRY = new THREE.IcosahedronGeometry(0.11, 0).translate(0, 0.39, 0);
+const BANK_FLOWER_HEAD_GEOMETRY = new THREE.SphereGeometry(0.11, 10, 8).scale(1, .7, 1).translate(0, 0.39, 0);
 
-const SHORE_STONE_COLORS = ['#d6ccb1', '#bcbba6', '#e0d2b4'] as const;
+const SHORE_STONE_COLORS = ['#eee0bd', '#ddd2b3', '#ead8ad'] as const;
 const REED_STALK_MATERIALS = ['#527957', '#65875b', '#789461'].map((color) => (
   new THREE.MeshStandardMaterial({ color, roughness: 0.94, flatShading: true })
 ));
@@ -65,15 +61,6 @@ export default function EnchantedPond({
   earthTexture,
   limestoneTexture,
 }: EnchantedPondProps) {
-  const ripples = useRef<THREE.Group>(null);
-  const firstHighlight = useRef<THREE.Group>(null);
-  const secondHighlight = useRef<THREE.Group>(null);
-  const glow = useRef<THREE.MeshBasicMaterial>(null);
-  const motionFrame = useRef({
-    rippleRotation: 0,
-    highlightOffset: 0,
-    glowPulse: 1,
-  });
   const pondGeometry = useMemo(() => ({
     bank: createOutlineGeometry(createPondOutline(6.35, 0.2, 64, 1.2)),
     depth: createOutlineGeometry(createPondOutline(6.04, 0.16, 64, 0.35)),
@@ -84,7 +71,8 @@ export default function EnchantedPond({
       map: limestoneTexture,
       color,
       roughness: 0.96,
-      flatShading: true,
+      bumpMap: limestoneTexture,
+      bumpScale: .018,
     })
   )), [limestoneTexture]);
 
@@ -95,18 +83,6 @@ export default function EnchantedPond({
     shoreStoneMaterials.forEach((material) => material.dispose());
   }, [pondGeometry, shoreStoneMaterials]);
 
-  useFrame(({ clock }) => {
-    const frame = getPondMotionFrame(
-      clock.elapsedTime,
-      presentation.rippleMotion,
-      motionFrame.current,
-    );
-    if (ripples.current) ripples.current.rotation.z = frame.rippleRotation;
-    if (firstHighlight.current) firstHighlight.current.position.x = -1.55 + frame.highlightOffset;
-    if (secondHighlight.current) secondHighlight.current.position.z = 1.2 - frame.highlightOffset;
-    if (glow.current) glow.current.opacity = presentation.pondGlow * frame.glowPulse * 0.24;
-  });
-
   return (
     <group dispose={null}>
       <mesh position={[0, -0.16, 0]} receiveShadow>
@@ -115,7 +91,7 @@ export default function EnchantedPond({
       </mesh>
 
       <mesh geometry={pondGeometry.bank} position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <meshStandardMaterial map={earthTexture} color="#9aa87b" roughness={0.98} />
+        <meshStandardMaterial map={limestoneTexture} color="#d8cba5" roughness={0.98} />
       </mesh>
 
       <mesh geometry={pondGeometry.depth} position={[0, 0.026, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -129,59 +105,7 @@ export default function EnchantedPond({
         />
       </mesh>
 
-      <mesh geometry={pondGeometry.water} position={[0, 0.056, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <meshPhysicalMaterial
-          color="#71bbb5"
-          transparent
-          opacity={0.72}
-          roughness={0.15}
-          metalness={0.02}
-          clearcoat={0.68}
-          clearcoatRoughness={0.2}
-          depthWrite={false}
-        />
-      </mesh>
-
-      <group ref={firstHighlight} position={[-1.55, 0.071, -0.72]} rotation={[-Math.PI / 2, 0, -0.18]}>
-        <mesh scale={[1.7, 0.58, 1]}>
-          <circleGeometry args={[1, 28]} />
-          <meshBasicMaterial color="#c9f3e8" transparent opacity={0.2} depthWrite={false} />
-        </mesh>
-      </group>
-      <group ref={secondHighlight} position={[1.72, 0.073, 1.2]} rotation={[-Math.PI / 2, 0, 0.34]}>
-        <mesh scale={[1.22, 0.46, 1]}>
-          <circleGeometry args={[1, 24]} />
-          <meshBasicMaterial color="#e2f8e9" transparent opacity={0.17} depthWrite={false} />
-        </mesh>
-      </group>
-
-      <group ref={ripples} position={[0, 0.083, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        {[2.05, 3.42, 4.72].map((radius, index) => (
-          <mesh key={radius}>
-            <ringGeometry args={[radius, radius + 0.035, 64]} />
-            <meshStandardMaterial
-              color="#bcece4"
-              emissive="#8fe2dc"
-              emissiveIntensity={0.75}
-              transparent
-              opacity={0.42 - index * 0.08}
-              roughness={0.18}
-              depthWrite={false}
-            />
-          </mesh>
-        ))}
-      </group>
-
-      <mesh position={[0, 0.094, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[2.3, 48]} />
-        <meshBasicMaterial
-          ref={glow}
-          color="#8ce5d7"
-          transparent
-          opacity={presentation.pondGlow * 0.24}
-          depthWrite={false}
-        />
-      </mesh>
+      <SanctuaryWater geometry={pondGeometry.water} motion={presentation.rippleMotion} glow={presentation.pondGlow} />
 
       {layout.pondStones.map((stone, index) => (
         <ShorelineStone

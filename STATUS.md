@@ -1,6 +1,6 @@
 # Common Grove — Current Status
 
-Last updated: 2026-09-04
+Last updated: 2026-09-06
 
 ## Current objective
 
@@ -24,7 +24,7 @@ Review and refine the prototype experience before voluntary staff sessions:
 - Internal employee product
 - Approximately 14 prospective participants
 - Web-first stylized 3D
-- One companion per employee
+- Multiple companions in each employee's personal garden (owner clarification, 2026-09-05); the current local slice includes Pip, Moss and Fern with gradual arrivals
 - Release 0 uses a bounded first-person employee view while Pip remains autonomous
 - Role-equitable progression is a product requirement
 - Simulated events precede production integrations
@@ -40,10 +40,12 @@ Review and refine the prototype experience before voluntary staff sessions:
 
 ## Immediate next outcome
 
-Let the owner experience where the garden leads across four returns, with both destination branches and optional Pip memories. Continue local visual and technical refinement; this is not an invitation-ready or production-complete build.
+The approved shared-companion slice is implemented locally: review the three-resident shortcut, direct targeting and shared-play behavior in `docs/superpowers/specs/2026-09-05-shared-companion-garden-design.md` and its plan. Keep the four-return journey, approved crafted visual style and local-only constraints; this is not an invitation-ready or production-complete build.
 
 ## Latest implementation
 
+- Creature art direction updated to the approved non-animal, soft-technology family: Pip uses B/Wisp (the future most-common default), Fern uses A/Roundling, and Moss uses C/Pebblekin. Defined sculpted heads, expressive layered eyes, tiny paddles/feet and subtle amber insets replace the previous ears and limbs. See `docs/design/garden-beings-2026-09-05.md` and the saved approved concept. Future rarity is a design decision only; current authored arrivals are unchanged.
+- This visual pass passed 28 focused pose/identity/interaction tests, targeted lint and a production build; the subsequent eye-depth adjustment was linted and checked in the live browser.
 - Four authored visits: beginning, one week later, several weeks later, and one season later.
 - Flowers accumulate; the pavilion gains cushions, books and lanterns; Orchard crowns/lanterns and Workshop inventions develop within a fixed destination plot.
 - An optional seed choice survives returns and may be made late. Earlier comparisons preserve the choice that existed then.
@@ -95,15 +97,20 @@ Let the owner experience where the garden leads across four returns, with both d
 - Discovery-seed transition completed and privacy comfort feedback clarified as temporary local research input.
 - Pip exploration expansion implementation completed: Pip can autonomously greet, accept petting, be carried and safely placed, and temporarily react to one snack and one wooden-ring toy. These session-local interactions add no scores, needs, upkeep, inventory, or persistent penalties.
 - Soft Storybook Grove environment polish implemented with deterministic layered foliage, an organic luminous pond, warm storybook lighting, localized landmark glow, pooled motes, refined paths, and state-driven reward and destination accents. The 40 × 40 meter footprint, 4 meter-per-second movement speed, ground plane, pond exclusion, obstacles, interaction coordinates, and product behavior remain unchanged.
+- Shared companion garden slice implemented: Pip, Moss and Fern arrive on returns 1/2/3, share the original clay body style with composed individual ears/markings/colors, retain independent journey profiles and memories, and remain together on return 4. A real preview shortcut advances the local journey to return 3.
+- Resident presentation scale tuned to 0.72 of the earlier close-up size so first-person encounters feel comfortable while the shared silhouettes remain readable.
+- Resident journal cards now make the community legible at a glance: each arrival has a color-coded initial, a neutral individual inclination, and a separate session relationship line without introducing scores, needs or health states.
+- Direct player actions are recipient-scoped through an epoch-checked interaction adapter; carried residents, snack offers, placement/resume state and stale completions cannot transfer credit between residents.
+- Shared-space coordination implemented with bounded grounded toy motion, exclusive/fair turns, an optional observer, finite social greetings, peer-aware route/placement obstacles, blocked-route recovery, comparison/carry cancellation and reduced-motion support.
 
-## Verification evidence — 2026-09-04
+## Verification evidence — 2026-09-05
 
-- Current full suite: **261 tests in 24 files pass**. ESLint and the production build exit 0. Build retains the large-chunk advisory and Vinext route-classification notice; the parallel final build also printed a plugin-timing advisory.
-- Browser: completed pet → remembered return greeting/journal; deferred Workshop choice on return 3 → historical seed comparison → return 4; second no-care Orchard run through return 4; final Workshop roof and Orchard lantern inspection; refresh and Restart journey both reset state. The preview is left at a clean beginning. Final branch inspection is recorded in the implementation plan.
-- Independent read-only review found and then rechecked the greeting starvation, current-vs-historical behavior mismatch, and replaying reward reveals. No remaining material issue was found in that scoped re-review.
+- Current full suite: **301 tests in 30 files pass**. ESLint and the production build exit 0. Build retains the existing large-chunk advisory and Vinext route-classification/plugin-timing notices.
+- Browser: opened the local preview, used “Preview three residents,” confirmed Pip/Moss/Fern in the journal and visually checked the new resident cards, the more comfortable resident scale, distinct shared-body residents, grounded independent movement, a shared-play status message and the unchanged crafted cliff/pond/pavilion composition. The preview remains open at return 3 for owner exploration.
+- Independent read-only review found recipient focus crossover, direct toy standoff clearance, peer overlap on historical remount, placement race safety and false arrival on failed routes. Each finding was addressed with a targeted fix and focused regression coverage; the final exact-working-tree recheck found no remaining material issue.
 - Standalone TypeScript check still fails: missing `@types/three`, resulting implicit-any errors, and older tuple/literal fixture types in environment/movement/interaction tests. New journey fixture typing was corrected. No dependency reinstall or `any` declaration workaround was used.
-- No fresh mobile viewport, OS reduced-motion, precise FPS/GPU benchmark, full snack/toy offer or full unsafe-placement browser pass is claimed for this milestone. Those remain explicit checks before owner acceptance.
-- Local feature branch: `feat/four-return-journey`. No upload, deployment or merge to main. Unrelated root dependency directories were preserved.
+- No precise FPS/GPU benchmark, full snack/toy offer for each resident, complete unsafe-placement browser pass, OS reduced-motion pass, or full four-return owner walkthrough is claimed for this milestone. Those remain explicit checks before owner acceptance.
+- Local feature branch: `codex/connected-sanctuary`. No upload, deployment or merge to main. Unrelated root dependency directories were preserved.
 
 ### Earlier evidence (2026-08-29; not a fresh result)
 
@@ -114,4 +121,18 @@ Let the owner experience where the garden leads across four returns, with both d
 
 ## Resume here
 
-Start the local app using README.md. Walk the full four-return journey, compare both destinations, and judge whether the accumulating place and Pip's remembered moments make returning meaningful. Next technical work is a clean standalone typecheck, exact performance baseline on the GPU workstation and an ordinary laptop, then the remaining interaction/accessibility checks and focused art refinement. See BACKLOG.md. Staff invitations remain paused until explicit owner approval. Do not begin production integrations, hosted access or distribution.
+Start the local app using README.md. Use the “Preview three residents” shortcut, watch Pip/Moss/Fern, then try direct targeting, toy turns, both destinations, comparison and restart. Next technical work is a clean standalone typecheck, exact performance baseline on the GPU workstation and an ordinary laptop, then the remaining interaction/accessibility checks and focused art refinement. See BACKLOG.md. Staff invitations remain paused until explicit owner approval. Do not begin production integrations, hosted access or distribution.
+
+## Spirit learning and shared planter — 2026-09-06
+
+The local prototype now includes an original making-and-growing book in the expanded nook, per-resident assembly and planting knowledge, one optional materials delivery, and autonomous carrying, assembly, soil filling and planting. A shared session reducer preserves progress across in-session visits and scene remounts; historical comparison and hidden tabs pause work. Knowledge and supplies gate actual stage completion. Residents can learn by watching an active worker and later inspect or water the finished planter without required upkeep.
+
+The real-navigation integration harness covers materials-first and knowledge-first arrival for Pip alone and all three residents, each completing within 240 active simulated seconds. It uses the live coordinator and safe route/movement adapter, reserves the final planter footprint from the first frame for all routing and safety checks, includes peers, and covers ten-second pickup interruption, blocked pickup recovery, pause, epoch changes, replayed batches and independent observation teaching. The explicit verification amendment allows the existing stopped, zero-speed correction of at most `.16` units onto a planned waypoint across a safe segment, with matching distance-travelled accounting. Ordinary moving frames retain their speed bound; arbitrary target placement or recovery repositioning is prohibited. Strict per-frame no-teleport coverage is not claimed, and the small arrival artifact remains for future locomotion work.
+
+Final automated verification after the review corrections: **419 tests in 43 files passed**, with serial Vitest exiting 0 in 106.28 seconds; fresh full app ESLint and the production build also exited 0. The corrected integration suite includes both prerequisite orders/rosters, final-footprint reservation and recovery. The build retains its existing chunk-size and route-classification advisories. The integration harness yields between bounded simulation chunks to keep Vitest worker messages responsive without changing simulated time. Standalone TypeScript remains non-green for the existing missing Three.js declarations and older fixture/type diagnostics; the new test's own literal-widening errors were corrected. Independent broad final review found no remaining code findings and approved a local implementation handoff, with the manual verification limits below.
+
+The controller's stable browser walkthrough completed both the Pip-only materials-first and three-resident knowledge-first runs at the corrected layout. It showed successive base/frame/final plants, a small attached mallet, Moss carrying a wooden piece, and grounded movement. Tab showed a visible delivery-button focus outline and Return activated delivery. Workshop choice, next visit, Last return/Now and Restart worked without losing live project state except for the explicit reset; nook access remained clear and standing nearby did not prevent completion.
+
+Manual verification is still incomplete: soil/seeds attachment closeups, the brief completion reaction, actual watering tilt, pickup during carrying with placement/recovery, hidden-tab return and OS reduced motion were not directly verified. Automated tests cover the relevant progression, pause, interaction and reduced-motion contracts, but complete visual acceptance is not claimed. The browser cannot emulate reduced motion, and global Windows preferences were not changed.
+
+Local preview: use the already-running [garden](http://127.0.0.1:3001/) or the existing Windows launch command in README.md. In Garden journal → Simulation controls, deliver materials and simulate two accomplishments for the Pip-only flow; after Restart journey, use Preview three residents and let a resident learn before delivery for the other order. No work orders are needed. Refresh and Restart journey clear project knowledge, materials and construction. Further recipes, football and multiplayer remain future scope; there is no persistence, production integration or publication.

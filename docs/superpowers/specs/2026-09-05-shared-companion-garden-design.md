@@ -2,7 +2,7 @@
 
 Date: 2026-09-05
 
-Status: Direction and gradual arrivals approved; appearance revised after owner feedback and written design awaiting final review. No multi-resident gameplay has been implemented yet.
+Status: Approved after appearance clarification with “yeah continue”; the first local three-resident implementation is complete for owner walkthrough under `docs/superpowers/plans/2026-09-05-shared-companion-garden.md`.
 
 ## Intent and approval
 

@@ -3,6 +3,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { Texture } from 'three';
+import { createGardenGroundGeometry, getGardenElevation, groundGardenPosition } from './gardenElevation';
+import { createCraftedLawnMaterial } from './gardenCraft';
 import type { GardenCorridor, StorybookEnvironmentLayout } from './environmentLayout';
 
 export type StorybookTerrainProps = Readonly<{
@@ -39,21 +41,22 @@ export type GardenPathBed = Readonly<{
 const UP = new THREE.Vector3(0, 1, 0);
 export const STEPPING_STONE_HEIGHT = 0.06;
 const PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
+const GROUND_GEOMETRY = createGardenGroundGeometry();
 const BERM_GEOMETRY = new THREE.CylinderGeometry(1, 1.08, 0.64, 10);
-const BED_GEOMETRY = new THREE.CylinderGeometry(1, 1, 0.08, 18);
-const STONE_GEOMETRY = new THREE.CylinderGeometry(1, 1.08, STEPPING_STONE_HEIGHT, 10);
+const BED_GEOMETRY = new THREE.SphereGeometry(1, 20, 12).scale(1, .04, 1);
+const STONE_GEOMETRY = new THREE.SphereGeometry(1, 16, 10).scale(1, STEPPING_STONE_HEIGHT / 2, 1);
 const PATH_GEOMETRY = new THREE.CircleGeometry(1, 28);
 const HEDGE_GEOMETRY = new THREE.DodecahedronGeometry(1, 2).translate(0, 1, 0);
 
-const OUTER_GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#789963', roughness: 1 });
-const BERM_MATERIALS = ['#6f8e58', '#78955d', '#688651'].map((color) => (
-  new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true })
+const OUTER_GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#96a965', roughness: 1 });
+const BERM_MATERIALS = ['#98a665', '#a2ad71', '#8e9f5e'].map((color) => (
+  new THREE.MeshStandardMaterial({ color, roughness: 1 })
 ));
-const BED_COLORS = ['#697a54', '#71815a', '#78885f'] as const;
+const BED_COLORS = ['#a39471', '#ae9b78', '#9b8f6a'] as const;
 const PATH_COLORS = ['#bdb18e', '#b5aa88', '#c3b694'] as const;
 const STONE_COLORS = ['#f0e3c5', '#dfd0b0', '#ead5aa', '#d9c29d'] as const;
-const HEDGE_MATERIAL = new THREE.MeshBasicMaterial({
-  color: '#759465',
+const HEDGE_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#95a65d', roughness: 1,
 });
 const boundaryHedges = createBoundaryHedges();
 
@@ -63,18 +66,14 @@ export default function StorybookTerrain({
   limestoneTexture,
   layout,
 }: StorybookTerrainProps) {
-  const grassMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-    map: grassTexture,
-    color: '#a9b993',
-    roughness: 1,
-  }), [grassTexture]);
+  const grassMaterial = useMemo(() => createCraftedLawnMaterial(grassTexture), [grassTexture]);
   const pathMaterials = useMemo(() => PATH_COLORS.map((color) => (
     new THREE.MeshStandardMaterial({
       map: earthTexture,
       color,
       roughness: 1,
       transparent: true,
-      opacity: 0.44,
+      opacity: 0.22,
       depthWrite: false,
     })
   )), [earthTexture]);
@@ -83,7 +82,8 @@ export default function StorybookTerrain({
     map: limestoneTexture,
     color,
     roughness: 0.96,
-    flatShading: true,
+    bumpMap: limestoneTexture,
+    bumpScale: .015,
   })), [limestoneTexture]);
   const steppingStones = useMemo(() => createSteppingStones(layout.corridors), [layout.corridors]);
   const pathBeds = useMemo(() => createGardenPathBeds(layout.corridors), [layout.corridors]);
@@ -106,10 +106,8 @@ export default function StorybookTerrain({
         receiveShadow
       />
       <mesh
-        geometry={PLANE_GEOMETRY}
+        geometry={GROUND_GEOMETRY}
         material={grassMaterial}
-        rotation={[-Math.PI / 2, 0, 0]}
-        scale={[40, 40, 1]}
         receiveShadow
       />
 
@@ -118,7 +116,7 @@ export default function StorybookTerrain({
           key={berm.id}
           geometry={BERM_GEOMETRY}
           material={BERM_MATERIALS[index % BERM_MATERIALS.length]}
-          position={[berm.center.x, 0.08, berm.center.z]}
+          position={groundGardenPosition(berm.center.x, berm.center.z, 0.08)}
           rotation={[0, index * 0.71, 0]}
           scale={[berm.radius * 1.06, 0.65, berm.radius * (index % 2 ? 0.58 : 0.66)]}
           receiveShadow
@@ -130,7 +128,7 @@ export default function StorybookTerrain({
           key={`${bed.id}-base`}
           geometry={BED_GEOMETRY}
           material={soilMaterials[index % soilMaterials.length]}
-          position={[bed.center.x, 0.012, bed.center.z]}
+          position={groundGardenPosition(bed.center.x, bed.center.z, 0.012)}
           rotation={[0, index * 0.47, 0]}
           scale={[bed.radius, 0.7, bed.radius * 0.68]}
           receiveShadow
@@ -139,14 +137,14 @@ export default function StorybookTerrain({
           key={`${bed.id}-overlap`}
           geometry={BED_GEOMETRY}
           material={soilMaterials[(index + 1) % soilMaterials.length]}
-          position={[bed.center.x + bed.radius * 0.18, 0.018, bed.center.z - bed.radius * 0.12]}
+          position={groundGardenPosition(bed.center.x + bed.radius * 0.18, bed.center.z - bed.radius * 0.12, 0.018)}
           rotation={[0, index * 0.47 + 0.82, 0]}
           scale={[bed.radius * 0.78, 0.72, bed.radius * 0.56]}
           receiveShadow
         />,
       ])}
 
-      {pathBeds.map((bed) => (
+      {pathBeds.filter((bed) => getGardenElevation(bed.position[0], bed.position[2]) === 0).map((bed) => (
         <group key={bed.id} position={[...bed.position]} rotation={[0, bed.rotationY, 0]}>
           <mesh
             geometry={PATH_GEOMETRY}
@@ -163,7 +161,7 @@ export default function StorybookTerrain({
           key={stone.id}
           geometry={STONE_GEOMETRY}
           material={stoneMaterials[stone.variant]}
-          position={[...stone.position]}
+          position={groundGardenPosition(stone.position[0], stone.position[2], stone.position[1])}
           rotation={[0, stone.rotationY, 0]}
           scale={[...stone.scale]}
           receiveShadow
@@ -193,6 +191,7 @@ function BoundaryHedges() {
   useLayoutEffect(() => {
     boundaryHedges.forEach((hedge, index) => {
       position.set(...hedge.position);
+      position.y += getGardenElevation(position.x, position.z);
       quaternion.setFromAxisAngle(UP, hedge.rotationY);
       scale.set(...hedge.scale);
       matrix.compose(position, quaternion, scale);

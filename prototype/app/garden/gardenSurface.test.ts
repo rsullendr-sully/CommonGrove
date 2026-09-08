@@ -13,10 +13,11 @@ import {
 import * as gardenSurface from './gardenSurface';
 
 describe('garden surface', () => {
-  it('caps the default renderer cost for touch and integrated GPUs', () => {
-    expect(GARDEN_RENDER_QUALITY.maximumDpr).toBeLessThanOrEqual(1);
-    expect(GARDEN_RENDER_QUALITY.antialias).toBe(false);
-    expect(GARDEN_RENDER_QUALITY.shadowMapSize).toBeLessThanOrEqual(1024);
+  it('keeps the sharper sanctuary renderer within a bounded GPU budget', () => {
+    expect(GARDEN_RENDER_QUALITY.minimumDpr).toBe(1);
+    expect(GARDEN_RENDER_QUALITY.maximumDpr).toBeLessThanOrEqual(1.5);
+    expect(GARDEN_RENDER_QUALITY.antialias).toBe(true);
+    expect(GARDEN_RENDER_QUALITY.shadowMapSize).toBeLessThanOrEqual(2048);
   });
 
   it('ships decodable PNG texture assets for every configured surface', () => {

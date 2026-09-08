@@ -3,6 +3,8 @@
 import { useFrame } from '@react-three/fiber';
 import { forwardRef, useImperativeHandle, useRef } from 'react';
 import * as THREE from 'three';
+import type { GardenCommunity } from './CommunityCoordinator';
+import { groundGardenPosition } from './gardenElevation';
 import type { SafePosition } from './interaction';
 import { PIP_INTERACTION_FRAME_PRIORITY, projectPipPlacement } from './pipInteraction';
 import {
@@ -94,13 +96,15 @@ export function createToyPlayApproach(
   start: GardenPoint,
   toy: GardenPoint,
   obstacles: readonly GardenObstacle[],
+  minimumStandoff = TOY_NUDGE_STANDOFF_DISTANCE,
 ): ToyPlayApproach {
   const towardStart = Math.atan2(start.z - toy.z, start.x - toy.x);
   const angularStep = Math.PI / 36;
   const offsets = [0];
   for (let step = 1; step < 36; step += 1) offsets.push(step, -step);
 
-  for (const distance of [TOY_NUDGE_STANDOFF_DISTANCE, 0.82, 0.92, 1.02, 1.12]) {
+  for (const extra of [0, .1, .2, .3, .4]) {
+    const distance = minimumStandoff + extra;
     for (const offset of offsets) {
       const angle = towardStart + offset * angularStep;
       const standoff = {
@@ -153,6 +157,7 @@ type GardenObjectProps = {
   position: SafePosition;
   carried: boolean;
   nudged?: boolean;
+  community?: GardenCommunity;
 };
 
 function useGardenObjectTransform(
@@ -160,6 +165,7 @@ function useGardenObjectTransform(
   position: SafePosition,
   carried: boolean,
   nudged: boolean,
+  community?: GardenCommunity,
 ) {
   const object = useRef<THREE.Group>(null);
   useImperativeHandle(forwardedRef, () => object.current!, []);
@@ -169,8 +175,10 @@ function useGardenObjectTransform(
       updateCarriedGardenObjectTransform(camera, object.current);
       return;
     }
-    object.current.position.set(position[0], position[1], position[2]);
-    object.current.rotation.set(nudged ? 0.18 : 0, 0, nudged ? -0.34 : 0);
+    const point = community?.state.toy.point ?? { x: position[0], z: position[2] };
+    object.current.position.set(...groundGardenPosition(point.x, point.z, position[1]));
+    const roll = community?.state.toy.roll ?? 0;
+    object.current.rotation.set(community ? roll : nudged ? .18 : 0, 0, community ? 0 : nudged ? -.34 : 0);
   }, PIP_INTERACTION_FRAME_PRIORITY);
   return object;
 }
@@ -184,7 +192,7 @@ export const GardenSnack = forwardRef<THREE.Group, GardenObjectProps>(function G
     <group ref={object} position={position} userData={{ interactableId: 'food' }}>
       <mesh scale={[0.2, 0.27, 0.2]} castShadow>
         <sphereGeometry args={[1, 18, 14]} />
-        <meshStandardMaterial color="#d99a37" roughness={0.86} />
+        <meshStandardMaterial color="#d4ad66" roughness={0.96} />
       </mesh>
       <mesh position={[0, 0.27, 0]} rotation={[0, 0, -0.12]} castShadow>
         <cylinderGeometry args={[0.025, 0.035, 0.16, 8]} />
@@ -192,27 +200,27 @@ export const GardenSnack = forwardRef<THREE.Group, GardenObjectProps>(function G
       </mesh>
       <mesh position={[0.07, 0.32, 0]} rotation={[0, 0, -0.55]} scale={[0.11, 0.045, 0.035]} castShadow>
         <sphereGeometry args={[1, 12, 8]} />
-        <meshStandardMaterial color="#618653" roughness={1} />
+        <meshStandardMaterial color="#8e9d59" roughness={1} />
       </mesh>
     </group>
   );
 });
 
 export const GardenToy = forwardRef<THREE.Group, GardenObjectProps>(function GardenToy(
-  { position, carried, nudged = false },
+  { position, carried, nudged = false, community },
   forwardedRef,
 ) {
-  const object = useGardenObjectTransform(forwardedRef, position, carried, nudged);
+  const object = useGardenObjectTransform(forwardedRef, position, carried, nudged, community);
   return (
     <group ref={object} position={position} userData={{ interactableId: 'toy' }}>
       {[
-        { x: -0.17, color: '#9b683f', rotation: 0.08 },
-        { x: 0, color: '#c58b52', rotation: -0.06 },
-        { x: 0.17, color: '#7e593d', rotation: 0.1 },
+        { x: -0.17, color: '#b39773', rotation: 0.08 },
+        { x: 0, color: '#d1b184', rotation: -0.06 },
+        { x: 0.17, color: '#9b8265', rotation: 0.1 },
       ].map(({ x, color, rotation }, index) => (
         <mesh key={index} position={[x, 0, 0]} rotation={[0, Math.PI / 2 + rotation, 0]} castShadow>
-          <torusGeometry args={[0.2, 0.055, 10, 20]} />
-          <meshStandardMaterial color={color} roughness={0.94} />
+          <torusGeometry args={[0.2, 0.055, 14, 28]} />
+          <meshStandardMaterial color={color} roughness={0.97} />
         </mesh>
       ))}
     </group>

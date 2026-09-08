@@ -4,19 +4,19 @@ export const GARDEN_SURFACE_SIZE = 96;
 export const GARDEN_SURFACE_REPEAT = 10;
 
 export const GARDEN_RENDER_QUALITY = {
-  minimumDpr: 0.7,
-  maximumDpr: 1,
-  antialias: false,
-  shadowMapSize: 1024,
+  minimumDpr: 1,
+  maximumDpr: 1.5,
+  antialias: true,
+  shadowMapSize: 2048,
 } as const;
 
 export type GardenTextureSurface = 'grass' | 'earth' | 'limestone' | 'wood';
 
 export const GARDEN_TEXTURE_PATHS = {
-  grass: '/textures/common-grove-grass.png',
+  grass: '/textures/sanctuary-grass-v1.png',
   earth: '/textures/common-grove-earth.png',
-  limestone: '/textures/common-grove-limestone.png',
-  wood: '/textures/common-grove-wood.png',
+  limestone: '/textures/sanctuary-limestone-v1.png',
+  wood: '/textures/sanctuary-timber-v1.png',
 } as const satisfies Record<GardenTextureSurface, string>;
 
 const GARDEN_TEXTURE_REPEATS: Record<GardenTextureSurface, readonly [number, number]> = {
@@ -106,6 +106,7 @@ export function prepareGardenTexture(
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
   texture.repeat.set(...repeat);
+  texture.anisotropy = 8;
   texture.needsUpdate = true;
   return texture;
 }

@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { getPipPose } from './pipPose';
 
 describe('Pip pose', () => {
+  it.each([['pet', 'loved'], ['rest', 'sleepy'], ['greet', 'happy'], ['playing', 'playful'], ['inspect', 'curious'], ['walk', 'content']] as const)('keeps %s expressions readable with reduced motion', (poseKind, expression) => {
+    for (const reducedMotion of [true, false]) {
+      expect(getPipPose({ poseKind, reducedMotion, speed: 0, distanceTravelled: 0, attentive: false }).expression).toBe(expression);
+    }
+  });
   it('alternates feet from distance travelled', () => {
     const first = getPipPose({ poseKind: 'walk', speed: 1, distanceTravelled: 0.1, attentive: false, reducedMotion: false });
     const second = getPipPose({ poseKind: 'walk', speed: 1, distanceTravelled: 0.55, attentive: false, reducedMotion: false });

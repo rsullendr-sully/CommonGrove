@@ -4,6 +4,18 @@
 
 Only these items are active.
 
+### CG-009 — Design the shared companion garden
+
+**Outcome:** The next gameplay slice supports the owner's intended multiple-creature garden, not a permanently single-pet experience.
+
+- [x] Record the 2026-09-05 clarification that multiple companions belong in the same personal garden
+- [x] Confirm the first population direction: Pip plus two additional residents, gradual arrivals and a preview shortcut
+- [x] Review the written design: `docs/superpowers/specs/2026-09-05-shared-companion-garden-design.md`
+- [x] Plan independent identity, behavior and memory; correct per-creature targeting; shared toy ownership; and safe movement among residents
+- [x] Implement and verify the approved multi-resident play slice while retaining the current art, original creatures, no-neglect principles and local-only setup
+
+This item is implemented as a local three-resident milestone; the full owner walkthrough remains open. It supersedes the old parking-lot treatment of multiple companions. Breeding, multiplayer and persistent storage are not implied.
+
 ### CG-008 — Make the long-term return loop understandable
 
 **Outcome:** A local four-visit journey shows why someone would return over time, not just what three reward buttons do.
@@ -80,7 +92,6 @@ Delivered environment work:
 
 Ideas belong here until they support the active validation question.
 
-- Multiple companions
 - Creature travel
 - Expanded garden biomes
 - Persistent long-term relationships and memories beyond the authored local journey

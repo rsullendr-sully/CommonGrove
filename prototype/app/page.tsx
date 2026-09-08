@@ -2,21 +2,35 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import GardenWorld from './GardenWorld';
-import { type GardenChoice, type GardenView } from './garden/rewardState';
-import { createJourney, journeyReducer, projectJourneyScene, getPipJourneyProfile, RETURN_CHAPTERS, type MemoryKind } from './garden/journey';
+import { type GardenChoice } from './garden/rewardState';
+import { projectJourneyScene, getPipJourneyProfile, getResidentJourneyProfile, RETURN_CHAPTERS, type JourneyEvent, type MemoryKind } from './garden/journey';
+import type { ResidentId } from './garden/residents';
+import type { FindResidentRequest } from './garden/findResident';
+import { createGardenSession, gardenSessionReducer, visiblePlanter } from './garden/gardenSession';
+import type { PlanterEvent } from './garden/planterProgress';
 import JourneyJournal from './garden/JourneyJournal';
 import './garden/journey.css';
+import './garden/sanctuary.css';
 
 export default function Home() {
-  const [journey, dispatchJourney] = useReducer(journeyReducer, undefined, createJourney);
+  const [session, dispatchSession] = useReducer(gardenSessionReducer, undefined, createGardenSession);
+  const { journey, project, view: gardenView, epoch } = session;
+  const dispatchJourney = useCallback((event: JourneyEvent) => dispatchSession({ type: 'journey', event }), []);
+  const setGardenView = useCallback((view: typeof gardenView) => dispatchSession({ type: 'view', view }), []);
+  const onProjectEvents = useCallback((eventEpoch: number, events: PlanterEvent[]) => {
+    dispatchSession({ type: 'project', epoch: eventEpoch, events });
+  }, []);
+  const onGardenRemount = useCallback(() => dispatchSession({ type: 'remount' }), []);
+  const simulateMaterials = useCallback(() => dispatchSession({ type: 'materials', id: 'planter-materials-1' }), []);
   const { rewardStage, choice: gardenChoice } = journey;
   const [interactionBusy, setInteractionBusy] = useState(false);
-  const [gardenView, setGardenView] = useState<GardenView>('before');
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<GardenChoice | null>(null);
   const [visitPreviewOpen, setVisitPreviewOpen] = useState(false);
   const [comfortResponse, setComfortResponse] = useState<'comfortable' | 'unsure' | 'invasive' | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
+  const [findRequest, setFindRequest] = useState<(FindResidentRequest & { scope: string }) | null>(null);
+  const findScope = `${sessionKey}-${journey.visit}-${gardenView}`;
   const firstChoiceRef = useRef<HTMLButtonElement>(null);
   const visitDoneRef = useRef<HTMLButtonElement>(null);
 
@@ -61,8 +75,14 @@ export default function Home() {
 
   const { visit: sceneVisit, ...scene } = projectJourneyScene(journey, gardenView);
   const comparing = gardenView === 'before' && rewardStage > 0;
-  const worldJourney = useMemo(() => ({ visit: journey.visit, sceneVisit, comparing, profile: getPipJourneyProfile(journey) }), [journey, sceneVisit, comparing]);
-  const rememberInteraction = useCallback((interaction: MemoryKind) => dispatchJourney({ type: 'remember', interaction }), []);
+  const worldJourney = useMemo(() => ({ visit: journey.visit, sceneVisit, comparing, profile: getPipJourneyProfile(journey),
+    profiles: { pip: getResidentJourneyProfile(journey, 'pip'), moss: getResidentJourneyProfile(journey, 'moss'), fern: getResidentJourneyProfile(journey, 'fern') } }), [journey, sceneVisit, comparing]);
+  const rememberInteraction = useCallback((interaction: MemoryKind, residentId: ResidentId) => dispatchJourney({ type: 'remember', interaction, residentId }), [dispatchJourney]);
+  const previewCommunity = () => {
+    if (interactionBusy || comparing) return;
+    dispatchJourney({ type: 'preview-community' });
+    setGardenView('now');
+  };
   const returnLater = () => {
     if (interactionBusy) return;
     dispatchJourney({ type: 'return' });
@@ -87,8 +107,9 @@ export default function Home() {
     setSessionKey((current) => current + 1);
   };
 
+  const visibleProject = visiblePlanter(session);
   return (
-    <main className="garden-app immersive-app">
+    <main className="garden-app immersive-app sanctuary-app">
       <header className="topbar immersive-topbar">
         <a className="brand" href="#garden" aria-label="Common Grove home">
           <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
@@ -101,19 +122,29 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="world-panel immersive-world" id="garden" aria-label="Explore your first-person Common Grove garden">
+      <section className="world-panel immersive-world" id="garden" tabIndex={-1} aria-label="Explore your first-person Common Grove garden">
         <GardenWorld
           key={`${sessionKey}-${journey.visit}`}
           rewardStage={rewardStage}
           {...scene}
           gardenChoice={gardenChoice}
           journey={worldJourney}
+          project={project}
+          projection={visibleProject}
+          epoch={epoch}
+          onProjectEvents={onProjectEvents}
+          onRemount={onGardenRemount}
           onMemory={rememberInteraction}
           onBusyChange={setInteractionBusy}
+          findRequest={findRequest?.scope === findScope ? findRequest : null}
         />
       </section>
 
-      <JourneyJournal state={journey} view={gardenView} busy={interactionBusy} onSimulate={simulateAchievement}
+      <JourneyJournal state={journey} view={gardenView} busy={interactionBusy} project={visibleProject} onMaterials={simulateMaterials} onSimulate={simulateAchievement} onPreviewCommunity={previewCommunity}
+        onFindResident={(id) => {
+          setFindRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1, scope: findScope }));
+          document.getElementById('garden')?.focus({ preventScroll: true });
+        }}
         onView={(view) => { if (view === 'now' || !interactionBusy) setGardenView(view); }} onReturn={returnLater} onChoice={() => { setPendingChoice(null); setChoiceOpen(true); }}
         onPrivacy={() => setVisitPreviewOpen(true)} onRestart={restartPrototype} />
 
