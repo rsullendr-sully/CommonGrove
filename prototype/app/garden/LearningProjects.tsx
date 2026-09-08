@@ -8,7 +8,7 @@ import type { ProjectDirective } from './projectScheduler';
 import PlanterProject, { ProjectTool } from './PlanterProject';
 import { PLANTER_LAYOUT } from './planterLayout';
 import type { ResidentId } from './residents';
-import ToolRackProject from './ToolRackProject';
+import ToolRackProject, { toolRackStoredPose, type RestingToolPose } from './ToolRackProject';
 
 export type ReusableToolInstance =
   | { tool: 'mallet' | 'can'; kind: 'resting'; anchor: GardenPoint }
@@ -29,6 +29,15 @@ export function reusableToolInstances(
   });
 }
 
+export function restingToolPose(tool: 'mallet' | 'can', anchor: GardenPoint): RestingToolPose {
+  const rack = PROJECT_LAYOUTS['tool-rack'];
+  const atRack = Math.hypot(anchor.x - rack.center.x, anchor.z - rack.center.z) <= rack.radius;
+  return atRack ? toolRackStoredPose(tool) : {
+    elevation: tool === 'mallet' ? .2 : .17,
+    rotation: [0, 0, 0],
+  };
+}
+
 export type LearningProjectsProps = {
   progress: ProjectsProgress;
   directives: Partial<Record<ResidentId, ProjectDirective>>;
@@ -41,11 +50,13 @@ export default function LearningProjects({ progress, directives, toolAnchors }: 
   return <group name="learning-projects">
     <PlanterProject progress={progress} layout={PLANTER_LAYOUT} directives={directives} />
     <ToolRackProject state={progress.projects['tool-rack']} layout={PROJECT_LAYOUTS['tool-rack']} />
-    {tools.flatMap(instance => instance.kind === 'resting' ? [
-      <group key={instance.tool} name={`resting-${instance.tool}`}
-        position={groundGardenPosition(instance.anchor.x, instance.anchor.z, instance.tool === 'mallet' ? .2 : .17)}>
+    {tools.flatMap(instance => {
+      if (instance.kind !== 'resting') return [];
+      const pose = restingToolPose(instance.tool, instance.anchor);
+      return [<group key={instance.tool} name={`resting-${instance.tool}`}
+        position={groundGardenPosition(instance.anchor.x, instance.anchor.z, pose.elevation)} rotation={pose.rotation}>
         <ProjectTool kind={instance.tool} />
-      </group>,
-    ] : [])}
+      </group>];
+    })}
   </group>;
 }

@@ -3,7 +3,7 @@
 import { CraftedWoodMaterial, SoftBoxGeometry } from './CraftedGeometry';
 import { groundGardenPosition } from './gardenElevation';
 import { PROJECT_RECIPES } from './projectDefinitions';
-import type { ProjectLayout } from './projectLayout';
+import type { ProjectLayout, ReusableTool } from './projectLayout';
 import type { ProjectState } from './projectProgress';
 import { useProjectWoodTexture } from './PlanterProject';
 
@@ -21,6 +21,18 @@ const TOOL_RACK_REVEALS: Record<string, ToolRackPart> = {
 export function toolRackParts(completedSteps: number): readonly ToolRackPart[] {
   return PROJECT_RECIPES['tool-rack'].slice(0, Math.max(0, completedSteps))
     .flatMap(step => TOOL_RACK_REVEALS[step.reveal] ? [TOOL_RACK_REVEALS[step.reveal]] : []);
+}
+
+export type RestingToolPose = {
+  elevation: number;
+  rotation: readonly [number, number, number];
+};
+
+/** Poses hang each tool from the matching completed-rack hook, clear of its base. */
+export function toolRackStoredPose(tool: ReusableTool): RestingToolPose {
+  return tool === 'mallet'
+    ? { elevation: .755, rotation: [0, 0, .08] }
+    : { elevation: .672, rotation: [0, Math.PI, 0] };
 }
 
 function JointPeg({ position, rotation = [Math.PI / 2, 0, 0] }: { position: [number, number, number]; rotation?: [number, number, number] }) {

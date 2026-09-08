@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createProjectsProgress } from './projectProgress';
 import type { ProjectDirective } from './projectScheduler';
-import { reusableToolInstances } from './LearningProjects';
+import { restingToolPose, reusableToolInstances } from './LearningProjects';
 
 const anchors = {
   mallet: { x: -15.2, z: -3.15 },
@@ -44,5 +44,13 @@ describe('shared project tool presentation', () => {
     expect(reusableToolInstances(progress, {}, anchors)).toEqual([]);
     progress.projects.planter.supplies = 'available';
     expect(reusableToolInstances(progress, {}, undefined)).toEqual([]);
+  });
+
+  it('keeps basket tools low while actual rack anchors select hanging poses', () => {
+    expect(restingToolPose('mallet', anchors.mallet)).toEqual({ elevation: .2, rotation: [0, 0, 0] });
+    expect(restingToolPose('can', anchors.can)).toEqual({ elevation: .17, rotation: [0, 0, 0] });
+
+    expect(restingToolPose('mallet', { x: -16.25, z: 1.5 }).elevation).toBeGreaterThan(.33);
+    expect(restingToolPose('can', { x: -15.75, z: 1.5 }).elevation).toBeGreaterThan(.3);
   });
 });
