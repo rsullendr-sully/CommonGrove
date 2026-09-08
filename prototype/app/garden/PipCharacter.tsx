@@ -93,9 +93,13 @@ export default function PipCharacter({ pose, project, appearance = RESIDENTS[0].
   const headHeight = .42;
   const eyes = shape === 'pebblekin' ? .118 : .112;
   useFrame(({ clock }, delta) => {
-    const work = project ? projectMotion(project) : { lean: 0, tap: 0, tilt: 0 };
+    const work = project ? projectMotion(project) : {
+      lean: 0, tap: 0, tilt: 0, fitRotation: 0, settle: 0, reach: 0, contact: false,
+    };
     if (projectAttachment.current) {
-      projectAttachment.current.rotation.x = -work.tap;
+      projectAttachment.current.position.y = work.settle;
+      projectAttachment.current.position.z = .065 + work.reach;
+      projectAttachment.current.rotation.x = work.fitRotation - work.tap - (work.contact && project?.action === 'tap' ? .16 : 0);
       projectAttachment.current.rotation.z = work.tilt;
     }
     const walking = pose.walkDistance !== undefined;

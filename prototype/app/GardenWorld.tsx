@@ -25,10 +25,8 @@ import type { GardenChoice } from './garden/rewardState';
 import { residentLookAngles, type FindResidentRequest } from './garden/findResident';
 import { createGardenMountHandshake } from './garden/gardenSession';
 import type { ProjectEvent, ProjectsProgress } from './garden/projectProgress';
-import { projectPlanter } from './garden/planterProgress';
 import type { ProjectId } from './garden/projectDefinitions';
-import PlanterProject from './garden/PlanterProject';
-import { PLANTER_LAYOUT } from './garden/planterLayout';
+import LearningProjects from './garden/LearningProjects';
 import type { ProjectDirective } from './garden/projectScheduler';
 
 type WorldJourney = ResidentJourney & { profiles: Record<ResidentId, PipJourneyProfile> };
@@ -203,7 +201,7 @@ function InteractionTargetTracker({ registrations, onTargetChange, republishSequ
   return null;
 }
 
-function PlanterProjectScene({ community, progress }: { community: GardenCommunity; progress: ProjectsProgress }) {
+function LearningProjectsScene({ community, progress }: { community: GardenCommunity; progress: ProjectsProgress }) {
   const [directives, setDirectives] = useState<Partial<Record<ResidentId, ProjectDirective>>>({});
   const presentationKey = useRef('');
   const [toolAnchors, setToolAnchors] = useState(() => community.projectRuntime?.toolAnchors);
@@ -223,7 +221,7 @@ function PlanterProjectScene({ community, progress }: { community: GardenCommuni
     }
   }, -.4);
   const supplied = Object.values(progress.projects).some(p => p.supplies !== 'absent');
-  return <PlanterProject progress={projectPlanter(progress)} layout={PLANTER_LAYOUT} directives={directives} toolAnchors={supplied ? toolAnchors : undefined} />;
+  return <LearningProjects progress={progress} directives={directives} toolAnchors={supplied ? toolAnchors : undefined} />;
 }
 
 type ResidentSlotProps = {
@@ -410,7 +408,7 @@ export default function GardenWorld({ journey, project, projection, demoResident
       <CommunityCoordinator community={community} roster={roster} actors={refs} player={player} focused={eligibleTarget}
         priorities={priorities} comparing={journey.comparing} reducedMotion={reducedMotion}
         project={project} projection={projection} activated={activated} onActivities={onActivities} epoch={projectMount.acknowledgedEpoch(projectEpoch)} onProjectEvents={emitProjectEvents} />
-      <PlanterProjectScene community={community} progress={projection} />
+      <LearningProjectsScene community={community} progress={projection} />
       <GardenEnvironment journey={journey} rewardStage={rewardStage} starflowersVisible={starflowersVisible} pavilionImproved={pavilionImproved}
         seedVisible={seedVisible} destinationVisible={destinationVisible} reducedMotion={reducedMotion} />
       <GardenSnack ref={food} position={objectPositions.food} carried={interaction.held === 'food'} />

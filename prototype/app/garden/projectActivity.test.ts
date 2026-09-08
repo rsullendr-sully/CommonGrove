@@ -7,14 +7,31 @@ import { GARDEN_OBSTACLES } from './navigation';
 const directive: ProjectDirective = { key: 'work:1', actor: 'pip', action: 'tap', tool: 'mallet', elapsed: .25,
   project: 'planter', step: 1, ability: 'B2', phase: 'perform', target: { x: 2, z: 12 }, lookAt: { x: 3, z: 12 } };
 describe('project acting', () => {
+  it('approaching never animates fastening', () => {
+    const motion = projectMotion({ action: 'tap', tool: 'mallet', elapsed: 1,
+      performing: false, reducedMotion: false });
+    expect(motion.tap).toBe(0);
+  });
+  it('uses a settling rotation for fitting and a separate strike for tapping', () => {
+    const fit = projectMotion({ action: 'fit', tool: 'piece', elapsed: .25,
+      performing: true, reducedMotion: false });
+    const tap = projectMotion({ action: 'tap', tool: 'mallet', elapsed: .25,
+      performing: true, reducedMotion: false });
+    expect(fit.fitRotation).toBeGreaterThan(0);
+    expect(fit.settle).toBeGreaterThan(0);
+    expect(fit.tap).toBe(0);
+    expect(tap.tap).toBeGreaterThan(0);
+    expect(tap.fitRotation).toBe(0);
+  });
   it('keeps reduced-motion tool use readable without rhythmic taps', () => {
     const a = projectMotion(projectVisual(directive, true));
     expect(a.tap).toBe(0);
     expect(a.lean).toBeGreaterThan(0);
+    expect(a.contact).toBe(true);
     expect(projectMotion(projectVisual({ ...directive, elapsed: 100 }, true))).toEqual(a);
   });
   it('keeps carrying gait free of the stationary work pose', () => {
-    expect(projectMotion(projectVisual({ ...directive, phase: 'approach' }, false))).toEqual({ lean: 0, tap: 0, tilt: 0 });
+    expect(projectMotion(projectVisual({ ...directive, phase: 'approach' }, false))).toMatchObject({ lean: 0, tap: 0, tilt: 0, contact: false });
     expect(projectMotion(projectVisual(directive, false)).tap).toBeGreaterThan(0);
     expect(projectMotion(projectVisual({ ...directive, action: 'water', tool: 'can' }, true)).tilt).toBeGreaterThan(0);
   });

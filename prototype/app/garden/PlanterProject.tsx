@@ -6,42 +6,48 @@ import * as THREE from 'three';
 import { CraftedWoodMaterial, SoftBoxGeometry } from './CraftedGeometry';
 import { groundGardenPosition } from './gardenElevation';
 import { GARDEN_TEXTURE_PATHS, prepareGardenTexture } from './gardenSurface';
+import { PROJECT_RECIPES } from './projectDefinitions';
+import type { ProjectsProgress } from './projectProgress';
 import type { ProjectDirective } from './projectScheduler';
 import { type PlanterLayout } from './planterLayout';
-import type { BuildStage, PlanterProjection } from './planterProgress';
-import type { GardenPoint } from './navigation';
 import type { ResidentId } from './residents';
 
-export type PlanterPart = 'base' | 'frame' | 'soil' | 'sprouts';
+export type PlanterPart = 'base' | 'base-fasteners' | 'frame' | 'frame-fasteners' | 'soil' | 'sprouts';
 export type BasketItem = NonNullable<ProjectDirective['tool']>;
 
-const PLANTER_PARTS: Record<BuildStage, readonly PlanterPart[]> = {
-  empty: [],
-  base: ['base'],
-  frame: ['base', 'frame'],
-  soil: ['base', 'frame', 'soil'],
-  planted: ['base', 'frame', 'soil', 'sprouts'],
+/** Shared authored-project wood treatment; each caller owns and disposes its clone. */
+export function useProjectWoodTexture() {
+  const source = useLoader(THREE.TextureLoader, GARDEN_TEXTURE_PATHS.wood);
+  const texture = useMemo(() => prepareGardenTexture(source.clone(), 'wood'), [source]);
+  useEffect(() => () => texture.dispose(), [texture]);
+  return texture;
+}
+
+const PLANTER_REVEALS: Record<string, PlanterPart> = {
+  'planter-base-seated': 'base',
+  'planter-base-fastened': 'base-fasteners',
+  'planter-frame-seated': 'frame',
+  'planter-frame-fastened': 'frame-fasteners',
+  'planter-soil-filled': 'soil',
+  'planter-seeds-planted': 'sprouts',
 };
 
-export function planterParts(stage: BuildStage): readonly PlanterPart[] {
-  return PLANTER_PARTS[stage];
+export function planterParts(completedSteps: number): readonly PlanterPart[] {
+  return PROJECT_RECIPES.planter.slice(0, Math.max(0, completedSteps))
+    .flatMap(step => PLANTER_REVEALS[step.reveal] ? [PLANTER_REVEALS[step.reveal]] : []);
 }
 
 export function basketItems(
-  progress: PlanterProjection,
+  progress: ProjectsProgress,
   directives: Partial<Record<ResidentId, ProjectDirective>>,
 ): readonly BasketItem[] {
-  if (progress.supplies === 'absent') return [];
-  const materials: BasketItem[] = progress.supplies === 'used'
-    ? []
-    : progress.supplies === 'available' || progress.stage === 'empty' || progress.stage === 'base'
-      ? ['piece', 'soil', 'seeds']
-      : progress.stage === 'frame'
-        ? ['soil', 'seeds']
-        : ['seeds'];
-  const claimed = new Set(Object.values(directives).flatMap(directive => directive?.tool ? [directive.tool] : []));
-  const items: BasketItem[] = [...materials, 'mallet', 'can'];
-  return items.filter(item => !claimed.has(item));
+  const remaining = (['planter', 'tool-rack'] as const).flatMap(project => {
+    const state = progress.projects[project];
+    return state.supplies === 'absent' || state.supplies === 'used'
+      ? [] : PROJECT_RECIPES[project].slice(state.completedSteps).map(step => step.tool);
+  });
+  const attached = new Set(Object.values(directives).flatMap(directive => directive?.tool ? [directive.tool] : []));
+  return (['piece', 'soil', 'seeds'] as const).filter(item => remaining.includes(item) && !attached.has(item));
 }
 
 export function ProjectTool({ kind }: { kind: BasketItem }): React.JSX.Element {
@@ -89,8 +95,8 @@ function PictureBook({ texture }: { texture: THREE.Texture }) {
   </group>;
 }
 
-function SupplyBasket({ progress, directives, texture, separateTools }: { progress: PlanterProjection; directives: Partial<Record<ResidentId, ProjectDirective>>; texture: THREE.Texture; separateTools: boolean }) {
-  const items = basketItems(progress, directives).filter(item => !separateTools || (item !== 'mallet' && item !== 'can'));
+function SupplyBasket({ progress, directives, texture }: { progress: ProjectsProgress; directives: Partial<Record<ResidentId, ProjectDirective>>; texture: THREE.Texture }) {
+  const items = basketItems(progress, directives);
   const positions: Record<BasketItem, readonly [number, number, number]> = {
     piece: [-.19, .23, -.11], soil: [0, .22, .08], seeds: [.2, .23, .1],
     mallet: [.19, .2, -.12], can: [-.2, .22, .1],
@@ -103,13 +109,26 @@ function SupplyBasket({ progress, directives, texture, separateTools }: { progre
   </group>;
 }
 
-function PlanterBed({ stage, texture }: { stage: BuildStage; texture: THREE.Texture }) {
-  const parts = planterParts(stage);
-  return <group name={`shared-planter-${stage}`}>
+function Fastener({ position, rotation = [Math.PI / 2, 0, 0] }: { position: readonly [number, number, number]; rotation?: readonly [number, number, number] }) {
+  return <mesh position={position} rotation={rotation} castShadow>
+    <cylinderGeometry args={[.026, .026, .026, 10]} />
+    <meshStandardMaterial color="#8c6e4d" roughness={.82} metalness={.04} />
+  </mesh>;
+}
+
+function PlanterBed({ completedSteps, texture }: { completedSteps: number; texture: THREE.Texture }) {
+  const parts = planterParts(completedSteps);
+  return <group name={`shared-planter-step-${completedSteps}`}>
     {parts.includes('base') && <mesh position={[0, .07, 0]} castShadow><SoftBoxGeometry args={[1.2, .13, 1]} /><CraftedWoodMaterial map={texture} color="#b68e60" /></mesh>}
+    {parts.includes('base-fasteners') && <group name="planter-base-fasteners">
+      {[-1, 1].flatMap(x => [-1, 1].map(z => <Fastener key={`${x}:${z}`} position={[x * .48, .145, z * .38]} />))}
+    </group>}
     {parts.includes('frame') && <group name="planter-frame">
       {[-1, 1].map(side => <mesh key={'rail-' + side} position={[0, .28, side * .44]} castShadow><SoftBoxGeometry args={[1.2, .34, .12]} /><CraftedWoodMaterial map={texture} color="#c5aa82" /></mesh>)}
       {[-1, 1].map(side => <mesh key={'end-' + side} position={[side * .54, .28, 0]} castShadow><SoftBoxGeometry args={[.12, .34, .78]} /><CraftedWoodMaterial map={texture} color="#bda077" /></mesh>)}
+    </group>}
+    {parts.includes('frame-fasteners') && <group name="planter-frame-fasteners">
+      {[-1, 1].flatMap(x => [-1, 1].map(z => <Fastener key={`${x}:${z}`} position={[x * .54, .45, z * .44]} rotation={[0, 0, Math.PI / 2]} />))}
     </group>}
     {parts.includes('soil') && <mesh position={[0, .31, 0]} scale={[.5, .065, .36]} castShadow><sphereGeometry args={[1, 24, 14]} /><meshStandardMaterial color="#554536" roughness={1} /></mesh>}
     {parts.includes('sprouts') && <group name="planter-sprouts" position={[0, .39, 0]}>
@@ -121,24 +140,21 @@ function PlanterBed({ stage, texture }: { stage: BuildStage; texture: THREE.Text
   </group>;
 }
 
-export default function PlanterProject({ progress, layout, directives, toolAnchors }: {
-  progress: PlanterProjection;
+export default function PlanterProject({ progress, layout, directives }: {
+  progress: ProjectsProgress;
   layout: PlanterLayout;
-  toolAnchors?: Record<'mallet' | 'can', GardenPoint>;
   directives: Partial<Record<ResidentId, ProjectDirective>>;
 }): React.JSX.Element {
-  const source = useLoader(THREE.TextureLoader, GARDEN_TEXTURE_PATHS.wood);
-  const texture = useMemo(() => prepareGardenTexture(source.clone(), 'wood'), [source]);
-  useEffect(() => () => texture.dispose(), [texture]);
+  const texture = useProjectWoodTexture();
+  const planter = progress.projects.planter;
+  const supplied = Object.values(progress.projects).some(project => project.supplies !== 'absent');
   return <group name="shared-planter-project">
     {progress.book && <group position={groundGardenPosition(layout.book.x, layout.book.z, .23)}><PictureBook texture={texture} /></group>}
-    {progress.supplies !== 'absent' && <group position={groundGardenPosition(layout.basket.x, layout.basket.z, .01)} rotation={[0, -.18, 0]}>
-      <SupplyBasket progress={progress} directives={directives} texture={texture} separateTools={!!toolAnchors} />
+    {supplied && <group position={groundGardenPosition(layout.basket.x, layout.basket.z, .01)} rotation={[0, -.18, 0]}>
+      <SupplyBasket progress={progress} directives={directives} texture={texture} />
     </group>}
-    {toolAnchors && (['mallet', 'can'] as const).filter(tool => !Object.values(directives).some(d => d.tool === tool)).map(tool =>
-      <group key={tool} position={groundGardenPosition(toolAnchors[tool].x, toolAnchors[tool].z, .23)}><ProjectTool kind={tool} /></group>)}
-    {progress.stage !== 'empty' && <group position={groundGardenPosition(layout.planter.x, layout.planter.z, .01)} rotation={[0, .08, 0]}>
-      <PlanterBed stage={progress.stage} texture={texture} />
+    {planter.completedSteps > 0 && <group position={groundGardenPosition(layout.planter.x, layout.planter.z, .01)} rotation={[0, .08, 0]}>
+      <PlanterBed completedSteps={planter.completedSteps} texture={texture} />
     </group>}
   </group>;
 }
