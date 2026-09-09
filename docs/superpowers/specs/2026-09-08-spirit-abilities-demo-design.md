@@ -2,7 +2,7 @@
 
 Date: 2026-09-08
 
-Status: Owner selected the middle approach: reusable learning with authored projects, rather than disconnected demonstrations or an open-ended crafting simulation. This written design awaits review before implementation planning. None of the new abilities below is claimed implemented.
+Status: Owner selected the middle approach: reusable learning with authored projects, rather than disconnected demonstrations or an open-ended crafting simulation. The owner approved proceeding with the first milestone on 2026-09-08. Implementation planning follows this contract; later batches still require focused designs. None of the new abilities below is claimed implemented.
 
 ## Outcome and boundaries
 
@@ -169,4 +169,4 @@ Run focused catalog/reducer/coordinator/session/navigation tests, then the full 
 
 ## Review decision
 
-Review this design before writing the first milestone's implementation plan. The selected direction is approved; the detailed behavior and first milestone above are the proposed execution contract. After approval, plan the first milestone, implement it with verification, and use its results to refine subsequent batches.
+The first milestone is approved for implementation planning. Implement it with verification, then use its results to refine subsequent batches. Implementation, visual verification and owner acceptance remain separate gates.
